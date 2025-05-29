@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, DateTime, Float
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
@@ -7,6 +7,7 @@ from typing import List, Optional
 import datetime
 import os
 from fastapi.responses import HTMLResponse
+from starlette.responses import JSONResponse
 
 DB_NAME = os.getenv("DB_NAME", "roverrecipes")
 DB_PATH = f"/data/{DB_NAME}.db"
@@ -188,33 +189,92 @@ def listar_recetas():
     db.close()
     return resultado
 
+@app.get("/categorias")
+def listar_categorias():
+    db = SessionLocal()
+    categorias = db.query(Categoria).all()
+    resultado = [{"id": c.id, "nombre": c.nombre} for c in categorias]
+    db.close()
+    return resultado
+
 @app.post("/recetas")
-def crear_receta(
+async def crear_receta(
+    request: Request,
     nombre: str = Form(...),
     descripcion: str = Form(""),
-    categoria_id: int = Form(None),
-    foto_principal: UploadFile = File(None)
+    categoria_id: str = Form(None),
+    foto_principal: UploadFile = File(None),
+    ingredientes: list[str] = Form([]),
+    unidades: list[str] = Form([]),
+    cantidades: list[str] = Form([]),
+    pasos: list[str] = Form([]),
+    fotos_pasos: list[UploadFile] = File([])
 ):
     db = SessionLocal()
     try:
+        # Guardar foto principal
         filename = None
         if foto_principal:
             filename = f"fotos/{datetime.datetime.utcnow().timestamp()}_{foto_principal.filename}"
+            os.makedirs(os.path.dirname(f"/app/app/{filename}"), exist_ok=True)
             with open(f"/app/app/{filename}", "wb") as f:
-                f.write(foto_principal.file.read())
+                f.write(await foto_principal.read())
+        # Convertir categoria_id
+        cat_id = int(categoria_id) if categoria_id and categoria_id.isdigit() else None
+        # Crear receta
         receta = Receta(
             nombre=nombre,
             descripcion=descripcion,
-            categoria_id=categoria_id,
+            categoria_id=cat_id,
             foto_principal=filename
         )
         db.add(receta)
         db.commit()
         db.refresh(receta)
-        return {"id": receta.id, "nombre": receta.nombre}
-    except SQLAlchemyError as e:
+        # Guardar ingredientes
+        for i, ing in enumerate(ingredientes):
+            if not ing.strip():
+                continue
+            unidad = unidades[i] if i < len(unidades) else ""
+            cantidad = cantidades[i] if i < len(cantidades) else "0"
+            # Buscar o crear ingrediente
+            ingrediente = db.query(Ingrediente).filter_by(nombre=ing.strip()).first()
+            if not ingrediente:
+                ingrediente = Ingrediente(nombre=ing.strip(), unidad=unidad)
+                db.add(ingrediente)
+                db.commit()
+                db.refresh(ingrediente)
+            # Relación RecetaIngrediente
+            receta_ingrediente = RecetaIngrediente(
+                receta_id=receta.id,
+                ingrediente_id=ingrediente.id,
+                cantidad=float(cantidad or 0)
+            )
+            db.add(receta_ingrediente)
+        # Guardar pasos
+        for i, paso_desc in enumerate(pasos):
+            if not paso_desc.strip():
+                continue
+            foto_paso = None
+            if fotos_pasos and i < len(fotos_pasos):
+                file = fotos_pasos[i]
+                if file and file.filename:
+                    foto_paso = f"fotos/pasos/{datetime.datetime.utcnow().timestamp()}_{file.filename}"
+                    os.makedirs(os.path.dirname(f"/app/app/{foto_paso}"), exist_ok=True)
+                    with open(f"/app/app/{foto_paso}", "wb") as f:
+                        f.write(await file.read())
+            paso = Paso(
+                receta_id=receta.id,
+                paso_numero=i+1,
+                descripcion=paso_desc.strip(),
+                foto=foto_paso
+            )
+            db.add(paso)
+        db.commit()
+        return JSONResponse({"success": True, "id": receta.id})
+    except Exception as e:
         db.rollback()
-        return {"error": str(e)}
+        return JSONResponse({"success": False, "error": str(e)})
     finally:
         db.close()
 
@@ -222,11 +282,11 @@ def crear_receta(
 def create_page():
     return '''
     <!DOCTYPE html>
-    <html lang="en">
+    <html lang="es">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Create Recipe</title>
+        <title>Crear Receta</title>
         <style>
             body { background: #f9f6f7; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; }
             .navbar { background: #fff; box-shadow: 0 2px 8px #eee; display: flex; align-items: center; padding: 0 2em; height: 60px; }
@@ -237,83 +297,150 @@ def create_page():
             h2 { margin-top: 2em; color: #222; }
             form { background: #fff; border-radius: 1em; box-shadow: 0 2px 8px #eee; padding: 2em; }
             input, textarea, select { width: 100%; padding: 0.5em; margin-top: 0.5em; margin-bottom: 1em; border: 1px solid #ddd; border-radius: 0.5em; }
-            button { background: #222; color: #fff; padding: 0.7em 1.5em; border: none; border-radius: 0.5em; cursor: pointer; transition: background 0.3s; }
-            button:hover { background: #444; }
+            button, .btn { background: #222; color: #fff; padding: 0.7em 1.5em; border: none; border-radius: 0.5em; cursor: pointer; transition: background 0.3s; margin-top: 1em; }
+            button:hover, .btn:hover { background: #444; }
+            .success, .error { padding: 1em; border-radius: 0.5em; margin-bottom: 1em; }
+            .success { background: #d4edda; color: #155724; }
+            .error { background: #f8d7da; color: #721c24; }
+            .ingredient, .step { display: flex; gap: 0.5em; margin-bottom: 0.5em; }
+            .ingredient input { flex: 1; }
+            .step textarea { flex: 2; }
+            .step input[type="file"] { flex: 1; }
         </style>
     </head>
     <body>
         <div class="navbar">
             <span class="logo">🍲 RecipeBox</span>
             <nav>
-                <a href="/">Home</a>
-                <a href="#">Explore</a>
-                <a href="/create">Create</a>
+                <a href="/">Inicio</a>
+                <a href="#">Explorar</a>
+                <a href="/create">Crear</a>
             </nav>
             <span style="margin-left:auto;"></span>
         </div>
         <div class="container">
-            <h2>Create a New Recipe</h2>
-            <form action="/recetas" method="post" enctype="multipart/form-data">
-                <label for="nombre">Recipe Name</label>
+            <h2>Crear una nueva receta</h2>
+            <div id="msg"></div>
+            <form id="recipeForm" enctype="multipart/form-data">
+                <label for="nombre">Nombre de la receta</label>
                 <input type="text" id="nombre" name="nombre" required>
 
-                <label for="descripcion">Description</label>
+                <label for="descripcion">Descripción</label>
                 <textarea id="descripcion" name="descripcion"></textarea>
 
-                <label for="categoria_id">Category</label>
+                <label for="categoria_id">Categoría</label>
                 <select id="categoria_id" name="categoria_id">
-                    <option value="">Select a category</option>
-                    <!-- Aquí se pueden agregar opciones dinámicamente desde la base de datos -->
+                    <option value="">Selecciona una categoría</option>
                 </select>
 
-                <label for="foto_principal">Main Photo</label>
+                <label for="foto_principal">Foto principal</label>
                 <input type="file" id="foto_principal" name="foto_principal" accept="image/*">
 
-                <h3>Ingredients</h3>
+                <h3>Ingredientes</h3>
                 <div id="ingredients">
                     <div class="ingredient">
-                        <input type="text" name="ingredientes[]" placeholder="Ingredient name">
-                        <input type="text" name="unidades[]" placeholder="Unit">
-                        <input type="number" name="cantidades[]" placeholder="Quantity" step="any">
+                        <input type="text" name="ingredientes" placeholder="Ingrediente">
+                        <input type="text" name="unidades" placeholder="Unidad">
+                        <input type="number" name="cantidades" placeholder="Cantidad" step="any">
+                        <button type="button" class="btn" onclick="removeIngredient(this)">Eliminar</button>
                     </div>
                 </div>
-                <button type="button" onclick="addIngredient()">Add Ingredient</button>
+                <button type="button" onclick="addIngredient()">Añadir ingrediente</button>
 
-                <h3>Steps</h3>
+                <h3>Paso a paso</h3>
                 <div id="steps">
                     <div class="step">
-                        <textarea name="pasos[]" placeholder="Step description"></textarea>
-                        <input type="file" name="fotos_pasos[]" accept="image/*">
+                        <textarea name="pasos" placeholder="Descripción del paso"></textarea>
+                        <input type="file" name="fotos_pasos" accept="image/*">
+                        <button type="button" class="btn" onclick="removeStep(this)">Eliminar</button>
                     </div>
                 </div>
-                <button type="button" onclick="addStep()">Add Step</button>
+                <button type="button" onclick="addStep()">Añadir paso</button>
 
-                <button type="submit">Save Recipe</button>
+                <button type="submit">Guardar receta</button>
             </form>
         </div>
         <script>
-            function addIngredient() {
-                const container = document.getElementById('ingredients');
-                const div = document.createElement('div');
-                div.className = 'ingredient';
-                div.innerHTML = `
-                    <input type="text" name="ingredientes[]" placeholder="Ingredient name">
-                    <input type="text" name="unidades[]" placeholder="Unit">
-                    <input type="number" name="cantidades[]" placeholder="Quantity" step="any">
-                `;
-                container.appendChild(div);
+        // Cargar categorías dinámicamente
+        fetch('/categorias').then(r=>r.json()).then(data=>{
+            const sel = document.getElementById('categoria_id');
+            data.forEach(cat=>{
+                const opt = document.createElement('option');
+                opt.value = cat.id;
+                opt.textContent = cat.nombre;
+                sel.appendChild(opt);
+            });
+        });
+        // Añadir/eliminar ingredientes
+        function addIngredient() {
+            const container = document.getElementById('ingredients');
+            const div = document.createElement('div');
+            div.className = 'ingredient';
+            div.innerHTML = `
+                <input type="text" name="ingredientes" placeholder="Ingrediente">
+                <input type="text" name="unidades" placeholder="Unidad">
+                <input type="number" name="cantidades" placeholder="Cantidad" step="any">
+                <button type="button" class="btn" onclick="removeIngredient(this)">Eliminar</button>
+            `;
+            container.appendChild(div);
+        }
+        function removeIngredient(btn) {
+            btn.parentElement.remove();
+        }
+        // Añadir/eliminar pasos
+        function addStep() {
+            const container = document.getElementById('steps');
+            const div = document.createElement('div');
+            div.className = 'step';
+            div.innerHTML = `
+                <textarea name="pasos" placeholder="Descripción del paso"></textarea>
+                <input type="file" name="fotos_pasos" accept="image/*">
+                <button type="button" class="btn" onclick="removeStep(this)">Eliminar</button>
+            `;
+            container.appendChild(div);
+        }
+        function removeStep(btn) {
+            btn.parentElement.remove();
+        }
+        // Enviar formulario por AJAX
+        document.getElementById('recipeForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const form = e.target;
+            const data = new FormData();
+            data.append('nombre', form.nombre.value);
+            data.append('descripcion', form.descripcion.value);
+            data.append('categoria_id', form.categoria_id.value);
+            if(form.foto_principal.files[0]) data.append('foto_principal', form.foto_principal.files[0]);
+            // Ingredientes
+            form.querySelectorAll('.ingredient').forEach(div=>{
+                data.append('ingredientes', div.querySelector('input[name="ingredientes"]').value);
+                data.append('unidades', div.querySelector('input[name="unidades"]').value);
+                data.append('cantidades', div.querySelector('input[name="cantidades"]').value);
+            });
+            // Pasos
+            form.querySelectorAll('.step').forEach(div=>{
+                data.append('pasos', div.querySelector('textarea[name="pasos"]').value);
+                if(div.querySelector('input[name="fotos_pasos"]').files[0])
+                    data.append('fotos_pasos', div.querySelector('input[name="fotos_pasos"]').files[0]);
+                else
+                    data.append('fotos_pasos', new Blob());
+            });
+            // Enviar
+            const msg = document.getElementById('msg');
+            msg.innerHTML = '';
+            try {
+                const resp = await fetch('/recetas', {method:'POST', body:data});
+                const res = await resp.json();
+                if(res.success) {
+                    msg.innerHTML = '<div class="success">¡Receta creada con éxito!</div>';
+                    setTimeout(()=>{ window.location.href = '/'; }, 1500);
+                } else {
+                    msg.innerHTML = '<div class="error">Error: '+res.error+'</div>';
+                }
+            } catch(err) {
+                msg.innerHTML = '<div class="error">Error: '+err+'</div>';
             }
-
-            function addStep() {
-                const container = document.getElementById('steps');
-                const div = document.createElement('div');
-                div.className = 'step';
-                div.innerHTML = `
-                    <textarea name="pasos[]" placeholder="Step description"></textarea>
-                    <input type="file" name="fotos_pasos[]" accept="image/*">
-                `;
-                container.appendChild(div);
-            }
+        }
         </script>
     </body>
     </html>
