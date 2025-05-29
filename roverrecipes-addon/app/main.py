@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Optional
 import datetime
 import os
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 
 DB_NAME = os.getenv("DB_NAME", "roverrecipes")
 DB_PATH = f"/data/{DB_NAME}.db"
@@ -74,9 +74,18 @@ class Paso(Base):
 Base.metadata.create_all(bind=engine)
 
 # ENDPOINTS BÁSICOS
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 def root():
-    return RedirectResponse(url="/recetas")
+    return """
+    <html>
+        <head><title>Rover Recipes Addon</title></head>
+        <body style='font-family:sans-serif;text-align:center;margin-top:50px;'>
+            <h1>🍲 Rover Recipes Addon</h1>
+            <p>¡Bienvenido!<br>Haz clic abajo para ver las recetas.</p>
+            <a href='/recetas' style='font-size:1.5em;color:#2196f3;'>Ver recetas</a>
+        </body>
+    </html>
+    """
 
 @app.get("/recetas")
 def listar_recetas():
