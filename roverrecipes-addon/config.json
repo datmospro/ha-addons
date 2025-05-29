@@ -27,5 +27,5 @@
     "ports": {
         "8000/tcp": 8000
     },
-    "image": "local/roverrecipes-addon-{arch}"
+    "build": true
 }
