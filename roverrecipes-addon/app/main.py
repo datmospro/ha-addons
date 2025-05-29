@@ -216,4 +216,105 @@ def crear_receta(
         db.rollback()
         return {"error": str(e)}
     finally:
-        db.close() 
+        db.close()
+
+@app.get("/create", response_class=HTMLResponse)
+def create_page():
+    return '''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Create Recipe</title>
+        <style>
+            body { background: #f9f6f7; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; }
+            .navbar { background: #fff; box-shadow: 0 2px 8px #eee; display: flex; align-items: center; padding: 0 2em; height: 60px; }
+            .navbar .logo { font-weight: bold; font-size: 1.3em; color: #222; margin-right: 2em; }
+            .navbar nav { flex: 1; }
+            .navbar nav a { margin: 0 1em; color: #444; text-decoration: none; font-weight: 500; }
+            .container { max-width: 1100px; margin: 2em auto; padding: 0 1em; }
+            h2 { margin-top: 2em; color: #222; }
+            form { background: #fff; border-radius: 1em; box-shadow: 0 2px 8px #eee; padding: 2em; }
+            input, textarea, select { width: 100%; padding: 0.5em; margin-top: 0.5em; margin-bottom: 1em; border: 1px solid #ddd; border-radius: 0.5em; }
+            button { background: #222; color: #fff; padding: 0.7em 1.5em; border: none; border-radius: 0.5em; cursor: pointer; transition: background 0.3s; }
+            button:hover { background: #444; }
+        </style>
+    </head>
+    <body>
+        <div class="navbar">
+            <span class="logo">🍲 RecipeBox</span>
+            <nav>
+                <a href="/">Home</a>
+                <a href="#">Explore</a>
+                <a href="/create">Create</a>
+            </nav>
+            <span style="margin-left:auto;"></span>
+        </div>
+        <div class="container">
+            <h2>Create a New Recipe</h2>
+            <form action="/recetas" method="post" enctype="multipart/form-data">
+                <label for="nombre">Recipe Name</label>
+                <input type="text" id="nombre" name="nombre" required>
+
+                <label for="descripcion">Description</label>
+                <textarea id="descripcion" name="descripcion"></textarea>
+
+                <label for="categoria_id">Category</label>
+                <select id="categoria_id" name="categoria_id">
+                    <option value="">Select a category</option>
+                    <!-- Aquí se pueden agregar opciones dinámicamente desde la base de datos -->
+                </select>
+
+                <label for="foto_principal">Main Photo</label>
+                <input type="file" id="foto_principal" name="foto_principal" accept="image/*">
+
+                <h3>Ingredients</h3>
+                <div id="ingredients">
+                    <div class="ingredient">
+                        <input type="text" name="ingredientes[]" placeholder="Ingredient name">
+                        <input type="text" name="unidades[]" placeholder="Unit">
+                        <input type="number" name="cantidades[]" placeholder="Quantity" step="any">
+                    </div>
+                </div>
+                <button type="button" onclick="addIngredient()">Add Ingredient</button>
+
+                <h3>Steps</h3>
+                <div id="steps">
+                    <div class="step">
+                        <textarea name="pasos[]" placeholder="Step description"></textarea>
+                        <input type="file" name="fotos_pasos[]" accept="image/*">
+                    </div>
+                </div>
+                <button type="button" onclick="addStep()">Add Step</button>
+
+                <button type="submit">Save Recipe</button>
+            </form>
+        </div>
+        <script>
+            function addIngredient() {
+                const container = document.getElementById('ingredients');
+                const div = document.createElement('div');
+                div.className = 'ingredient';
+                div.innerHTML = `
+                    <input type="text" name="ingredientes[]" placeholder="Ingredient name">
+                    <input type="text" name="unidades[]" placeholder="Unit">
+                    <input type="number" name="cantidades[]" placeholder="Quantity" step="any">
+                `;
+                container.appendChild(div);
+            }
+
+            function addStep() {
+                const container = document.getElementById('steps');
+                const div = document.createElement('div');
+                div.className = 'step';
+                div.innerHTML = `
+                    <textarea name="pasos[]" placeholder="Step description"></textarea>
+                    <input type="file" name="fotos_pasos[]" accept="image/*">
+                `;
+                container.appendChild(div);
+            }
+        </script>
+    </body>
+    </html>
+    ''' 
