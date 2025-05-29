@@ -8,6 +8,7 @@ import datetime
 import os
 from fastapi.responses import HTMLResponse
 from starlette.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 DB_NAME = os.getenv("DB_NAME", "roverrecipes")
 DB_PATH = f"/data/{DB_NAME}.db"
@@ -26,6 +27,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Montar la carpeta de archivos estáticos (frontend compilado)
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 # MODELOS DE BASE DE DATOS
 class Categoria(Base):
@@ -172,7 +176,15 @@ def root():
     </html>
     '''
 
-@app.get("/recetas")
+@app.get("/api/categorias")
+def listar_categorias():
+    db = SessionLocal()
+    categorias = db.query(Categoria).all()
+    resultado = [{"id": c.id, "nombre": c.nombre} for c in categorias]
+    db.close()
+    return resultado
+
+@app.get("/api/recetas")
 def listar_recetas():
     db = SessionLocal()
     recetas = db.query(Receta).all()
@@ -189,15 +201,7 @@ def listar_recetas():
     db.close()
     return resultado
 
-@app.get("/categorias")
-def listar_categorias():
-    db = SessionLocal()
-    categorias = db.query(Categoria).all()
-    resultado = [{"id": c.id, "nombre": c.nombre} for c in categorias]
-    db.close()
-    return resultado
-
-@app.post("/recetas")
+@app.post("/api/recetas")
 async def crear_receta(
     request: Request,
     nombre: str = Form(...),
@@ -429,7 +433,7 @@ def create_page():
             const msg = document.getElementById('msg');
             msg.innerHTML = '';
             try {
-                const resp = await fetch('/recetas', {method:'POST', body:data});
+                const resp = await fetch('/api/recetas', {method:'POST', body:data});
                 const res = await resp.json();
                 if(res.success) {
                     msg.innerHTML = '<div class="success">¡Receta creada con éxito!</div>';
