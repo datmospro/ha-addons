@@ -73,6 +73,10 @@ class Paso(Base):
 Base.metadata.create_all(bind=engine)
 
 # ENDPOINTS BÁSICOS
+@app.get("/")
+def root():
+    return {"mensaje": "¡Bienvenido a Rover Recipes Addon! Usa /recetas para ver las recetas."}
+
 @app.get("/recetas")
 def listar_recetas():
     db = SessionLocal()
