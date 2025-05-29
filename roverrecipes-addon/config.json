@@ -11,8 +11,8 @@
     "host_network": true,
     "options": {
         "db_name": "roverrecipes",
-        "db_user": "admin",
-        "db_password": "admin123",
+        "db_user": "datmos",
+        "db_password": "datmos222",
         "db_host": "mariadb",
         "db_port": 3306
     },
