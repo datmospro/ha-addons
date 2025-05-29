@@ -7,14 +7,11 @@ from typing import List, Optional
 import datetime
 import os
 
-DB_USER = os.getenv("DB_USER", "datmos")
-DB_PASS = os.getenv("DB_PASS", "datmos222")
-DB_HOST = os.getenv("DB_HOST", "mariadb")
 DB_NAME = os.getenv("DB_NAME", "roverrecipes")
+DB_PATH = f"/data/{DB_NAME}.db"
+DATABASE_URL = f"sqlite:///{DB_PATH}"
 
-DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}/{DB_NAME}"
-
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
