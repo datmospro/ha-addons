@@ -12,12 +12,16 @@
     "options": {
         "db_name": "roverrecipes",
         "db_user": "admin",
-        "db_password": "admin123"
+        "db_password": "admin123",
+        "db_host": "mariadb",
+        "db_port": 3306
     },
     "schema": {
         "db_name": "str",
         "db_user": "str",
-        "db_password": "str"
+        "db_password": "str",
+        "db_host": "str",
+        "db_port": "int"
     },
     "arch": [
         "amd64",
