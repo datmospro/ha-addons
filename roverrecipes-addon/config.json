@@ -1,0 +1,26 @@
+{
+    "name": "Rover Recipes",
+    "version": "0.1.0",
+    "slug": "roverrecipes",
+    "description": "Centro de recetas de cocina integrado con MariaDB.",
+    "startup": "services",
+    "boot": "auto",
+    "ingress": true,
+    "panel_icon": "mdi:food",
+    "panel_title": "Recetas",
+    "host_network": true,
+    "options": {},
+    "schema": {},
+    "arch": [
+        "amd64",
+        "aarch64",
+        "armv7"
+    ],
+    "init": false,
+    "map": [
+        "config:rw"
+    ],
+    "ports": {
+        "8000/tcp": 8000
+    }
+}
