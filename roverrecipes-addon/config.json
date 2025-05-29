@@ -1,16 +1,24 @@
 {
-    "name": "Rover Recipes",
-    "version": "0.1.0",
-    "slug": "roverrecipes",
-    "description": "Centro de recetas de cocina integrado con MariaDB.",
+    "name": "Rover Recipes Addon",
+    "version": "1.0.0",
+    "slug": "roverrecipes_addon",
+    "description": "Addon para gestionar recetas.",
     "startup": "services",
     "boot": "auto",
     "ingress": true,
     "panel_icon": "mdi:food",
     "panel_title": "Recetas",
     "host_network": true,
-    "options": {},
-    "schema": {},
+    "options": {
+        "db_name": "roverrecipes",
+        "db_user": "admin",
+        "db_password": "admin123"
+    },
+    "schema": {
+        "db_name": "str",
+        "db_user": "str",
+        "db_password": "str"
+    },
     "arch": [
         "amd64",
         "aarch64",
@@ -22,5 +30,6 @@
     ],
     "ports": {
         "8000/tcp": 8000
-    }
+    },
+    "image": "local/roverrecipes-addon-{arch}"
 }
