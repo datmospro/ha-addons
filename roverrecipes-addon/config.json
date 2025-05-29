@@ -5,7 +5,7 @@
     "description": "Addon para gestionar recetas.",
     "startup": "services",
     "boot": "auto",
-    "ingress": true,
+    "ingress": false,
     "panel_icon": "mdi:food",
     "panel_title": "Recetas",
     "host_network": true,
