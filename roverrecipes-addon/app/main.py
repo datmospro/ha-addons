@@ -29,6 +29,7 @@ app.add_middleware(
 )
 
 # Montar la carpeta de archivos estáticos (frontend compilado)
+# FastAPI servirá desde la carpeta 'static' que está al mismo nivel que main.py dentro del contenedor
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 # MODELOS DE BASE DE DATOS
