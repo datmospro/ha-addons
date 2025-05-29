@@ -76,16 +76,100 @@ Base.metadata.create_all(bind=engine)
 # ENDPOINTS BÁSICOS
 @app.get("/", response_class=HTMLResponse)
 def root():
-    return """
-    <html>
-        <head><title>Rover Recipes Addon</title></head>
-        <body style='font-family:sans-serif;text-align:center;margin-top:50px;'>
-            <h1>🍲 Rover Recipes Addon</h1>
-            <p>¡Bienvenido!<br>Haz clic abajo para ver las recetas.</p>
-            <a href='/recetas' style='font-size:1.5em;color:#2196f3;'>Ver recetas</a>
-        </body>
+    return '''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Rover Recipes Addon</title>
+        <style>
+            body { background: #f9f6f7; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; }
+            .navbar { background: #fff; box-shadow: 0 2px 8px #eee; display: flex; align-items: center; padding: 0 2em; height: 60px; }
+            .navbar .logo { font-weight: bold; font-size: 1.3em; color: #222; margin-right: 2em; }
+            .navbar nav { flex: 1; }
+            .navbar nav a { margin: 0 1em; color: #444; text-decoration: none; font-weight: 500; }
+            .navbar .search { background: #f3eaea; border-radius: 1.5em; padding: 0.5em 1em; border: none; width: 250px; margin-right: 2em; }
+            .container { max-width: 1100px; margin: 2em auto; padding: 0 1em; }
+            h2 { margin-top: 2em; color: #222; }
+            .featured, .categories { display: flex; gap: 1.5em; flex-wrap: wrap; }
+            .featured-recipe, .category-card { background: #fff; border-radius: 1em; box-shadow: 0 2px 8px #eee; overflow: hidden; width: 220px; transition: transform 0.2s; }
+            .featured-recipe:hover, .category-card:hover { transform: translateY(-5px) scale(1.03); }
+            .featured-recipe img, .category-card img { width: 100%; height: 140px; object-fit: cover; }
+            .featured-recipe .info, .category-card .info { padding: 1em; }
+            .featured-recipe .title { font-size: 1.1em; font-weight: bold; margin-bottom: 0.3em; }
+            .featured-recipe .desc { color: #888; font-size: 0.95em; }
+            .category-card .title { font-size: 1em; font-weight: 500; margin-top: 0.5em; }
+            @media (max-width: 900px) { .featured, .categories { flex-direction: column; align-items: center; } }
+        </style>
+    </head>
+    <body>
+        <div class="navbar">
+            <span class="logo">🍲 RecipeBox</span>
+            <nav>
+                <a href="/">Home</a>
+                <a href="#">Explore</a>
+                <a href="#">Create</a>
+            </nav>
+            <input class="search" type="text" placeholder="Search for recipes" />
+            <span style="margin-left:auto;"></span>
+        </div>
+        <div class="container">
+            <h2>Featured Recipes</h2>
+            <div class="featured">
+                <div class="featured-recipe">
+                    <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80" alt="Classic Tomato Pasta" />
+                    <div class="info">
+                        <div class="title">Classic Tomato Pasta</div>
+                        <div class="desc">A simple and delicious pasta dish</div>
+                    </div>
+                </div>
+                <div class="featured-recipe">
+                    <img src="https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=400&q=80" alt="Grilled Salmon with Roasted Vegetables" />
+                    <div class="info">
+                        <div class="title">Grilled Salmon with Roasted Vegetables</div>
+                        <div class="desc">Healthy and flavorful grilled salmon</div>
+                    </div>
+                </div>
+                <div class="featured-recipe">
+                    <img src="https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=400&q=80" alt="Decadent Chocolate Cake" />
+                    <div class="info">
+                        <div class="title">Decadent Chocolate Cake</div>
+                        <div class="desc">Rich and moist chocolate cake</div>
+                    </div>
+                </div>
+            </div>
+            <h2>Categories</h2>
+            <div class="categories">
+                <div class="category-card">
+                    <img src="https://images.unsplash.com/photo-1502741338009-cac2772e18bc?auto=format&fit=crop&w=400&q=80" alt="Italian" />
+                    <div class="info"><div class="title">Italian</div></div>
+                </div>
+                <div class="category-card">
+                    <img src="https://images.unsplash.com/photo-1464306076886-debca5e8a6b0?auto=format&fit=crop&w=400&q=80" alt="Seafood" />
+                    <div class="info"><div class="title">Seafood</div></div>
+                </div>
+                <div class="category-card">
+                    <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80" alt="Desserts" />
+                    <div class="info"><div class="title">Desserts</div></div>
+                </div>
+                <div class="category-card">
+                    <img src="https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=400&q=80" alt="Vegetarian" />
+                    <div class="info"><div class="title">Vegetarian</div></div>
+                </div>
+                <div class="category-card">
+                    <img src="https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=400&q=80" alt="Quick & Easy" />
+                    <div class="info"><div class="title">Quick & Easy</div></div>
+                </div>
+                <div class="category-card">
+                    <img src="https://images.unsplash.com/photo-1464306076886-debca5e8a6b0?auto=format&fit=crop&w=400&q=80" alt="Healthy" />
+                    <div class="info"><div class="title">Healthy</div></div>
+                </div>
+            </div>
+        </div>
+    </body>
     </html>
-    """
+    '''
 
 @app.get("/recetas")
 def listar_recetas():
