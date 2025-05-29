@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Optional
 import datetime
 import os
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 
 DB_NAME = os.getenv("DB_NAME", "roverrecipes")
 DB_PATH = f"/data/{DB_NAME}.db"
@@ -93,8 +93,8 @@ def root():
             .container { max-width: 1100px; margin: 2em auto; padding: 0 1em; }
             h2 { margin-top: 2em; color: #222; }
             .featured, .categories { display: flex; gap: 1.5em; flex-wrap: wrap; }
-            .featured-recipe, .category-card { background: #fff; border-radius: 1em; box-shadow: 0 2px 8px #eee; overflow: hidden; width: 220px; transition: transform 0.2s; }
-            .featured-recipe:hover, .category-card:hover { transform: translateY(-5px) scale(1.03); }
+            .featured-recipe, .category-card { background: #fff; border-radius: 1em; box-shadow: 0 2px 8px #eee; overflow: hidden; width: 220px; transition: transform 0.2s; cursor: pointer; text-decoration: none; color: inherit; }
+            .featured-recipe:hover, .category-card:hover { transform: translateY(-5px) scale(1.03); box-shadow: 0 4px 16px #ddd; }
             .featured-recipe img, .category-card img { width: 100%; height: 140px; object-fit: cover; }
             .featured-recipe .info, .category-card .info { padding: 1em; }
             .featured-recipe .title { font-size: 1.1em; font-weight: bold; margin-bottom: 0.3em; }
@@ -117,54 +117,54 @@ def root():
         <div class="container">
             <h2>Featured Recipes</h2>
             <div class="featured">
-                <div class="featured-recipe">
+                <a class="featured-recipe" href="/recetas/1">
                     <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80" alt="Classic Tomato Pasta" />
                     <div class="info">
                         <div class="title">Classic Tomato Pasta</div>
                         <div class="desc">A simple and delicious pasta dish</div>
                     </div>
-                </div>
-                <div class="featured-recipe">
+                </a>
+                <a class="featured-recipe" href="/recetas/2">
                     <img src="https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=400&q=80" alt="Grilled Salmon with Roasted Vegetables" />
                     <div class="info">
                         <div class="title">Grilled Salmon with Roasted Vegetables</div>
                         <div class="desc">Healthy and flavorful grilled salmon</div>
                     </div>
-                </div>
-                <div class="featured-recipe">
-                    <img src="https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=400&q=80" alt="Decadent Chocolate Cake" />
+                </a>
+                <a class="featured-recipe" href="/recetas/3">
+                    <img src="https://images.unsplash.com/photo-1505250469679-203ad9ced0cb?auto=format&fit=crop&w=400&q=80" alt="Decadent Chocolate Cake" />
                     <div class="info">
                         <div class="title">Decadent Chocolate Cake</div>
                         <div class="desc">Rich and moist chocolate cake</div>
                     </div>
-                </div>
+                </a>
             </div>
             <h2>Categories</h2>
             <div class="categories">
-                <div class="category-card">
+                <a class="category-card" href="/categorias/italian">
                     <img src="https://images.unsplash.com/photo-1502741338009-cac2772e18bc?auto=format&fit=crop&w=400&q=80" alt="Italian" />
                     <div class="info"><div class="title">Italian</div></div>
-                </div>
-                <div class="category-card">
+                </a>
+                <a class="category-card" href="/categorias/seafood">
                     <img src="https://images.unsplash.com/photo-1464306076886-debca5e8a6b0?auto=format&fit=crop&w=400&q=80" alt="Seafood" />
                     <div class="info"><div class="title">Seafood</div></div>
-                </div>
-                <div class="category-card">
+                </a>
+                <a class="category-card" href="/categorias/desserts">
                     <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80" alt="Desserts" />
                     <div class="info"><div class="title">Desserts</div></div>
-                </div>
-                <div class="category-card">
-                    <img src="https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=400&q=80" alt="Vegetarian" />
+                </a>
+                <a class="category-card" href="/categorias/vegetarian">
+                    <img src="https://images.unsplash.com/photo-1464306076886-debca5e8a6b0?auto=format&fit=crop&w=400&q=80" alt="Vegetarian" />
                     <div class="info"><div class="title">Vegetarian</div></div>
-                </div>
-                <div class="category-card">
-                    <img src="https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=400&q=80" alt="Quick & Easy" />
+                </a>
+                <a class="category-card" href="/categorias/quick-easy">
+                    <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80" alt="Quick & Easy" />
                     <div class="info"><div class="title">Quick & Easy</div></div>
-                </div>
-                <div class="category-card">
-                    <img src="https://images.unsplash.com/photo-1464306076886-debca5e8a6b0?auto=format&fit=crop&w=400&q=80" alt="Healthy" />
+                </a>
+                <a class="category-card" href="/categorias/healthy">
+                    <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80" alt="Healthy" />
                     <div class="info"><div class="title">Healthy</div></div>
-                </div>
+                </a>
             </div>
         </div>
     </body>
