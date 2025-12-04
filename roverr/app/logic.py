@@ -498,6 +498,19 @@ def sync_movies(torrents, api_key):
                     
                     # Create DB Entry with complete metadata
                     if not Movie.select().where(Movie.torrent_hash == t['hash']).exists():
+                        # Determine initial status based on torrent state (instead of hardcoded 'pending')
+                        state = t['state']
+                        if state in ['metaDL', 'allocating', 'queuedDL']:
+                            initial_status = 'new'
+                        elif state in ['downloading', 'forceDL', 'stalledDL', 'pausedDL']:
+                            initial_status = 'downloading'
+                        elif state in ['uploading', 'pausedUP', 'queuedUP', 'stalledUP', 'completed', 'checkingUP', 'checkingDL']:
+                            initial_status = 'pending'
+                        elif state in ['error', 'missingFiles']:
+                            initial_status = 'error'
+                        else:
+                            initial_status = 'pending'  # Fallback
+                        
                         Movie.create(
                             torrent_hash=t['hash'],
                             title=metadata.get('title', title),
@@ -510,7 +523,7 @@ def sync_movies(torrents, api_key):
                             state=t['state'],
                             progress=t['progress'],
                             size=t['size'],
-                            status='pending',
+                            status=initial_status,  # Use intelligent status based on torrent state
                             cast=metadata.get('cast'), # Already JSON string
                             crew=metadata.get('crew'), # Already JSON string
                             vote_average=metadata.get('vote_average'),
@@ -2551,7 +2564,9 @@ def fetch_rss_movies(limit=30):
                                         existing_movie.metadata_updated_at = datetime.now()
                                         existing_movie.torrent_name = torrent_name
                                         
-                                        # Keep the current status since sync_movies determines it based on torrent state
+                                        # Override status to 'new' - this was just auto-downloaded from RSS
+                                        # Fixes race condition where sync_movies assigns incorrect 'pending' status
+                                        existing_movie.status = 'new'
                                         
                                         existing_movie.save()
                                         logger.info(f"Successfully updated existing movie '{title}' ({year}) with RSS metadata")
