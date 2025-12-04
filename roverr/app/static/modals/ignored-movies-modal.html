@@ -1,0 +1,24 @@
+<!-- Ignored Movies Modal -->
+<div id="ignored-movies-modal" class="modal-backdrop">
+    <div class="modal-dialog" style="max-width: 800px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Ignored Movies</h3>
+        </div>
+        <div style="padding: 1rem; border-bottom: 1px solid var(--border);">
+            <input type="text" id="ignored-movies-search" placeholder="Search movies..."
+                style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-secondary); color: var(--text);">
+        </div>
+        <div class="modal-body">
+            <div id="ignored-movies-loading" style="display: none; text-align: center; padding: 2rem;">
+                <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem;"></i>
+                <p style="margin-top: 1rem;">Loading ignored movies...</p>
+            </div>
+            <div id="ignored-movies-list" style="max-height: 500px; overflow-y: auto;">
+                <!-- Ignored movies will be injected here -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="ignored-movies-close-btn" class="btn secondary">Close</button>
+        </div>
+    </div>
+</div>

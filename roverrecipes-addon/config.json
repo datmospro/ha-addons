@@ -1,0 +1,31 @@
+{
+    "name": "Rover Recipes Addon",
+    "version": "1.0.0",
+    "slug": "roverrecipes_addon",
+    "description": "Addon para gestionar recetas.",
+    "startup": "services",
+    "boot": "auto",
+    "ingress": false,
+    "panel_icon": "mdi:food",
+    "panel_title": "Recetas",
+    "host_network": true,
+    "options": {
+        "db_name": "roverrecipes"
+    },
+    "schema": {
+        "db_name": "str"
+    },
+    "arch": [
+        "amd64",
+        "aarch64",
+        "armv7"
+    ],
+    "init": false,
+    "map": [
+        "config:rw"
+    ],
+    "ports": {
+        "8000/tcp": 8000
+    },
+    "build": true
+}

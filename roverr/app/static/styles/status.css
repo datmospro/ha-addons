@@ -1,0 +1,156 @@
+/* ===================================
+   STATUS BADGES
+   Status Badges and Overlays
+   =================================== */
+
+/* ========== Dashboard Status Badges ========== */
+.status-badge {
+    padding: 0.25rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-moved {
+    background-color: rgba(34, 197, 94, 0.2);
+    color: var(--success);
+}
+
+.status-pending {
+    background-color: rgba(234, 179, 8, 0.2);
+    color: var(--warning);
+}
+
+.status-error {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: var(--error);
+}
+
+.status-skipped {
+    background-color: rgba(148, 163, 184, 0.2);
+    color: var(--text-secondary);
+}
+
+/* ========== Overlay Status Badges (on movie cards) ========== */
+.overlay-status {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: white;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.overlay-status.moved {
+    background-color: rgba(34, 197, 94, 0.9);
+}
+
+.overlay-status.pending {
+    background-color: rgba(234, 179, 8, 0.9);
+}
+
+.overlay-status.error {
+    background-color: rgba(239, 68, 68, 0.9);
+}
+
+.overlay-status.skipped {
+    background-color: rgba(148, 163, 184, 0.9);
+}
+
+.overlay-status.copying {
+    background-color: rgba(59, 130, 246, 0.9);
+}
+
+.overlay-status.missing {
+    background-color: rgba(249, 115, 22, 0.85);
+    /* Orange */
+    color: white;
+}
+
+.overlay-status.orphaned {
+    background-color: rgba(220, 38, 38, 0.9);
+    /* Red */
+    color: white;
+}
+
+.overlay-status.new {
+    background-color: rgba(6, 182, 212, 0.9);
+}
+
+.overlay-status.downloading {
+    background-color: rgba(99, 102, 241, 0.9);
+}
+
+/* ========== Detail View Status Badges ========== */
+.badge.status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    border: none !important;
+}
+
+.badge.status.moved {
+    background-color: rgba(34, 197, 94, 0.2);
+    color: var(--status-moved-text);
+}
+
+.badge.status.pending {
+    background-color: rgba(234, 179, 8, 0.2);
+    color: var(--status-pending-text);
+}
+
+.badge.status.error {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: var(--status-error-text);
+}
+
+.badge.status.skipped {
+    background-color: rgba(148, 163, 184, 0.2);
+    color: var(--status-skipped-text);
+}
+
+.badge.status.copying {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: var(--status-copying-text);
+}
+
+.badge.status.missing {
+    background-color: rgba(249, 115, 22, 0.2);
+    /* Orange */
+    color: #fdba74;
+}
+
+.badge.status.orphaned {
+    background-color: rgba(220, 38, 38, 0.2);
+    /* Red */
+    color: #fca5a5;
+}
+
+.badge.status.new {
+    background-color: rgba(6, 182, 212, 0.2);
+    color: var(--status-new-text);
+}
+
+.badge.status.downloading {
+    background-color: rgba(99, 102, 241, 0.2);
+    color: var(--status-downloading-text);
+}

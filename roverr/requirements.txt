@@ -1,0 +1,4 @@
+feedparser
+qbittorrent-api
+requests
+peewee

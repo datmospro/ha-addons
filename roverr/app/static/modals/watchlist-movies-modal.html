@@ -1,0 +1,20 @@
+<!-- Watchlist Movies Modal -->
+<div id="watchlist-movies-modal" class="modal-backdrop">
+    <div class="modal-dialog" style="max-width: 800px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Watchlist Movies</h3>
+        </div>
+        <div class="modal-body">
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                These movies are being monitored for correct file size from RSS feeds.
+            </p>
+            <div id="watchlist-movies-container"
+                style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 60vh; overflow-y: auto;">
+                <!-- Populated by JavaScript -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="watchlist-movies-close-btn" class="btn secondary">Close</button>
+        </div>
+    </div>
+</div>

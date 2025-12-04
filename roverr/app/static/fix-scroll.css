@@ -1,0 +1,29 @@
+/* CRITICAL FIX: Prevent horizontal scroll on entire page */
+body {
+    overflow-x: hidden !important;
+}
+
+.main-content {
+    overflow-x: hidden !important;
+}
+
+.movie-details-layout {
+    max-width: 100% !important;
+    overflow: hidden !important;
+}
+
+.movie-info-panel {
+    min-width: 0 !important;
+    overflow: hidden !important;
+}
+
+.cast-section,
+.crew-section {
+    overflow: hidden !important;
+}
+
+.cast-carousel {
+    width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+}

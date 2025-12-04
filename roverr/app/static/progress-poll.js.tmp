@@ -1,0 +1,75 @@
+// Real-time progress updates for movie details view
+let progressPollInterval = null;
+
+function startProgressPolling() {
+    // Clear any existing interval
+    if (progressPollInterval) {
+        clearInterval(progressPollInterval);
+    }
+    
+    // Poll every 2 seconds
+    progressPollInterval = setInterval(async () => {
+        // Only poll if we're on movie details view
+        const container = document.getElementById('movie-details-content');
+        if (!container || !container.getAttribute('data-hash')) {
+            stopProgressPolling();
+            return;
+        }
+        
+        const hash = container.getAttribute('data-hash');
+        
+        try {
+            const res = await fetch(`${API_BASE}/movie/${hash}`);
+            const movie = await res.json();
+            
+            if (movie.error) return;
+            
+            // Update ONLY the progress elements if copying
+            if (movie.copy_progress && movie.copy_progress.status === 'copying') {
+                updateProgressDisplay(movie.copy_progress);
+            } else if (movie.copy_progress && movie.copy_progress.status === 'completed') {
+                // Refresh the full view ONCE when completed
+                stopProgressPolling();
+                showMovieDetails(hash);
+            }
+            
+        } catch (e) {
+            console.error('Error polling progress:', e);
+        }
+    }, 2000);
+}
+
+function stopProgressPolling() {
+    if (progressPollInterval) {
+        clearInterval(progressPollInterval);
+        progressPollInterval = null;
+    }
+}
+
+function updateProgressDisplay(copyProgress) {
+    // Update percentage
+    const percentSpans = document.querySelectorAll('.details-progress-container .progress-info span:first-child');
+    percentSpans.forEach(span => {
+        if (span.textContent.includes('Copying...')) {
+            span.textContent = `Copying... ${copyProgress.percent}%`;
+        }
+    });
+    
+    // Update speed
+    const speedSpans = document.querySelectorAll('.details-progress-container .progress-info span:last-child');
+    speedSpans.forEach(span => {
+        if (span.textContent.includes('MB/s')) {
+            span.textContent = `${copyProgress.speed} MB/s`;
+        }
+    });
+    
+    // Update progress bar width
+    const progressBars = document.querySelectorAll('.details-progress-container .progress-bar .fill.copying');
+    progressBars.forEach(bar => {
+        bar.style.width = `${copyProgress.percent}%`;
+    });
+}
+
+// Export for use in showMovieDetails
+window.startProgressPolling = startProgressPolling;
+window.stopProgressPolling = stopProgressPolling;

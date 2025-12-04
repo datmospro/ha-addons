@@ -1,0 +1,66 @@
+<!-- Edit RSS Feed Modal -->
+<div id="edit-rss-modal" class="modal-backdrop">
+    <div class="modal-dialog" style="max-width: 900px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Edit RSS Feed</h3>
+        </div>
+        <div class="modal-body">
+            <div class="input-group">
+                <label>Name</label>
+                <input type="text" id="edit-rss-name" placeholder="Name">
+            </div>
+            <div class="checkbox-row">
+                <input type="checkbox" id="edit-rss-enabled">
+                <label for="edit-rss-enabled">Enabled</label>
+            </div>
+            <div class="checkbox-row">
+                <input type="checkbox" id="edit-rss-auto-add">
+                <label for="edit-rss-auto-add">Auto-download movies</label>
+            </div>
+
+            <!-- Auto-download Settings (Hidden by default) -->
+            <div id="edit-rss-auto-download-settings"
+                style="display: none; margin-top: 0.75rem; margin-bottom: 0.75rem; padding: 0.75rem; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border);">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label>Preferred Size (MB)</label>
+                        <input type="number" id="edit-rss-preferred-size" placeholder="e.g. 5000">
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label>Max Size (MB)</label>
+                        <input type="number" id="edit-rss-max-size" placeholder="e.g. 12000">
+                    </div>
+                </div>
+                <small style="color: var(--text-muted); display: block; margin-top: 0.5rem;">
+                    Will download torrent closest to Preferred Size, up to Max Size.
+                </small>
+            </div>
+
+            <div class="checkbox-row">
+                <input type="checkbox" id="edit-rss-auto-copy">
+                <label for="edit-rss-auto-copy">Auto-copy to destination when download completes</label>
+            </div>
+
+            <div class="input-group">
+                <label>Label/Tag</label>
+                <input type="text" id="edit-rss-label" placeholder="Label">
+            </div>
+            <div class="input-group">
+                <label>Refresh Interval (seconds)</label>
+                <input type="number" id="edit-rss-interval" min="60">
+            </div>
+            <div class="input-group">
+                <label>RSS URL</label>
+                <input type="url" id="edit-rss-url" placeholder="URL">
+            </div>
+        </div>
+        <div class="modal-footer" style="justify-content: space-between;">
+            <button id="edit-rss-test-btn" class="btn warning"><i class="fa-solid fa-plug"></i>
+                Test</button>
+            <div style="display: flex; gap: 0.5rem;">
+                <button id="edit-rss-cancel-btn" class="btn secondary">Cancel</button>
+                <button id="edit-rss-save-btn" class="btn primary">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
