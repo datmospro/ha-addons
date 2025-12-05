@@ -340,6 +340,9 @@ def sync_movies(torrents, api_key):
             if movie.ignored:
                 continue
 
+            # CAPTURE OLD STATUS BEFORE ANY MODIFICATIONS (Critical for download completion detection)
+            old_status = movie.status
+
             # Update dynamic fields
             movie.progress = t['progress']
             movie.state = t['state']
@@ -403,9 +406,7 @@ def sync_movies(torrents, api_key):
                         else:
                             movie.status = 'pending' # Default fallback
             
-            # Check for status change from downloading to pending (download completed)
-            old_status = Movie.get_or_none(Movie.torrent_hash == t['hash']).status if movie.id else None
-            
+            # Save changes
             movie.save()
             
             # AUTO-COPY: Trigger copy if download just completed and RSS feed has auto_copy enabled
