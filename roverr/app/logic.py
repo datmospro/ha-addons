@@ -418,8 +418,6 @@ def sync_movies(torrents, api_key):
                 (old_status == 'new' and movie.status in ['pending', 'uploading', 'completed', 'queuedUP', 'stalledUP'])
             )
             
-            logger.info(f"DEBUG {movie.title}: old={old_status}, new={movie.status}, completed={download_completed}")
-            
             if download_completed:
                 logger.info(f"Movie '{movie.title}' download completed, checking auto-copy...")
                 
