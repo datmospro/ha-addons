@@ -409,10 +409,16 @@ def sync_movies(torrents, api_key):
             # Save changes
             movie.save()
             
-            # AUTO-COPY: Trigger copy if download just completed and RSS feed has auto_copy enabled
-            # Expanded to detect multiple final states (not just 'pending') for better reliability
-            download_completed = (old_status == 'downloading' and 
-                                movie.status in ['pending', 'uploading', 'completed', 'queuedUP', 'stalledUP'])
+            # AUTO-COPY: Trigger copy if download just completed
+            # Detect TWO scenarios:
+            # 1. Normal: 'downloading' → 'pending/uploading/completed' (slow downloads)
+            # 2. Fast: 'new' → 'pending/uploading/completed' (very fast downloads that skip 'downloading' state)
+            download_completed = (
+                (old_status == 'downloading' and movie.status in ['pending', 'uploading', 'completed', 'queuedUP', 'stalledUP']) or
+                (old_status == 'new' and movie.status in ['pending', 'uploading', 'completed', 'queuedUP', 'stalledUP'])
+            )
+            
+            logger.info(f"DEBUG {movie.title}: old={old_status}, new={movie.status}, completed={download_completed}")
             
             if download_completed:
                 logger.info(f"Movie '{movie.title}' download completed, checking auto-copy...")
