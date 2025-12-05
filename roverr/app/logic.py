@@ -1611,19 +1611,32 @@ def process_torrents(config_ignored=None):
     logger.info("Starting torrent check (Scheduler)...")
     
     try:
-        # Get active torrents (needed for sync_movies)
-        torrents = get_active_torrents(None)
-        
-        # Run the exact same logic as the Web UI
-        # This handles:
-        # 1. Updating movie status
-        # 2. Sending "Download Complete" notifications
-        # 3. Triggering auto-copy based on RSS tags/settings
-        api_key = settings.get('tmdb_api_key')
-        sync_movies(torrents, api_key)
-        
+        qb = get_qb_client(settings)
+        qb.auth_log_in()
     except Exception as e:
-        logger.error(f"Error in process_torrents: {e}")
+        logger.error(f"Failed to connect to torrent client: {e}")
+        return
+
+    # Get ALL torrents
+    torrents = qb.torrents_info()
+    
+    # Convert to format expected by sync_movies
+    torrent_list = []
+    for t in torrents:
+        torrent_list.append({
+            'hash': t.hash,
+            'name': t.name,
+            'progress': t.progress,
+            'state': t.state,
+            'size': t.size,
+            'tags': t.tags if hasattr(t, 'tags') else '',
+            'category': t.category if hasattr(t, 'category') else '',
+            'content_path': t.content_path if hasattr(t, 'content_path') else ''
+        })
+    
+    # Call sync_movies - this handles status updates + auto-copy detection
+    api_key = settings.get('tmdb_api_key')
+    sync_movies(torrent_list, api_key)
 
 def get_active_torrents(config_ignored=None):
     settings = load_settings()
