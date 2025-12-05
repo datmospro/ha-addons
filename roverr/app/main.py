@@ -19,7 +19,8 @@ async def scheduler():
         interval = settings.get('poll_interval', 5) * 60
         
         # Check if scheduler is enabled
-        if settings.get('enable_scheduler', False) and interval > 0:
+        # Check if scheduler is enabled - ALWAYS RUNNING NOW
+        if interval > 0:
             logger.info("Running scheduled check...")
             try:
                 process_torrents(None)
