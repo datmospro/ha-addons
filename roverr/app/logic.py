@@ -1709,8 +1709,17 @@ def manual_move(torrent_hash, config_ignored=None):
             return {"success": False, "message": "Torrent not found"}
             
         torrent = torrents[0]
-        process_single_torrent(qb, torrent, settings)
-        return {"success": True, "message": f"Started processing {torrent.name}"}
+        
+        # Run in background thread to avoid blocking API (Cloudflare 524 Fix)
+        def _move_thread():
+            try:
+                process_single_torrent(qb, torrent, settings)
+            except Exception as e:
+                logger.error(f"Error in background move thread: {e}")
+
+        threading.Thread(target=_move_thread).start()
+        
+        return {"success": True, "message": f"Started processing {torrent.name} in background"}
     except Exception as e:
         return {"success": False, "message": str(e)}
 
