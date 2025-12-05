@@ -9,7 +9,7 @@ import json
 import requests
 import hashlib
 from datetime import datetime
-from database import MoveHistory
+from database import MoveHistory, Movie
 
 # Configure Logging
 logging.basicConfig(
@@ -1607,24 +1607,22 @@ def get_qb_client(settings):
 def process_torrents(config_ignored=None):
     # We ignore the passed config now, use settings.json
     settings = load_settings()
-    logger.info("Starting torrent check...")
+    logger.info("Starting torrent check (Scheduler)...")
     
     try:
-        qb = get_qb_client(settings)
-        qb.auth_log_in()
+        # Get active torrents (needed for sync_movies)
+        torrents = get_active_torrents(None)
+        
+        # Run the exact same logic as the Web UI
+        # This handles:
+        # 1. Updating movie status
+        # 2. Sending "Download Complete" notifications
+        # 3. Triggering auto-copy based on RSS tags/settings
+        api_key = settings.get('tmdb_api_key')
+        sync_movies(torrents, api_key)
+        
     except Exception as e:
-        logger.error(f"Failed to connect to torrent client: {e}")
-        return
-
-    # Get completed torrents
-    torrents = qb.torrents_info(status_filter='completed')
-    
-    for torrent in torrents:
-        # Check if already processed
-        if MoveHistory.select().where(MoveHistory.torrent_name == torrent.name, MoveHistory.status == 'success').exists():
-            continue
-
-        process_single_torrent(qb, torrent, settings)
+        logger.error(f"Error in process_torrents: {e}")
 
 def get_active_torrents(config_ignored=None):
     settings = load_settings()
@@ -1796,6 +1794,17 @@ def process_single_torrent(qb, torrent, settings):
                 if settings.get('telegram_notify_on_move', True):
                     send_telegram_notification(f"🚀 <b>Movie Moved to Library</b>\n\n🎬 {title} ({year})\n📂 {dest_file}")
 
+                # Clear Watchlist if applicable
+                try:
+                    movie = Movie.get_or_none(Movie.torrent_hash == torrent.hash)
+                    if movie and movie.watchlist:
+                        movie.watchlist = False
+                        movie.watchlist_expiry = None
+                        movie.save()
+                        logger.info(f"Removed '{title}' ({year}) from watchlist after successful move")
+                except Exception as wl_err:
+                    logger.error(f"Error clearing watchlist for {title}: {wl_err}")
+
             else:
                 logger.info(f"File already exists: {dest_file}")
                 MoveHistory.create(torrent_name=torrent.name, status='skipped', message="Destination exists", source_path=source_path, dest_path=dest_file)
@@ -1830,6 +1839,17 @@ def process_single_torrent(qb, torrent, settings):
                 # Notify Telegram: Moved
                 if settings.get('telegram_notify_on_move', True):
                     send_telegram_notification(f"🚀 <b>Movie Moved to Library</b>\n\n🎬 {title} ({year})\n📂 {dest_dir}")
+
+                # Clear Watchlist if applicable
+                try:
+                    movie = Movie.get_or_none(Movie.torrent_hash == torrent.hash)
+                    if movie and movie.watchlist:
+                        movie.watchlist = False
+                        movie.watchlist_expiry = None
+                        movie.save()
+                        logger.info(f"Removed '{title}' ({year}) from watchlist after successful move")
+                except Exception as wl_err:
+                    logger.error(f"Error clearing watchlist for {title}: {wl_err}")
 
             else:
                 logger.warning(f"No video files found in {source_path}")
