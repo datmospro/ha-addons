@@ -1619,6 +1619,7 @@ def process_torrents(config_ignored=None):
 
     # Get ALL torrents
     torrents = qb.torrents_info()
+    logger.info(f"Found {len(torrents)} total torrents in client")
     
     # Convert to format expected by sync_movies
     torrent_list = []
@@ -1634,9 +1635,15 @@ def process_torrents(config_ignored=None):
             'content_path': t.content_path if hasattr(t, 'content_path') else ''
         })
     
+    logger.info(f"Converted {len(torrent_list)} torrents for sync_movies")
+    
     # Call sync_movies - this handles status updates + auto-copy detection
-    api_key = settings.get('tmdb_api_key')
-    sync_movies(torrent_list, api_key)
+    try:
+        api_key = settings.get('tmdb_api_key')
+        sync_movies(torrent_list, api_key)
+        logger.info("Sync_movies completed successfully")
+    except Exception as e:
+        logger.error(f"Error calling sync_movies: {e}", exc_info=True)
 
 def get_active_torrents(config_ignored=None):
     settings = load_settings()
