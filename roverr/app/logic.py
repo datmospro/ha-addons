@@ -418,6 +418,10 @@ def sync_movies(torrents, api_key):
                 (old_status == 'new' and movie.status in ['pending', 'uploading', 'completed', 'queuedUP', 'stalledUP'])
             )
             
+            # Selective debug logging ONLY for RSS movies (tagged with 'Roverr') to avoid log flooding
+            if 'Roverr' in t.get('tags', ''):
+                logger.info(f"RSS DEBUG [{movie.title}]: old={old_status}, new={movie.status}, completed={download_completed}")
+            
             if download_completed:
                 logger.info(f"Movie '{movie.title}' download completed, checking auto-copy...")
                 
