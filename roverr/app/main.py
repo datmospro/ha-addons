@@ -23,7 +23,8 @@ async def scheduler():
         if interval > 0:
             logger.info("Running scheduled check...")
             try:
-                process_torrents(None)
+                # Run in thread to avoid blocking the event loop (Web UI)
+                await asyncio.to_thread(process_torrents, None)
             except Exception as e:
                 logger.error(f"Error in scheduler: {e}")
         else:
