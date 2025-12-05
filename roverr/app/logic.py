@@ -2595,6 +2595,14 @@ def fetch_rss_movies(limit=30):
                                     torrent_name=torrent_name
                                 )
                                 logger.info(f"Created DB entry for auto-downloaded movie: {title} ({year})")
+                                
+                                # Notify Telegram: New Movie Found (RSS Auto-Download)
+                                settings = load_settings()
+                                if settings.get('telegram_notify_on_new_movie', True):
+                                    movie_title = metadata.get('title', title) if metadata else title
+                                    movie_year = metadata.get('year', year) if metadata else year
+                                    send_telegram_notification(f"🆕 <b>New Movie Found</b>\n\n🎬 {movie_title} ({movie_year})\n📥 Auto-downloaded from RSS.")
+                                
                             except Exception as create_error:
                                 # Handle race condition: sync_movies may have already created this entry
                                 if "UNIQUE constraint failed" in str(create_error):
