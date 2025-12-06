@@ -1145,7 +1145,8 @@ def get_movie_details(torrent_hash, api_key):
                         "imdb_id": movie.imdb_id,
                         "imdb_rating": movie.imdb_rating,
                         "imdb_votes": movie.imdb_votes,
-                        "genres": json.loads(movie.genres) if movie.genres else []
+                        "genres": json.loads(movie.genres) if movie.genres else [],
+                        "tmdb_id": movie.tmdb_id if hasattr(movie, 'tmdb_id') else None
                     }
                 
                 # For regular torrents, return with orphaned status
