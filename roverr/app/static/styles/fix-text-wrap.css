@@ -1,0 +1,74 @@
+/* CRITICAL FIX: Force text wrapping at all screen sizes */
+
+#view-movie-details {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+}
+
+#movie-details-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+}
+
+.movie-details-layout {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.movie-info-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+    box-sizing: border-box !important;
+}
+
+.movie-info-panel>* {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.synopsis {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
+
+.synopsis p {
+    width: 100% !important;
+    max-width: 100% !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important;
+    box-sizing: border-box !important;
+}
+
+.paths-box {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
+
+.path-item code {
+    width: 100% !important;
+    max-width: 100% !important;
+    word-break: break-all !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important;
+    box-sizing: border-box !important;
+}
+
+.ratings-section,
+.cast-section,
+.crew-section {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
