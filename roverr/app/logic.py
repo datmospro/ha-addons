@@ -1307,7 +1307,8 @@ def get_movie_details(torrent_hash, api_key):
                 "crew": crew,
                 "imdb_id": movie.imdb_id,
                 "imdb_rating": movie.imdb_rating,
-                "imdb_votes": movie.imdb_votes
+                "imdb_votes": movie.imdb_votes,
+                "tmdb_id": movie.tmdb_id if hasattr(movie, 'tmdb_id') else None
             }
         else:
             # No cache, fetch from TMDB
@@ -1347,7 +1348,8 @@ def get_movie_details(torrent_hash, api_key):
                     "crew": crew,
                     "imdb_id": metadata.get('imdb_id'),
                     "imdb_rating": metadata.get('imdb_rating'),
-                    "imdb_votes": metadata.get('imdb_votes')
+                    "imdb_votes": metadata.get('imdb_votes'),
+                    "tmdb_id": metadata.get('tmdb_id')
                 }
                 
                 # Update database with cached metadata
