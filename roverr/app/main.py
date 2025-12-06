@@ -434,6 +434,7 @@ def search_movies(q: str, tmdb_id: int = None):
     
     try:
         settings = load_settings()
+        logger.info(f"Search request: q='{q}', tmdb_id={tmdb_id}")
         results = search_indexers(q.strip(), settings, tmdb_id=tmdb_id)
         return {"success": True, "results": results, "count": len(results)}
     except Exception as e:
