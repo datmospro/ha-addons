@@ -758,6 +758,10 @@ function closeTrailerModal() {
     }
 }
 
+// Make functions globally accessible so they can be called from event listeners
+window.showTrailerModal = showTrailerModal;
+window.closeTrailerModal = closeTrailerModal;
+
 // Setup trailer modal event listeners
 document.addEventListener('DOMContentLoaded', () => {
     const trailerModal = document.getElementById('trailer-modal');
