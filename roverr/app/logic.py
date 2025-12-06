@@ -2318,6 +2318,138 @@ def test_indexer_connection(url, api_key):
         logger.error(f"Unexpected error testing indexer: {e}")
         return False, f"Unexpected error: {str(e)}"
 
+def calculate_title_similarity(title1, title2):
+    """
+    Calcula la similitud entre dos títulos de películas (0.0 a 1.0).
+    Normaliza los títulos eliminando puntuación y convirtiendo a minúsculas.
+    
+    Args:
+        title1: Primer título
+        title2: Segundo título
+    
+    Returns:
+        float: Similitud entre 0.0 (completamente diferente) y 1.0 (idéntico)
+    """
+    from difflib import SequenceMatcher
+    
+    def normalize(text):
+        # Eliminar puntuación y convertir a minúsculas
+        import re
+        text = re.sub(r'[^\w\s]', '', text.lower())
+        # Eliminar años
+        text = re.sub(r'\b\d{4}\b', '', text)
+        # Eliminar palabras comunes de calidad/release
+        text = re.sub(r'\b(bluray|bdrip|webrip|hdtv|1080p|720p|480p|x264|x265|hevc|aac|ac3|dd5|dts)\b', '', text, flags=re.IGNORECASE)
+        return text.strip()
+    
+    norm1 = normalize(title1)
+    norm2 = normalize(title2)
+    
+    if not norm1 or not norm2:
+        return 0.0
+    
+    return SequenceMatcher(None, norm1, norm2).ratio()
+
+
+def is_word_match(search_term, result_title):
+    """
+    Verifica si el término de búsqueda aparece como palabra completa en el título del resultado.
+    Esto previene que "Eli" coincida con "película" o "rebelión".
+    
+    Args:
+        search_term: Término buscado (ej: "Eli")
+        result_title: Título del resultado del indexer
+    
+    Returns:
+        bool: True si el término aparece como palabra completa
+    """
+    import re
+    # Buscar el término como palabra completa (con límites de palabra \b)
+    pattern = r'\b' + re.escape(search_term) + r'\b'
+    return bool(re.search(pattern, result_title, re.IGNORECASE))
+
+
+def filter_search_results(results, search_query, min_similarity=0.4):
+    """
+    Filtra resultados de búsqueda para eliminar coincidencias falsas.
+    
+    Para títulos cortos (<=4 caracteres), aplica validación estricta de palabra completa.
+    Para todos, aplica fuzzy matching para eliminar títulos muy diferentes.
+    
+    Args:
+        results: Lista de resultados de search_indexers
+        search_query: Query original de búsqueda (puede contener múltiples títulos separados por |)
+        min_similarity: Umbral mínimo de similitud (0.0 a 1.0)
+    
+    Returns:
+        Lista filtrada de resultados con campo '_similarity' añadido
+    """
+    if not results:
+        return []
+    
+    # Extraer títulos base del query (separados por |)
+    base_queries = [q.strip() for q in search_query.split('|') if q.strip()]
+    
+    filtered = []
+    
+    for result in results:
+        result_title = result.get('title', '')
+        if not result_title:
+            continue
+        
+        best_similarity = 0.0
+        matched_query = None
+        is_strict_match = False
+        
+        for base_query in base_queries:
+            # Para títulos muy cortos, verificar palabra completa
+            if len(base_query) <= 4:
+                if is_word_match(base_query, result_title):
+                    is_strict_match = True
+                    # Si es palabra completa, calcular similitud normalizada
+                    similarity = calculate_title_similarity(base_query, result_title)
+                    if similarity > best_similarity:
+                        best_similarity = similarity
+                        matched_query = base_query
+            else:
+                # Para títulos normales, usar fuzzy matching
+                similarity = calculate_title_similarity(base_query, result_title)
+                if similarity > best_similarity:
+                    best_similarity = similarity
+                    matched_query = base_query
+        
+        # Decidir si aceptar el resultado
+        accept = False
+        
+        # Para títulos cortos, REQUIERE palabra completa
+        if any(len(q) <= 4 for q in base_queries):
+            if is_strict_match and best_similarity >= min_similarity:
+                accept = True
+        else:
+            # Para títulos normales, solo similitud
+            if best_similarity >= min_similarity:
+                accept = True
+        
+        # También aceptar si el título empieza con el query
+        for query in base_queries:
+            if result_title.lower().startswith(query.lower()):
+                accept = True
+                best_similarity = max(best_similarity, 0.8)
+                break
+        
+        if accept:
+            result['_similarity'] = best_similarity
+            result['_matched_query'] = matched_query
+            filtered.append(result)
+    
+    # Ordenar por similitud (más similar primero)
+    filtered.sort(key=lambda x: x.get('_similarity', 0), reverse=True)
+    
+    logger.info(f"Filtered results: {len(results)} → {len(filtered)} (removed {len(results) - len(filtered)} false positives)")
+    
+    return filtered
+
+
 def search_indexers(query, settings, tmdb_id=None):
     """
     Search all configured indexers for movies matching the query.
@@ -2624,8 +2756,15 @@ def search_indexers(query, settings, tmdb_id=None):
         except Exception as fallback_err:
             logger.error(f"Error in English fallback: {fallback_err}")
     
-    logger.info(f"Total search results: {len(all_results)}")
+    logger.info(f"Total raw search results before filtering: {len(all_results)}")
+    
+    # FILTER RESULTS TO REMOVE FALSE POSITIVES
+    # This is critical for short titles like "Eli" which match "película", "rebelión", etc.
+    all_results = filter_search_results(all_results, query, min_similarity=0.4)
+    
+    logger.info(f"Total filtered search results: {len(all_results)}")
     return all_results
+
 
 
 def test_rss_feed(url):
