@@ -288,7 +288,6 @@ function renderMovieDetails(container, movie, hash) {
             `<button class="btn warning retry-move-btn" data-hash="${hash}"><i class="fa-solid fa-rotate-right"></i> Retry Move</button>` : ''}
                 <button class="btn secondary identify-btn" data-hash="${hash}"><i class="fa-solid fa-magnifying-glass"></i> Identify Manually</button>
                 <button class="btn secondary manual-search-btn" data-hash="${hash}"><i class="fa-solid fa-globe"></i> Manual Search</button>
-                <button class="btn secondary trailer-btn" data-hash="${hash}"><i class="fa-solid fa-play-circle"></i> Ver Tráiler</button>
                 <button class="btn danger delete-movie-btn" data-hash="${hash}"><i class="fa-solid fa-trash"></i> Remove from Dashboard</button>
             </div>
         </div>
@@ -299,6 +298,16 @@ function renderMovieDetails(container, movie, hash) {
             </div>
             <div class="movie-info-panel">
                 <h1>${escapeHtml(movie.title)} <span class="year">(${movie.year || 'N/A'})</span></h1>
+                
+                <button class="trailer-btn-content" data-hash="${hash}" title="Ver Tráiler">
+                    <div class="trailer-btn-icon">
+                        <i class="fa-solid fa-play"></i>
+                    </div>
+                    <div class="trailer-btn-text">
+                        <span class="trailer-btn-label">Ver Tráiler</span>
+                        <span class="trailer-btn-subtitle">YouTube</span>
+                    </div>
+                </button>
                 
                 <div class="meta-row">
                     <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
@@ -434,7 +443,7 @@ function setupMovieDetailsListeners(hash) {
         manualSearchBtn.addEventListener('click', () => handleManualSearch(hash));
     }
 
-    const trailerBtn = container.querySelector('.trailer-btn');
+    const trailerBtn = container.querySelector('.trailer-btn-content');
     if (trailerBtn) {
         trailerBtn.addEventListener('click', () => showTrailerModal(hash));
     }
