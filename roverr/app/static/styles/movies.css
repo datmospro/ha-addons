@@ -68,7 +68,7 @@
 /* ========== Movie Details Layout ========== */
 .movie-details-layout {
     display: grid;
-    grid-template-columns: 300px 1fr;
+    grid-template-columns: 300px minmax(0, 1fr);
     gap: 2rem;
     align-items: start;
     max-width: 100%;
@@ -124,6 +124,8 @@
     border-radius: 8px;
     padding: 1rem;
     margin-bottom: 2rem;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .path-item {
@@ -149,6 +151,11 @@
     font-family: monospace;
     font-size: 0.9rem;
     word-break: break-all;
+}
+
+.synopsis {
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .synopsis h3 {
