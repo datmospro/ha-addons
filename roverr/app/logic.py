@@ -128,6 +128,50 @@ def clean_torrent_name(name):
     title = base.replace('.', ' ').strip()
     return title, None
 
+def sanitize_path_component(name):
+    """
+    Sanitizes a path component to prevent path traversal attacks.
+    
+    Only removes security-critical characters:
+    - Path traversal sequences (..)
+    - Path separators (/ and \)
+    - Null bytes (\0)
+    
+    Preserves legitimate special characters like colons (:), hyphens (-), etc.
+    that are commonly part of movie titles.
+    
+    Args:
+        name: String to sanitize (e.g., movie title or year)
+    
+    Returns:
+        Sanitized string safe for use as a filesystem path component
+    
+    Examples:
+        "Vengadores: El despertar" -> "Vengadores: El despertar" (unchanged)
+        "../../etc/passwd" -> "_.._..._etc_passwd" (path traversal blocked)
+        "Movie/Bad/Path" -> "Movie_Bad_Path" (separators removed)
+    """
+    if not name:
+        return ""
+    
+    # 1. Remove path traversal sequences (replace each .. with _)
+    # This converts ../../etc to _.._..._etc
+    while '..' in name:
+        name = name.replace('..', '_', 1)  # Replace one at a time to avoid issues
+    
+    # 2. Remove path separators (prevent directory traversal)
+    name = name.replace('/', '_').replace('\\', '_')
+    
+    # 3. Remove null bytes (extremely dangerous)
+    name = name.replace('\0', '')
+    
+    # 4. Limit length (Windows has 255 char limit per path component)
+    # Leave margin for " (YYYY)" and file extension
+    if len(name) > 200:
+        name = name[:200].strip()
+    
+    return name.strip()
+
 def get_disk_free_space(path):
     """
     Returns available disk space in bytes for the filesystem containing path.
@@ -1985,8 +2029,13 @@ def process_single_torrent(qb, torrent, settings):
         MoveHistory.create(torrent_name=torrent.name, status='skipped', message="Invalid name format", source_path=source_path, dest_path="")
         return
 
-    title = match.group(1).strip()
-    year = match.group(2).strip()
+    # 4. Sanitize title and year to prevent path traversal attacks
+    title_raw = match.group(1).strip()
+    year_raw = match.group(2).strip()
+    
+    title = sanitize_path_component(title_raw)
+    year = sanitize_path_component(year_raw)
+    
     folder_name = f"{title} ({year})"
     
     # Destination Path
@@ -1996,6 +2045,30 @@ def process_single_torrent(qb, torrent, settings):
         return
 
     dest_dir = os.path.join(local_dest, folder_name)
+    
+    # 5. Security Check: Verify destination is within expected directory
+    # This prevents path traversal even if sanitization is bypassed
+    try:
+        dest_real = os.path.realpath(dest_dir)
+        local_real = os.path.realpath(local_dest)
+        
+        # Ensure dest_real starts with local_real (must be subdirectory)
+        if not dest_real.startswith(local_real + os.sep) and dest_real != local_real:
+            logger.error(f"SECURITY: Path traversal attempt detected! Torrent: {torrent.name}")
+            logger.error(f"  Expected base: {local_real}")
+            logger.error(f"  Attempted path: {dest_real}")
+            MoveHistory.create(
+                torrent_name=torrent.name,
+                status='error',
+                message="Path traversal attempt blocked by security check",
+                source_path=source_path,
+                dest_path=""
+            )
+            return
+    except Exception as e:
+        logger.error(f"Error in path security check: {e}")
+        return
+    
     logger.info(f"Destination directory: {dest_dir}")
     
     try:
