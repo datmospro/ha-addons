@@ -2372,6 +2372,124 @@ def search_indexers(query, settings, tmdb_id=None):
             logger.error(f"Error searching indexer {name}: {e}")
             continue
     
+    # FALLBACK TO ENGLISH IF NO RESULTS FOUND
+    # If search in tracker's language returned 0 results and we have TMDB ID,
+    # try searching with English title as fallback
+    if len(all_results) == 0 and tmdb_id:
+        logger.warning(f"No results found in tracker language(s). Trying English fallback...")
+        
+        try:
+            # Fetch English title from TMDB
+            tmdb_api_key = settings.get('tmdb_api_key')
+            english_titles = get_movie_titles_in_languages(tmdb_id, ['en-US'], tmdb_api_key)
+            
+            if english_titles and 'en-US' in english_titles:
+                english_title = english_titles['en-US']
+                logger.info(f"🇬🇧 English fallback title: '{english_title}'")
+                
+                # Generate variants for English title
+                english_variants = []
+                english_variants.append(english_title)
+                
+                # Remove punctuation variant
+                clean_english = re.sub(r'[:;,\-\–\—]', ' ', english_title)
+                clean_english = re.sub(r'\s+', ' ', clean_english).strip()
+                if clean_english != english_title:
+                    english_variants.append(clean_english)
+                
+                # Remove dots variant
+                no_dots_english = english_title.replace('.', ' ')
+                no_dots_english = re.sub(r'\s+', ' ', no_dots_english).strip()
+                if no_dots_english != english_title and no_dots_english not in english_variants:
+                    english_variants.append(no_dots_english)
+                
+                logger.info(f"Searching with English variants: {english_variants}")
+                
+                # Search again with English title
+                for indexer in indexers:
+                    try:
+                        name = indexer.get('name', 'Unknown')
+                        url = indexer.get('url', '').rstrip('/')
+                        api_key = indexer.get('api_key', '')
+                        categories = indexer.get('categories', '2000')
+                        
+                        if not url or not api_key:
+                            continue
+                        
+                        for variant in english_variants:
+                            try:
+                                params = {
+                                    't': 'movie',
+                                    'q': variant,
+                                    'apikey': api_key,
+                                    'cat': categories
+                                }
+                                
+                                logger.info(f"[English Fallback] Searching {name} for '{variant}'")
+                                response = requests.get(url, params=params, timeout=15)
+                                
+                                if response.status_code != 200:
+                                    continue
+                                
+                                root = ET.fromstring(response.content)
+                                
+                                for item in root.findall('.//item'):
+                                    try:
+                                        title_elem = item.find('title')
+                                        link_elem = item.find('link')
+                                        size_elem = item.find('size')
+                                        
+                                        download_url = link_elem.text if link_elem is not None else ''
+                                        title_text = title_elem.text if title_elem is not None else 'Unknown'
+                                        size = int(size_elem.text) if size_elem is not None and size_elem.text else 0
+                                        
+                                        item_signature = f"{title_text}_{size}"
+                                        
+                                        if download_url in seen_urls or item_signature in seen_items:
+                                            continue
+                                        
+                                        year = None
+                                        year_match = re.search(r'\((\d{4})\)|\s(\d{4})(?:\s|$)', title_text)
+                                        if year_match:
+                                            year = year_match.group(1) or year_match.group(2)
+                                        
+                                        result = {
+                                            'title': title_text,
+                                            'url': download_url,
+                                            'size': size,
+                                            'indexer': name,
+                                            'year': year
+                                        }
+                                        
+                                        all_results.append(result)
+                                        seen_urls.add(download_url)
+                                        seen_items.add(item_signature)
+                                        
+                                    except Exception as item_err:
+                                        logger.error(f"Error parsing item in English fallback: {item_err}")
+                                        continue
+                                
+                                # Log results found with this variant
+                                logger.info(f"Found {len([r for r in all_results if r['indexer'] == name])} results from {name} with English query '{variant}'")
+                                
+                            except Exception as variant_err:
+                                logger.error(f"Error searching variant '{variant}': {variant_err}")
+                                continue
+                                
+                    except Exception as indexer_err:
+                        logger.error(f"Error in English fallback for {name}: {indexer_err}")
+                        continue
+                
+                if all_results:
+                    logger.info(f"✅ English fallback successful: found {len(all_results)} results")
+                else:
+                    logger.warning(f"❌ English fallback also returned 0 results")
+            else:
+                logger.warning("Could not fetch English title from TMDB for fallback")
+                
+        except Exception as fallback_err:
+            logger.error(f"Error in English fallback: {fallback_err}")
+    
     logger.info(f"Total search results: {len(all_results)}")
     return all_results
 
