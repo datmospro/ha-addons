@@ -200,6 +200,35 @@ def get_movie_details_endpoint(torrent_hash: str):
             
     return details
 
+@app.get("/api/movie/{torrent_hash}/trailer")
+def get_movie_trailer_endpoint(torrent_hash: str):
+    """Get trailer information for a movie"""
+    from database import Movie
+    from logic import get_movie_videos
+    
+    settings = load_settings()
+    api_key = settings.get('tmdb_api_key')
+    
+    if not api_key:
+        return {"success": False, "message": "TMDB API key not configured"}
+    
+    try:
+        # Get movie from database to retrieve TMDB ID
+        movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
+        if not movie:
+            return {"success": False, "message": "Movie not found"}
+        
+        if not movie.tmdb_id:
+            return {"success": False, "message": "TMDB ID not available for this movie"}
+        
+        # Fetch trailer from TMDB
+        trailer_data = get_movie_videos(movie.tmdb_id, api_key)
+        return trailer_data
+        
+    except Exception as e:
+        logger.error(f"Error getting trailer: {e}")
+        return {"success": False, "message": str(e)}
+
 @app.post("/api/move/{torrent_hash}")
 def move_torrent_endpoint(torrent_hash: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(manual_move, torrent_hash)

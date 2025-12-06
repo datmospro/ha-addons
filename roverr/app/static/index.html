@@ -443,7 +443,24 @@
 
 </body>
 
-</html><!-- Watchlist Movies Modal -->
+</html><!-- Trailer Modal -->
+<div id="trailer-modal" class="modal-backdrop">
+    <div class="modal-dialog" style="max-width: 900px;">
+        <div class="modal-header">
+            <h3 class="modal-title" id="trailer-modal-title">Tráiler</h3>
+            <button class="modal-close-btn" id="trailer-modal-close-btn" aria-label="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 0;">
+            <div id="trailer-container" style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;">
+                <!-- YouTube iframe will be injected here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Watchlist Movies Modal -->
 <div id="watchlist-movies-modal" class="modal-backdrop">
     <div class="modal-dialog" style="max-width: 800px;">
         <div class="modal-header">

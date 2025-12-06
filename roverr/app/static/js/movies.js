@@ -288,6 +288,7 @@ function renderMovieDetails(container, movie, hash) {
             `<button class="btn warning retry-move-btn" data-hash="${hash}"><i class="fa-solid fa-rotate-right"></i> Retry Move</button>` : ''}
                 <button class="btn secondary identify-btn" data-hash="${hash}"><i class="fa-solid fa-magnifying-glass"></i> Identify Manually</button>
                 <button class="btn secondary manual-search-btn" data-hash="${hash}"><i class="fa-solid fa-globe"></i> Manual Search</button>
+                <button class="btn secondary trailer-btn" data-hash="${hash}"><i class="fa-solid fa-play-circle"></i> Ver Tráiler</button>
                 <button class="btn danger delete-movie-btn" data-hash="${hash}"><i class="fa-solid fa-trash"></i> Remove from Dashboard</button>
             </div>
         </div>
@@ -431,6 +432,11 @@ function setupMovieDetailsListeners(hash) {
     const manualSearchBtn = container.querySelector('.manual-search-btn');
     if (manualSearchBtn) {
         manualSearchBtn.addEventListener('click', () => handleManualSearch(hash));
+    }
+
+    const trailerBtn = container.querySelector('.trailer-btn');
+    if (trailerBtn) {
+        trailerBtn.addEventListener('click', () => showTrailerModal(hash));
     }
 
     // Carousel navigation buttons
@@ -687,6 +693,96 @@ function renderManualSearchResults(container, results, movieTitle, originalHash)
         });
     });
 }
+
+// ========== TRAILER MODAL ===========
+
+async function showTrailerModal(hash) {
+    const modal = document.getElementById('trailer-modal');
+    const trailerContainer = document.getElementById('trailer-container');
+    const modalTitle = document.getElementById('trailer-modal-title');
+
+    if (!modal || !trailerContainer) {
+        showToast('Error loading trailer modal', 'error');
+        return;
+    }
+
+    // Show loading state
+    modalTitle.textContent = 'Cargando tráiler...';
+    trailerContainer.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>';
+    modal.classList.add('active');
+
+    try {
+        // Fetch trailer data from API
+        const response = await fetch(`/api/movie/${hash}/trailer`);
+        const data = await response.json();
+
+        if (!data.success) {
+            trailerContainer.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--text-muted);">${escapeHtml(data.message || 'No hay tráiler disponible')}</div>`;
+            modalTitle.textContent = 'Tráiler no disponible';
+            return;
+        }
+
+        // Update modal title
+        modalTitle.textContent = data.name || 'Tráiler';
+
+        // Create YouTube iframe embed
+        const youtubeKey = data.youtube_key;
+        const embedUrl = `https://www.youtube.com/embed/${youtubeKey}?autoplay=1&rel=0`;
+
+        trailerContainer.innerHTML = `
+            <iframe 
+                src="${embedUrl}" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                allowfullscreen
+            ></iframe>
+        `;
+
+    } catch (error) {
+        console.error('Error loading trailer:', error);
+        trailerContainer.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--danger);">Error loading trailer</div>';
+        modalTitle.textContent = 'Error';
+    }
+}
+
+function closeTrailerModal() {
+    const modal = document.getElementById('trailer-modal');
+    const trailerContainer = document.getElementById('trailer-container');
+
+    if (modal) {
+        modal.classList.remove('active');
+    }
+
+    // Stop video by clearing iframe
+    if (trailerContainer) {
+        trailerContainer.innerHTML = '';
+    }
+}
+
+// Setup trailer modal event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    const trailerModal = document.getElementById('trailer-modal');
+    const trailerCloseBtn = document.getElementById('trailer-modal-close-btn');
+
+    if (trailerCloseBtn) {
+        trailerCloseBtn.addEventListener('click', closeTrailerModal);
+    }
+
+    // Close on backdrop click
+    if (trailerModal) {
+        trailerModal.addEventListener('click', (e) => {
+            if (e.target === trailerModal) {
+                closeTrailerModal();
+            }
+        });
+    }
+
+    // Close on ESC key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && trailerModal && trailerModal.classList.contains('active')) {
+            closeTrailerModal();
+        }
+    });
+});
 
 // ========== MULTI-SELECT ===========
 

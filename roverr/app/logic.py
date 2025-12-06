@@ -535,6 +535,64 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False):
         logger.error(f"Error fetching complete metadata for {title}: {e}")
         return None
 
+def get_movie_videos(tmdb_id, api_key):
+    """
+    Fetches movie trailers from TMDB API.
+    Returns the YouTube key for the official trailer if available.
+    
+    Args:
+        tmdb_id: TMDB movie ID
+        api_key: TMDB API key
+    
+    Returns:
+        dict with 'success', 'youtube_key', and 'name' if trailer found
+        dict with 'success': False if no trailer available
+    """
+    try:
+        # Get videos for this movie
+        videos_url = f"https://api.themoviedb.org/3/movie/{tmdb_id}/videos"
+        params = {"api_key": api_key, "language": get_language()}
+        res = requests.get(videos_url, params=params, timeout=5)
+        
+        if res.status_code != 200:
+            logger.error(f"TMDB videos API error: {res.status_code}")
+            return {"success": False, "message": "API error"}
+        
+        data = res.json()
+        videos = data.get('results', [])
+        
+        if not videos:
+            # Try English fallback if no videos in configured language
+            params['language'] = 'en-US'
+            res = requests.get(videos_url, params=params, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                videos = data.get('results', [])
+        
+        # Filter for YouTube trailers
+        trailers = [
+            v for v in videos 
+            if v.get('site') == 'YouTube' and v.get('type') == 'Trailer'
+        ]
+        
+        if not trailers:
+            return {"success": False, "message": "No trailer available"}
+        
+        # Prioritize official trailers
+        official_trailers = [t for t in trailers if t.get('official', False)]
+        trailer = official_trailers[0] if official_trailers else trailers[0]
+        
+        return {
+            "success": True,
+            "youtube_key": trailer.get('key'),
+            "name": trailer.get('name', 'Trailer'),
+            "official": trailer.get('official', False)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching movie videos: {e}")
+        return {"success": False, "message": str(e)}
+
 
 def sync_movies(torrents, api_key):
     """
