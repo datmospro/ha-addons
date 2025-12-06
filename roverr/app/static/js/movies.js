@@ -362,12 +362,20 @@ function renderMovieDetails(container, movie, hash) {
                 
                 <div class="cast-section">
                     <h3>Reparto</h3>
-                    <div class="cast-carousel">${castHTML}</div>
+                    <div class="carousel-wrapper">
+                        <button class="carousel-nav carousel-prev" data-carousel="cast"><i class="fa-solid fa-chevron-left"></i></button>
+                        <div class="cast-carousel">${castHTML}</div>
+                        <button class="carousel-nav carousel-next" data-carousel="cast"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
                 </div>
                 
                 <div class="crew-section">
                     <h3>Equipo</h3>
-                    <div class="cast-carousel">${crewHTML}</div>
+                    <div class="carousel-wrapper">
+                        <button class="carousel-nav carousel-prev" data-carousel="crew"><i class="fa-solid fa-chevron-left"></i></button>
+                        <div class="cast-carousel">${crewHTML}</div>
+                        <button class="carousel-nav carousel-next" data-carousel="crew"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -424,6 +432,32 @@ function setupMovieDetailsListeners(hash) {
     if (manualSearchBtn) {
         manualSearchBtn.addEventListener('click', () => handleManualSearch(hash));
     }
+
+    // Carousel navigation buttons
+    const carouselNavButtons = container.querySelectorAll('.carousel-nav');
+    carouselNavButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const isNext = btn.classList.contains('carousel-next');
+            const carouselType = btn.dataset.carousel;
+
+            // Find the carousel wrapper and the carousel itself
+            const wrapper = btn.closest('.carousel-wrapper');
+            const carousel = wrapper.querySelector('.cast-carousel');
+
+            if (carousel) {
+                const scrollAmount = 300; // Scroll 300px at a time
+                const currentScroll = carousel.scrollLeft;
+                const newScroll = isNext
+                    ? currentScroll + scrollAmount
+                    : currentScroll - scrollAmount;
+
+                carousel.scrollTo({
+                    left: newScroll,
+                    behavior: 'smooth'
+                });
+            }
+        });
+    });
 }
 
 // Polling para detalles
