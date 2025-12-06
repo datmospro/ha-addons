@@ -148,3 +148,30 @@
 #trailer-modal .modal-body {
     padding: 0;
 }
+
+/* ===================================
+   MANUAL SEARCH MODAL
+   Scrollable Results List
+   =================================== */
+
+#manual-search-modal .modal-dialog {
+    max-width: 900px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#manual-search-modal .modal-body {
+    max-height: calc(85vh - 180px);
+    /* Subtract header and footer height */
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#manual-search-modal .modal-header {
+    flex-shrink: 0;
+}
+
+#manual-search-modal .modal-footer {
+    flex-shrink: 0;
+}
