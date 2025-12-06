@@ -1,0 +1,17 @@
+﻿.synopsis h3 {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.synopsis p {
+    color: var(--text-secondary);
+    line-height: 1.6;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+}
+
+.actions-row {
+    margin-top: 2rem;
+}
