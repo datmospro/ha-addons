@@ -72,7 +72,7 @@
     gap: 2rem;
     align-items: start;
     max-width: 100%;
-    overflow: hidden;
+    
     padding: 2rem;
 }
 
@@ -82,12 +82,20 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
+.movie-info-panel {
+    min-width: 0;
+    width: 100%;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+}
+
 .movie-info-panel h1 {
     margin-top: 0;
     font-size: 2rem;
     margin-bottom: 0.5rem;
     min-width: 0;
-    overflow: hidden;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .movie-info-panel .year {
