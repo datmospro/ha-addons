@@ -2456,7 +2456,7 @@ def search_indexers(query, settings, tmdb_id=None):
                                         
                                         result = {
                                             'title': title_text,
-                                            'url': download_url,
+                                            'download_url': download_url,
                                             'size': size,
                                             'indexer': name,
                                             'year': year
