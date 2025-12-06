@@ -2938,6 +2938,7 @@ def fetch_rss_movies(limit=30):
                                     imdb_id=metadata.get('imdb_id') if metadata else None,
                                     imdb_rating=metadata.get('imdb_rating') if metadata else None,
                                     imdb_votes=metadata.get('imdb_votes') if metadata else None,
+                                    tmdb_id=int(entry_tmdb_id) if entry_tmdb_id else None,  # Save TMDB ID for intelligent search
                                     metadata_updated_at=datetime.now(),
                                     torrent_name=torrent_name
                                 )
@@ -2974,6 +2975,7 @@ def fetch_rss_movies(limit=30):
                                         existing_movie.imdb_id = metadata.get('imdb_id') if metadata else None
                                         existing_movie.imdb_rating = metadata.get('imdb_rating') if metadata else None
                                         existing_movie.imdb_votes = metadata.get('imdb_votes') if metadata else None
+                                        existing_movie.tmdb_id = int(entry_tmdb_id) if entry_tmdb_id else None  # Save TMDB ID
                                         existing_movie.metadata_updated_at = datetime.now()
                                         existing_movie.torrent_name = torrent_name
                                         
