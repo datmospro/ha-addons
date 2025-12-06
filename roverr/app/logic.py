@@ -45,6 +45,8 @@ DEFAULT_SETTINGS = {
 COPY_PROGRESS = {} # {hash: {percent: float, speed: float, status: str}}
 STOP_FLAGS = set() # Set of hashes to stop
 RSS_LAST_FETCH = {} # {feed_url: timestamp} - Track last fetch time for each RSS feed
+RESERVED_SPACE = {} # {dest_path: reserved_bytes} - Track space reserved by active copies
+SPACE_LOCK = threading.Lock() # Thread-safe access to RESERVED_SPACE
 
 def send_telegram_notification(message):
     """
@@ -125,6 +127,178 @@ def clean_torrent_name(name):
     
     title = base.replace('.', ' ').strip()
     return title, None
+
+def get_disk_free_space(path):
+    """
+    Returns available disk space in bytes for the filesystem containing path.
+    Works cross-platform (Windows, Linux, macOS).
+    
+    Args:
+        path: Path to check (file or directory)
+    
+    Returns:
+        int: Available space in bytes
+    """
+    import shutil
+    stat = shutil.disk_usage(path)
+    return stat.free
+
+def get_dir_size(path):
+    """
+    Calculate total size of a directory recursively.
+    For files, returns file size directly.
+    
+    Args:
+        path: Path to file or directory
+    
+    Returns:
+        int: Total size in bytes
+    """
+    if os.path.isfile(path):
+        return os.path.getsize(path)
+    
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(path):
+        for filename in filenames:
+            filepath = os.path.join(dirpath, filename)
+            try:
+                if os.path.exists(filepath):
+                    total_size += os.path.getsize(filepath)
+            except (OSError, PermissionError) as e:
+                logger.warning(f"Could not get size of {filepath}: {e}")
+                continue
+    return total_size
+
+def check_and_reserve_disk_space(source_path, dest_path, safety_buffer_percent=5, min_buffer_mb=500):
+    """
+    Verifies sufficient disk space and reserves it atomically (thread-safe).
+    MUST be paired with release_disk_space_reservation() after copy completes.
+    
+    Args:
+        source_path: Path to source file/directory
+        dest_path: Destination directory path
+        safety_buffer_percent: Percentage buffer (default 5%)
+        min_buffer_mb: Minimum buffer in MB (default 500MB)
+    
+    Returns:
+        tuple: (success: bool, message: str, details: dict)
+               details contains: {'required_bytes', 'available_bytes', 'reserved_bytes', 'source_size'}
+    
+    Side Effects:
+        On success: Adds reservation to RESERVED_SPACE global dict
+        On failure: No reservation made
+    
+    Thread Safety:
+        Uses SPACE_LOCK to ensure atomic check-and-reserve operation
+    """
+    global RESERVED_SPACE, SPACE_LOCK
+    
+    try:
+        # 1. Calculate source size
+        source_size = get_dir_size(source_path)
+        if source_size == 0:
+            return False, "Source is empty (0 bytes)", {}
+        
+        # 2. Calculate required space with buffer
+        buffer_bytes = max(
+            int(source_size * (safety_buffer_percent / 100)),
+            min_buffer_mb * 1024 * 1024
+        )
+        required_bytes = source_size + buffer_bytes
+        
+        # 3. Thread-safe check and reserve
+        with SPACE_LOCK:
+            # Get actual free space on disk
+            disk_free = get_disk_free_space(dest_path)
+            
+            # Calculate total reserved by active copies for this destination
+            # Normalize path for consistent comparison
+            dest_normalized = os.path.normpath(dest_path)
+            total_reserved = RESERVED_SPACE.get(dest_normalized, 0)
+            
+            # Calculate truly available space
+            available_bytes = disk_free - total_reserved
+            
+            # Check if sufficient
+            if required_bytes > available_bytes:
+                # Format sizes for error message
+                def format_size(bytes_val):
+                    gb = bytes_val / (1024**3)
+                    if gb >= 1:
+                        return f"{gb:.2f}GB"
+                    else:
+                        mb = bytes_val / (1024**2)
+                        return f"{mb:.0f}MB"
+                
+                message = (
+                    f"Insufficient disk space: Need {format_size(required_bytes)} "
+                    f"({format_size(source_size)} + {format_size(buffer_bytes)} buffer), "
+                    f"only {format_size(available_bytes)} available"
+                )
+                
+                if total_reserved > 0:
+                    message += f", {format_size(total_reserved)} reserved by active copies"
+                
+                return False, message, {
+                    'required_bytes': required_bytes,
+                    'available_bytes': available_bytes,
+                    'reserved_bytes': total_reserved,
+                    'source_size': source_size
+                }
+            
+            # Reserve space
+            RESERVED_SPACE[dest_normalized] = total_reserved + required_bytes
+            
+            logger.info(
+                f"Space reserved: {required_bytes / (1024**3):.2f}GB for {os.path.basename(source_path)}, "
+                f"Total reserved: {RESERVED_SPACE[dest_normalized] / (1024**3):.2f}GB, "
+                f"Disk free: {disk_free / (1024**3):.2f}GB"
+            )
+            
+            return True, "Space check passed", {
+                'required_bytes': required_bytes,
+                'available_bytes': available_bytes,
+                'reserved_bytes': total_reserved,
+                'source_size': source_size
+            }
+            
+    except Exception as e:
+        logger.error(f"Error checking disk space: {e}")
+        return False, f"Error checking disk space: {str(e)}", {}
+
+def release_disk_space_reservation(dest_path, reserved_bytes):
+    """
+    Releases disk space reservation. MUST be called after check_and_reserve_disk_space().
+    Safe to call multiple times (idempotent).
+    
+    Args:
+        dest_path: Destination directory path (same as used in check_and_reserve)
+        reserved_bytes: Amount of bytes to release (from check_and_reserve return value)
+    """
+    global RESERVED_SPACE, SPACE_LOCK
+    
+    if reserved_bytes <= 0:
+        return
+    
+    try:
+        with SPACE_LOCK:
+            dest_normalized = os.path.normpath(dest_path)
+            current_reserved = RESERVED_SPACE.get(dest_normalized, 0)
+            
+            new_reserved = max(0, current_reserved - reserved_bytes)
+            
+            if new_reserved == 0:
+                # Remove entry if no longer reserved
+                RESERVED_SPACE.pop(dest_normalized, None)
+            else:
+                RESERVED_SPACE[dest_normalized] = new_reserved
+            
+            logger.info(
+                f"Space released: {reserved_bytes / (1024**3):.2f}GB, "
+                f"Remaining reserved: {new_reserved / (1024**3):.2f}GB"
+            )
+    except Exception as e:
+        logger.error(f"Error releasing disk space reservation: {e}")
 
 from database import MoveHistory, Movie
 
@@ -1263,6 +1437,17 @@ def get_movie_details(torrent_hash, api_key):
         # Check if copying
         if torrent_hash in COPY_PROGRESS:
             status = 'copying'
+        
+        # Determine source_path display:
+        # Only show "N/A" if movie hasn't started downloading yet (status=new)
+        # For downloading, show path since file already exists (even if incomplete)
+        # For RSS movies, show "RSS Feed" instead
+        if status == 'new':
+            display_source_path = "N/A"
+        elif movie and movie.state == 'rss':
+            display_source_path = "RSS Feed"
+        else:
+            display_source_path = content_path
 
         movie_details.update({
             "torrent_name": t.name,
@@ -1270,7 +1455,7 @@ def get_movie_details(torrent_hash, api_key):
             "size": t.size,
             "state": t.state,
             "status": status,
-            "source_path": content_path,
+            "source_path": display_source_path,
             "dest_path": dest_path,
             "download_stats": {
                 "progress": t.progress * 100,
@@ -1824,24 +2009,45 @@ def process_single_torrent(qb, torrent, settings):
             dest_file = os.path.join(dest_dir, new_name)
             
             if not os.path.exists(dest_file):
-                logger.info(f"Copying {source_path} to {dest_file}")
-                copy_with_progress(source_path, dest_file, torrent.hash, limit)
-                MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_file, status='success')
+                # Check and reserve disk space BEFORE copying
+                success, message, details = check_and_reserve_disk_space(source_path, dest_dir)
                 
-                # Notify Telegram: Moved
-                if settings.get('telegram_notify_on_move', True):
-                    send_telegram_notification(f"🚀 <b>Movie Moved to Library</b>\n\n🎬 {title} ({year})\n📂 {dest_file}")
-
-                # Clear Watchlist if applicable
+                if not success:
+                    logger.error(f"Disk space check failed for {torrent.name}: {message}")
+                    MoveHistory.create(
+                        torrent_name=torrent.name,
+                        status='error',
+                        message=f"Disk space check failed: {message}",
+                        source_path=source_path,
+                        dest_path=dest_file
+                    )
+                    return
+                
+                # Space reserved successfully, proceed with copy
+                reserved_bytes = details['required_bytes']
                 try:
-                    movie = Movie.get_or_none(Movie.torrent_hash == torrent.hash)
-                    if movie and movie.watchlist:
-                        movie.watchlist = False
-                        movie.watchlist_expiry = None
-                        movie.save()
-                        logger.info(f"Removed '{title}' ({year}) from watchlist after successful move")
-                except Exception as wl_err:
-                    logger.error(f"Error clearing watchlist for {title}: {wl_err}")
+                    logger.info(f"Copying {source_path} to {dest_file}")
+                    copy_with_progress(source_path, dest_file, torrent.hash, limit)
+                    MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_file, status='success')
+                    
+                    # Notify Telegram: Moved
+                    if settings.get('telegram_notify_on_move', True):
+                        send_telegram_notification(f"🚀 <b>Movie Moved to Library</b>\n\n🎬 {title} ({year})\n📂 {dest_file}")
+
+                    # Clear Watchlist if applicable
+                    try:
+                        movie = Movie.get_or_none(Movie.torrent_hash == torrent.hash)
+                        if movie and movie.watchlist:
+                            movie.watchlist = False
+                            movie.watchlist_expiry = None
+                            movie.save()
+                            logger.info(f"Removed '{title}' ({year}) from watchlist after successful move")
+                    except Exception as wl_err:
+                        logger.error(f"Error clearing watchlist for {title}: {wl_err}")
+                        
+                finally:
+                    # ALWAYS release reservation, even if copy fails
+                    release_disk_space_reservation(dest_dir, reserved_bytes)
 
             else:
                 logger.info(f"File already exists: {dest_file}")
@@ -1850,48 +2056,70 @@ def process_single_torrent(qb, torrent, settings):
         # If it's a directory
         elif os.path.isdir(source_path):
             logger.info(f"Source is a directory: {source_path}")
-            video_extensions = ['.mkv', '.mp4', '.avi']
-            copied = False
-            for root, dirs, files in os.walk(source_path):
-                for file in files:
-                    if any(file.lower().endswith(ext) for ext in video_extensions):
-                        # Found video
-                        src_file = os.path.join(root, file)
-                        ext = os.path.splitext(file)[1]
-                        new_name = f"{folder_name}{ext}"
-                        dest_file = os.path.join(dest_dir, new_name)
-                        
-                        if not os.path.exists(dest_file):
-                            logger.info(f"Copying {src_file} to {dest_file}")
-                            copy_with_progress(src_file, dest_file, torrent.hash, limit)
-                            copied = True
-                        else:
-                            logger.info(f"File already exists: {dest_file}")
-                            # Mark as skipped if at least one file exists?
-                            # But we might have multiple files.
-                            pass
-                        
-            if copied:
-                MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_dir, status='success')
-                
-                # Notify Telegram: Moved
-                if settings.get('telegram_notify_on_move', True):
-                    send_telegram_notification(f"🚀 <b>Movie Moved to Library</b>\n\n🎬 {title} ({year})\n📂 {dest_dir}")
+            
+            # Check and reserve disk space BEFORE copying
+            success, message, details = check_and_reserve_disk_space(source_path, dest_dir)
+            
+            if not success:
+                logger.error(f"Disk space check failed for {torrent.name}: {message}")
+                MoveHistory.create(
+                    torrent_name=torrent.name,
+                    status='error',
+                    message=f"Disk space check failed: {message}",
+                    source_path=source_path,
+                    dest_path=dest_dir
+                )
+                return
+            
+            # Space reserved successfully, proceed with copy
+            reserved_bytes = details['required_bytes']
+            try:
+                video_extensions = ['.mkv', '.mp4', '.avi']
+                copied = False
+                for root, dirs, files in os.walk(source_path):
+                    for file in files:
+                        if any(file.lower().endswith(ext) for ext in video_extensions):
+                            # Found video
+                            src_file = os.path.join(root, file)
+                            ext = os.path.splitext(file)[1]
+                            new_name = f"{folder_name}{ext}"
+                            dest_file = os.path.join(dest_dir, new_name)
+                            
+                            if not os.path.exists(dest_file):
+                                logger.info(f"Copying {src_file} to {dest_file}")
+                                copy_with_progress(src_file, dest_file, torrent.hash, limit)
+                                copied = True
+                            else:
+                                logger.info(f"File already exists: {dest_file}")
+                                # Mark as skipped if at least one file exists?
+                                # But we might have multiple files.
+                                pass
+                            
+                if copied:
+                    MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_dir, status='success')
+                    
+                    # Notify Telegram: Moved
+                    if settings.get('telegram_notify_on_move', True):
+                        send_telegram_notification(f"🚀 <b>Movie Moved to Library</b>\n\n🎬 {title} ({year})\n📂 {dest_dir}")
 
-                # Clear Watchlist if applicable
-                try:
-                    movie = Movie.get_or_none(Movie.torrent_hash == torrent.hash)
-                    if movie and movie.watchlist:
-                        movie.watchlist = False
-                        movie.watchlist_expiry = None
-                        movie.save()
-                        logger.info(f"Removed '{title}' ({year}) from watchlist after successful move")
-                except Exception as wl_err:
-                    logger.error(f"Error clearing watchlist for {title}: {wl_err}")
+                    # Clear Watchlist if applicable
+                    try:
+                        movie = Movie.get_or_none(Movie.torrent_hash == torrent.hash)
+                        if movie and movie.watchlist:
+                            movie.watchlist = False
+                            movie.watchlist_expiry = None
+                            movie.save()
+                            logger.info(f"Removed '{title}' ({year}) from watchlist after successful move")
+                    except Exception as wl_err:
+                        logger.error(f"Error clearing watchlist for {title}: {wl_err}")
 
-            else:
-                logger.warning(f"No video files found in {source_path}")
-                MoveHistory.create(torrent_name=torrent.name, status='skipped', message="No video file found in folder", source_path=source_path, dest_path=dest_dir)
+                else:
+                    logger.warning(f"No video files found in {source_path}")
+                    MoveHistory.create(torrent_name=torrent.name, status='skipped', message="No video file found in folder", source_path=source_path, dest_path=dest_dir)
+                    
+            finally:
+                # ALWAYS release reservation, even if copy fails
+                release_disk_space_reservation(dest_dir, reserved_bytes)
         else:
              logger.error(f"Source path is valid but neither file nor dir? {source_path}")
              MoveHistory.create(torrent_name=torrent.name, status='error', message="Invalid source type", source_path=source_path, dest_path="")
