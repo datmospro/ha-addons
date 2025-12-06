@@ -33,6 +33,50 @@ async def scheduler():
         
         await asyncio.sleep(max(60, interval)) # Sleep at least 60s
 
+# Database Backup Scheduler
+async def backup_scheduler():
+    """
+    Runs daily database backup at 3 AM.
+    Creates automatic backups to prevent data loss.
+    """
+    from database import backup_database
+    from datetime import datetime
+    
+    logger.info("Database backup scheduler started")
+    
+    # Wait 60 seconds on startup before first check
+    await asyncio.sleep(60)
+    
+    last_backup_date = None
+    
+    while True:
+        try:
+            now = datetime.now()
+            current_date = now.date()
+            
+            # Check if we should backup (once per day at 3 AM or later)
+            should_backup = (
+                last_backup_date != current_date and
+                now.hour >= 3  # After 3 AM
+            )
+            
+            if should_backup:
+                logger.info("Starting daily database backup...")
+                success, message, backup_path = await asyncio.to_thread(backup_database)
+                
+                if success:
+                    logger.info(f"✅ Daily backup completed: {message}")
+                    last_backup_date = current_date
+                else:
+                    logger.error(f"❌ Daily backup failed: {message}")
+            
+        except Exception as e:
+            logger.error(f"Error in backup scheduler: {e}")
+        
+        # Check every hour
+        await asyncio.sleep(3600)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -42,6 +86,9 @@ async def lifespan(app: FastAPI):
     # Import and start RSS scheduler
     from logic import rss_scheduler
     asyncio.create_task(rss_scheduler())
+    
+    # Start database backup scheduler (daily at 3 AM)
+    asyncio.create_task(backup_scheduler())
     
     yield
     # Shutdown
@@ -625,6 +672,93 @@ def reset_ignored_movies():
     except Exception as e:
         logger.error(f"Error resetting ignored movies: {e}")
         return {"success": False, "message": str(e)}
+
+# Database Backup Endpoints
+@app.post("/api/database/backup")
+def create_manual_backup():
+    """Manually trigger a database backup"""
+    from database import backup_database
+    
+    try:
+        success, message, backup_path = backup_database()
+        return {
+            "success": success,
+            "message": message,
+            "backup_path": backup_path if success else None
+        }
+    except Exception as e:
+        logger.error(f"Error creating manual backup: {e}")
+        return {"success": False, "message": str(e)}
+
+@app.get("/api/database/backups")
+def list_backups():
+    """Get list of available database backups"""
+    from database import get_backup_list
+    
+    try:
+        backups = get_backup_list()
+        return {
+            "success": True,
+            "backups": backups,
+            "count": len(backups)
+        }
+    except Exception as e:
+        logger.error(f"Error listing backups: {e}")
+        return {"success": False, "message": str(e), "backups": []}
+
+@app.post("/api/database/restore")
+def restore_backup(payload: dict):
+    """
+    Restore database from a backup file.
+    WARNING: This will overwrite the current database!
+    """
+    from database import restore_database_from_backup
+    
+    backup_path = payload.get('backup_path')
+    if not backup_path:
+        return {"success": False, "message": "No backup_path provided"}
+    
+    try:
+        success, message = restore_database_from_backup(backup_path)
+        return {"success": success, "message": message}
+    except Exception as e:
+        logger.error(f"Error restoring backup: {e}")
+        return {"success": False, "message": str(e)}
+
+@app.get("/api/database/info")
+def get_database_info():
+    """Get database information including size and backup status"""
+    import os
+    from database import get_backup_list
+    
+    try:
+        db_path = "/data/history.db"
+        info = {
+            "success": True,
+            "database_exists": os.path.exists(db_path),
+            "database_size_mb": 0,
+            "wal_size_mb": 0,
+            "total_backups": 0,
+            "latest_backup": None
+        }
+        
+        if os.path.exists(db_path):
+            info["database_size_mb"] = round(os.path.getsize(db_path) / (1024 * 1024), 2)
+        
+        wal_path = f"{db_path}-wal"
+        if os.path.exists(wal_path):
+            info["wal_size_mb"] = round(os.path.getsize(wal_path) / (1024 * 1024), 2)
+        
+        backups = get_backup_list()
+        info["total_backups"] = len(backups)
+        if backups:
+            info["latest_backup"] = backups[0]  # Already sorted newest first
+        
+        return info
+    except Exception as e:
+        logger.error(f"Error getting database info: {e}")
+        return {"success": False, "message": str(e)}
+
 
 # Serve Frontend
 import os
