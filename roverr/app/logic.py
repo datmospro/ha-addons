@@ -1263,7 +1263,8 @@ def get_movie_details(torrent_hash, api_key):
                         "imdb_rating": movie.imdb_rating,
                         "imdb_votes": movie.imdb_votes,
                         "genres": json.loads(movie.genres) if movie.genres else [],
-                        "tmdb_id": movie.tmdb_id if hasattr(movie, 'tmdb_id') else None
+                        "tmdb_id": movie.tmdb_id if hasattr(movie, 'tmdb_id') else None,
+                        "country_code": movie.country_code if hasattr(movie, 'country_code') else None
                     }
                 
                 # For regular torrents, return with orphaned status
@@ -1425,7 +1426,8 @@ def get_movie_details(torrent_hash, api_key):
                 "imdb_id": movie.imdb_id,
                 "imdb_rating": movie.imdb_rating,
                 "imdb_votes": movie.imdb_votes,
-                "tmdb_id": movie.tmdb_id if hasattr(movie, 'tmdb_id') else None
+                "tmdb_id": movie.tmdb_id if hasattr(movie, 'tmdb_id') else None,
+                "country_code": movie.country_code if hasattr(movie, 'country_code') else None
             }
         else:
             # No cache, fetch from TMDB
@@ -1466,7 +1468,8 @@ def get_movie_details(torrent_hash, api_key):
                     "imdb_id": metadata.get('imdb_id'),
                     "imdb_rating": metadata.get('imdb_rating'),
                     "imdb_votes": metadata.get('imdb_votes'),
-                    "tmdb_id": metadata.get('tmdb_id')
+                    "tmdb_id": metadata.get('tmdb_id'),
+                    "country_code": metadata.get('country_code')
                 }
                 
                 # Update database with cached metadata
