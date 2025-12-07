@@ -48,6 +48,7 @@ class Movie(BaseModel):
     imdb_votes = CharField(null=True) # IMDb vote count
     tmdb_id = IntegerField(null=True) # TMDB movie ID for unique identification
     metadata_updated_at = DateTimeField(null=True) # Last metadata update
+    country_code = CharField(null=True, max_length=2) # ISO 3166-1 country code (e.g., 'US', 'ES')
     ignored = BooleanField(default=False) # If True, sync will skip this movie
     torrent_name = CharField(null=True) # Original torrent name for history linking
     watchlist = BooleanField(default=False) # If True, movie is in watchlist monitoring
@@ -72,6 +73,7 @@ def migrate_db():
         ('imdb_votes', 'TEXT'),
         ('tmdb_id', 'INTEGER'),
         ('metadata_updated_at', 'DATETIME'),
+        ('country_code', 'TEXT'),
         ('ignored', 'BOOLEAN'),
         ('torrent_name', 'TEXT'),
         ('watchlist', 'BOOLEAN'),

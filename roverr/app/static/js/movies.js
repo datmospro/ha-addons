@@ -14,6 +14,36 @@ import { showToast, formatBytes, getProgressClass, escapeHtml } from './ui.js';
 import { getStatusClass, getStatusIconAndLabel } from './templates.js';
 import { switchView, getCurrentView } from './navigation.js';
 
+/**
+ * Converts ISO 3166-1 country code to flag emoji
+ * @param {string} code - Two-letter country code (e.g., 'US', 'ES', 'FR')
+ * @returns {string} - Flag emoji or empty string if invalid
+ */
+function countryCodeToFlag(code) {
+    if (!code || code.length !== 2) return '';
+    const codePoints = code.toUpperCase().split('').map(char => 127397 + char.charCodeAt());
+    return String.fromCodePoint(...codePoints);
+}
+
+/**
+ * Gets country name from country code for tooltip
+ * @param {string} code - Two-letter country code
+ * @returns {string} - Country name or code if unknown
+ */
+function getCountryName(code) {
+    const countries = {
+        'US': 'United States', 'GB': 'United Kingdom', 'FR': 'France', 'DE': 'Germany',
+        'ES': 'Spain', 'IT': 'Italy', 'JP': 'Japan', 'KR': 'South Korea', 'CN': 'China',
+        'IN': 'India', 'CA': 'Canada', 'AU': 'Australia', 'MX': 'Mexico', 'BR': 'Brazil',
+        'RU': 'Russia', 'AR': 'Argentina', 'NZ': 'New Zealand', 'SE': 'Sweden', 'NO': 'Norway',
+        'DK': 'Denmark', 'FI': 'Finland', 'NL': 'Netherlands', 'BE': 'Belgium', 'CH': 'Switzerland',
+        'AT': 'Austria', 'PL': 'Poland', 'CZ': 'Czech Republic', 'IE': 'Ireland', 'PT': 'Portugal',
+        'GR': 'Greece', 'TR': 'Turkey', 'TH': 'Thailand', 'ID': 'Indonesia', 'PH': 'Philippines',
+        'IL': 'Israel', 'SA': 'Saudi Arabia', 'EG': 'Egypt', 'ZA': 'South Africa', 'NG': 'Nigeria'
+    };
+    return countries[code] || code;
+}
+
 // Referencias DOM
 let moviesGrid;
 let selectionCounter;
@@ -299,17 +329,20 @@ function renderMovieDetails(container, movie, hash) {
             <div class="movie-info-panel">
                 <h1>${escapeHtml(movie.title)} <span class="year">(${movie.year || 'N/A'})</span></h1>
                 
-                <button class="trailer-btn-content" data-hash="${hash}" title="Ver Tráiler">
+                <button class="trailer-btn-content" data-hash="${hash}" title="Trailer">
                     <div class="trailer-btn-icon">
                         <i class="fa-solid fa-play"></i>
                     </div>
                     <div class="trailer-btn-text">
-                        <span class="trailer-btn-label">Ver Tráiler</span>
+                        <span class="trailer-btn-label">Trailer</span>
                         <span class="trailer-btn-subtitle">YouTube</span>
                     </div>
                 </button>
                 
                 <div class="meta-row">
+                    ${movie.country_code ? `<span class="badge country" title="${escapeHtml(getCountryName(movie.country_code))}">
+                        <span class="flag-emoji">${countryCodeToFlag(movie.country_code)}</span>
+                    </span>` : ''}
                     <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
                     <span class="badge status ${statusClass}">${statusIcon} ${statusLabel}</span>
                     <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${formatBytes(movie.size)}</span>

@@ -148,51 +148,6 @@
 }
 
 .trailer-btn-label {
-    font-size: 0.9rem;
-    font-weight: 500;
-    line-height: 1;
-    color: var(--text-primary);
-}
-
-.trailer-btn-subtitle {
-    font-size: 0.7rem;
-    opacity: 0.6;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-weight: 400;
-    color: var(--text-secondary);
-}
-
-.meta-row {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 2rem;
-}
-
-.badge.runtime {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    padding: 0.25rem 0.75rem;
-    border-radius: 4px;
-    font-size: 0.9rem;
-}
-
-.paths-box {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 2rem;
-    min-width: 0;
-    box-sizing: border-box;
-}
-
-.path-item {
-    margin-bottom: 0.5rem;
-}
-
-.path-item:last-child {
     margin-bottom: 0;
 }
 

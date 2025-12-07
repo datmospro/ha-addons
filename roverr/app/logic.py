@@ -513,6 +513,12 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False):
         if imdb_id:
             imdb_rating, imdb_votes = scrape_imdb_rating(imdb_id)
         
+        # Get production country (use first country if multiple)
+        production_countries = details.get('production_countries', [])
+        country_code = None
+        if production_countries and len(production_countries) > 0:
+            country_code = production_countries[0].get('iso_3166_1')  # e.g., 'US', 'ES', 'FR'
+        
         return {
             'title': details.get('title'),
             'year': details.get('release_date', '')[:4],
@@ -528,7 +534,8 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False):
             'imdb_id': imdb_id,
             'imdb_rating': imdb_rating,
             'imdb_votes': imdb_votes,
-            'tmdb_id': movie_id  # Add TMDB ID for multi-language search
+            'tmdb_id': movie_id,  # Add TMDB ID for multi-language search
+            'country_code': country_code  # Add country code for flag display
         }
         
     except Exception as e:
@@ -817,6 +824,7 @@ def sync_movies(torrents, api_key):
                             imdb_rating=metadata.get('imdb_rating'),
                             imdb_votes=metadata.get('imdb_votes'),
                             tmdb_id=metadata.get('tmdb_id'),  # Save TMDB ID for multi-language search
+                            country_code=metadata.get('country_code'),  # Save country code for flag display
                             metadata_updated_at=datetime.now(),
                             torrent_name=t['name']
                         )
@@ -992,6 +1000,12 @@ def identify_movie(torrent_hash, tmdb_id, api_key):
         if imdb_id:
             imdb_rating, imdb_votes = scrape_imdb_rating(imdb_id)
         
+        # Get production country (use first country if multiple)
+        production_countries = details.get('production_countries', [])
+        country_code = None
+        if production_countries and len(production_countries) > 0:
+            country_code = production_countries[0].get('iso_3166_1')
+        
         # Update Metadata
         movie.title = details.get('title')
         movie.year = details.get('release_date', '')[:4]
@@ -1005,6 +1019,7 @@ def identify_movie(torrent_hash, tmdb_id, api_key):
         movie.imdb_id = imdb_id
         movie.imdb_rating = imdb_rating
         movie.imdb_votes = imdb_votes
+        movie.country_code = country_code
         movie.metadata_updated_at = datetime.now()
         
         # Update Images
