@@ -286,6 +286,7 @@ export async function showMovieDetails(hash) {
  * Renderiza los detalles de una película
  */
 function renderMovieDetails(container, movie, hash) {
+    console.log('renderMovieDetails called with movie:', movie.title, 'country_code:', movie.country_code);
     const runtime = movie.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m` : 'N/A';
     const { icon: statusIcon, label: statusLabel } = getStatusIconAndLabel(movie.status);
     const statusClass = getStatusClass(movie.status);
@@ -346,9 +347,7 @@ function renderMovieDetails(container, movie, hash) {
                 </button>
                 
                 <div class="meta-row">
-                    ${movie.country_code ? `<span class="badge country" title="${escapeHtml(getCountryName(movie.country_code))}">
-                        <span class="flag-emoji">${(() => { const flag = countryCodeToFlag(movie.country_code); console.log('FLAG RESULT:', flag, 'from code:', movie.country_code); return flag; })()}</span>
-                    </span>` : ''}
+                    ${movie.country_code ? `<span class="badge country" title="${escapeHtml(getCountryName(movie.country_code))}"><span class="flag-emoji">${countryCodeToFlag(movie.country_code)}</span></span>` : ''}
                     <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
                     <span class="badge status ${statusClass}">${statusIcon} ${statusLabel}</span>
                     <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${formatBytes(movie.size)}</span>
