@@ -347,7 +347,7 @@ function renderMovieDetails(container, movie, hash) {
                 
                 <div class="meta-row">
                     ${movie.country_code ? `<span class="badge country" title="${escapeHtml(getCountryName(movie.country_code))}">
-                        <span class="flag-emoji">${countryCodeToFlag(movie.country_code)}</span>
+                        <span class="flag-emoji">${(() => { const flag = countryCodeToFlag(movie.country_code); console.log('FLAG RESULT:', flag, 'from code:', movie.country_code); return flag; })()}</span>
                     </span>` : ''}
                     <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
                     <span class="badge status ${statusClass}">${statusIcon} ${statusLabel}</span>
