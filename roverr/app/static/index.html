@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Roverr - Media Manager</title>    <!-- Modular CSS Architecture -->
+    <title>Roverr - Media Manager</title> <!-- Modular CSS Architecture -->
     <link rel="stylesheet" href="styles/base.css">
     <link rel="stylesheet" href="styles/layout.css">
     <link rel="stylesheet" href="styles/components.css">
@@ -439,7 +439,8 @@
         <!-- Modals are loaded dynamically from modals/ directory via modal-loader.js -->
     </div>
 
-    <script type="module" src="js/main.js"></script>
+    <!-- Main JavaScript - Version parameter forces cache refresh on updates -->
+    <script type="module" src="js/main.js?v=4.2.91"></script>
 
 </body>
 
@@ -453,7 +454,8 @@
             </button>
         </div>
         <div class="modal-body" style="padding: 0;">
-            <div id="trailer-container" style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;">
+            <div id="trailer-container"
+                style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;">
                 <!-- YouTube iframe will be injected here -->
             </div>
         </div>
@@ -480,4 +482,3 @@
         </div>
     </div>
 </div>
-
