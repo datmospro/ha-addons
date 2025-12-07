@@ -338,21 +338,13 @@ function renderMovieDetails(container, movie, hash) {
             <div class="movie-info-panel">
                 <h1>${escapeHtml(movie.title)} <span class="year">(${movie.year || 'N/A'})</span></h1>
                 
-                <button class="trailer-btn-content" data-hash="${hash}" title="Trailer">
-                    <div class="trailer-btn-icon">
-                        <i class="fa-solid fa-play"></i>
-                    </div>
-                    <div class="trailer-btn-text">
-                        <span class="trailer-btn-label">Trailer</span>
-                        <span class="trailer-btn-subtitle">YouTube</span>
-                    </div>
-                </button>
                 
                 <div class="meta-row">
                     <span class="badge status ${statusClass}">${statusIcon} ${statusLabel}</span>
                     <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
                     <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${formatBytes(movie.size)}</span>
                     ${movie.country_code ? `<span class="badge country" title="${escapeHtml(getCountryName(movie.country_code))}"><span class="flag-emoji">${countryCodeToFlag(movie.country_code)}</span></span>` : ''}
+                    <button class="badge trailer-badge" data-hash="${hash}" title="Trailer"><i class="fa-brands fa-youtube"></i></button>
                 </div>
                 
                 ${movie.status === 'copying' && movie.copy_progress ? `
@@ -483,7 +475,7 @@ function setupMovieDetailsListeners(hash) {
         manualSearchBtn.addEventListener('click', () => handleManualSearch(hash));
     }
 
-    const trailerBtn = container.querySelector('.trailer-btn-content');
+    const trailerBtn = container.querySelector('.trailer-badge');
     if (trailerBtn) {
         trailerBtn.addEventListener('click', () => showTrailerModal(hash));
     }

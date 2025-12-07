@@ -71,6 +71,29 @@
     font-weight: 600;
 }
 
+/* Trailer badge */
+.badge.trailer-badge {
+    border-color: #ff0000;
+    color: var(--text-primary);
+    background: var(--card-bg);
+    cursor: pointer;
+    padding: 0.75rem;
+}
+
+.badge.trailer-badge i {
+    color: #ff0000;
+    font-size: 1rem;
+}
+
+.badge.trailer-badge:hover {
+    background: rgba(255, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.badge.trailer-badge:active {
+    transform: translateY(0);
+}
+
 @media (max-width: 768px) {
     .meta-row {
         gap: 0.75rem;
