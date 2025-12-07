@@ -25,10 +25,10 @@ function countryCodeToFlag(code) {
         return '';
     }
     const countryCode = code.toLowerCase();
-    // Using flagcdn.com for 20px width flag images
-    return `<img src="https://flagcdn.com/w20/${countryCode}.png" 
-                 srcset="https://flagcdn.com/w40/${countryCode}.png 2x" 
-                 width="20" 
+    // Using flagcdn.com for 28px width flag images
+    return `<img src="https://flagcdn.com/w40/${countryCode}.png" 
+                 srcset="https://flagcdn.com/w80/${countryCode}.png 2x" 
+                 width="28" 
                  alt="${code} flag" 
                  style="display: inline-block; vertical-align: middle; margin-right: 4px;">`;
 }
@@ -349,10 +349,10 @@ function renderMovieDetails(container, movie, hash) {
                 </button>
                 
                 <div class="meta-row">
-                    ${movie.country_code ? `<span class="badge country" title="${escapeHtml(getCountryName(movie.country_code))}"><span class="flag-emoji">${countryCodeToFlag(movie.country_code)}</span></span>` : ''}
-                    <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
                     <span class="badge status ${statusClass}">${statusIcon} ${statusLabel}</span>
+                    <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
                     <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${formatBytes(movie.size)}</span>
+                    ${movie.country_code ? `<span class="badge country" title="${escapeHtml(getCountryName(movie.country_code))}"><span class="flag-emoji">${countryCodeToFlag(movie.country_code)}</span></span>` : ''}
                 </div>
                 
                 ${movie.status === 'copying' && movie.copy_progress ? `
