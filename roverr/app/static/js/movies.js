@@ -1,7 +1,7 @@
 ﻿/**
- * MÃ³dulo de PelÃ­culas para Roverr
- * Gestiona la vista de detalles de pelÃ­culas y multi-selecciÃ³n
- * ExtraÃ­do de app.js - lÃ­neas 1056-1237, 1239-1567, 1587-1838
+ * Módulo de Películas para Roverr
+ * Gestiona la vista de detalles de películas y multi-selección
+ * Extraído de app.js - líneas 1056-1237, 1239-1567, 1587-1838
  */
 
 import { state } from './state.js';
@@ -25,12 +25,12 @@ function countryCodeToFlag(code) {
         return '';
     }
     const countryCode = code.toLowerCase();
-    // Using flagcdn.com for flag images (28px width)
-    return `<img src="https://flagcdn.com/w40/${countryCode}.png" 
-                 srcset="https://flagcdn.com/w80/${countryCode}.png 2x" 
-                 width="28" 
+    // Using flagcdn.com for 20px width flag images
+    return `<img src="https://flagcdn.com/w20/${countryCode}.png" 
+                 srcset="https://flagcdn.com/w40/${countryCode}.png 2x" 
+                 width="20" 
                  alt="${code} flag" 
-                 style="display: inline-block; vertical-align: middle; margin-right: 4px;">`< br />}
+                 style="display: inline-block; vertical-align: middle; margin-right: 4px;">`;
 }
 
 /**
@@ -62,7 +62,7 @@ let deleteSelectedBtn;
 let deleteModal;
 
 /**
- * Inicializa el mÃ³dulo de pelÃ­culas
+ * Inicializa el módulo de películas
  */
 export function initMovies() {
     moviesGrid = document.getElementById('movies-grid');
@@ -94,8 +94,8 @@ export function initMovies() {
 }
 
 /**
- * Carga y renderiza las pelÃ­culas
- * LÃ­neas 1056-1237 de app.js
+ * Carga y renderiza las películas
+ * Líneas 1056-1237 de app.js
  */
 export async function fetchMovies(isPolling = false) {
     if (!moviesGrid) return;
@@ -125,7 +125,7 @@ export async function fetchMovies(isPolling = false) {
 }
 
 /**
- * Actualiza la notificaciÃ³n de series ignoradas
+ * Actualiza la notificación de series ignoradas
  */
 function updateSeriesNotification(ignored) {
     const notificationArea = document.getElementById('series-notification');
@@ -144,7 +144,7 @@ function updateSeriesNotification(ignored) {
 }
 
 /**
- * Renderiza las tarjetas de pelÃ­culas
+ * Renderiza las tarjetas de películas
  */
 function renderMovieCards(movies) {
     // Map existing cards
@@ -178,7 +178,7 @@ function renderMovieCards(movies) {
 }
 
 /**
- * Actualiza una tarjeta de pelÃ­cula existente
+ * Actualiza una tarjeta de película existente
  */
 function updateMovieCard(card, movie, posterSrc, statusClass, statusIcon, statusLabel) {
     card.dataset.movie = JSON.stringify({
@@ -206,7 +206,7 @@ function updateMovieCard(card, movie, posterSrc, statusClass, statusIcon, status
 }
 
 /**
- * Crea una nueva tarjeta de pelÃ­cula
+ * Crea una nueva tarjeta de película
  */
 function createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel) {
     const card = document.createElement('div');
@@ -259,8 +259,8 @@ function createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel)
 }
 
 /**
- * Muestra los detalles de una pelÃ­cula
- * LÃ­neas 1239-1438 de app.js
+ * Muestra los detalles de una película
+ * Líneas 1239-1438 de app.js
  */
 export async function showMovieDetails(hash) {
     switchView('movie-details');
@@ -285,7 +285,7 @@ export async function showMovieDetails(hash) {
 }
 
 /**
- * Renderiza los detalles de una pelÃ­cula
+ * Renderiza los detalles de una película
  */
 function renderMovieDetails(container, movie, hash) {
     console.log('renderMovieDetails called with movie:', movie.title, 'country_code:', movie.country_code);
@@ -309,7 +309,7 @@ function renderMovieDetails(container, movie, hash) {
         </div>
     `).join('') : '<p>No crew information available.</p>';
 
-    // Este es el mismo HTML que en app.js lÃ­neas 1312-1428
+    // Este es el mismo HTML que en app.js líneas 1312-1428
     container.innerHTML = `
         ${movie.backdrop_url ? `<div class="movie-backdrop" style="background-image: url('${movie.backdrop_url}');"></div>` : ''}
         
@@ -349,10 +349,10 @@ function renderMovieDetails(container, movie, hash) {
                 </button>
                 
                 <div class="meta-row">
-                    <span class="badge status ${statusClass}">${statusIcon} ${statusLabel}</span>
-                    <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
-                    <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${formatBytes(movie.size)}</span>
                     ${movie.country_code ? `<span class="badge country" title="${escapeHtml(getCountryName(movie.country_code))}"><span class="flag-emoji">${countryCodeToFlag(movie.country_code)}</span></span>` : ''}
+                    <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
+                    <span class="badge status ${statusClass}">${statusIcon} ${statusLabel}</span>
+                    <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${formatBytes(movie.size)}</span>
                 </div>
                 
                 ${movie.status === 'copying' && movie.copy_progress ? `
@@ -756,7 +756,7 @@ async function showTrailerModal(hash) {
     }
 
     // Show loading state
-    modalTitle.textContent = 'Cargando trÃ¡iler...';
+    modalTitle.textContent = 'Cargando tráiler...';
     trailerContainer.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>';
     modal.classList.add('active');
 
@@ -766,13 +766,13 @@ async function showTrailerModal(hash) {
         const data = await response.json();
 
         if (!data.success) {
-            trailerContainer.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--text-muted);">${escapeHtml(data.message || 'No hay trÃ¡iler disponible')}</div>`;
-            modalTitle.textContent = 'TrÃ¡iler no disponible';
+            trailerContainer.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--text-muted);">${escapeHtml(data.message || 'No hay tráiler disponible')}</div>`;
+            modalTitle.textContent = 'Tráiler no disponible';
             return;
         }
 
         // Update modal title
-        modalTitle.textContent = data.name || 'TrÃ¡iler';
+        modalTitle.textContent = data.name || 'Tráiler';
 
         // Create YouTube iframe embed
         const youtubeKey = data.youtube_key;
