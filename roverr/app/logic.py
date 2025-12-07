@@ -2405,7 +2405,24 @@ def filter_search_results(results, search_query, min_similarity=0.4):
     # Extraer títulos base del query (separados por |)
     base_queries = [q.strip() for q in search_query.split('|') if q.strip()]
     
+    # CRITICAL FIX: Remove years from base_queries for length checking
+    # Years like "2012" were triggering strict word matching for ALL queries
+    # We remove them for the short-title check, but keep them for similarity matching
+    base_queries_no_year = []
+    for q in base_queries:
+        # Remove year patterns (4-digit numbers)
+        q_no_year = re.sub(r'\b\d{4}\b', '', q).strip()
+        if q_no_year:  # Only add if something remains after removing year
+            base_queries_no_year.append(q_no_year)
+    
+    # Use queries without years for short-title detection
+    queries_for_length_check = base_queries_no_year if base_queries_no_year else base_queries
+    
+    logger.debug(f"Filter: Original queries: {base_queries}")
+    logger.debug(f"Filter: Queries for length check (years removed): {queries_for_length_check}")
+    
     filtered = []
+    rejected_count = 0
     
     for result in results:
         result_title = result.get('title', '')
@@ -2417,36 +2434,44 @@ def filter_search_results(results, search_query, min_similarity=0.4):
         is_strict_match = False
         
         for base_query in base_queries:
-            # Para títulos muy cortos, verificar palabra completa
-            if len(base_query) <= 4:
-                if is_word_match(base_query, result_title):
+            # For very short titles, verify complete word match
+            # But use queries_for_length_check to determine if it's "short"
+            query_no_year = re.sub(r'\b\d{4}\b', '', base_query).strip()
+            is_short_query = len(query_no_year) <= 4 if query_no_year else len(base_query) <= 4
+            
+            if is_short_query:
+                # Use the query without year for word matching
+                if query_no_year and is_word_match(query_no_year, result_title):
                     is_strict_match = True
-                    # Si es palabra completa, calcular similitud normalizada
+                    # Calculate similarity with the full query (including year)
                     similarity = calculate_title_similarity(base_query, result_title)
                     if similarity > best_similarity:
                         best_similarity = similarity
                         matched_query = base_query
             else:
-                # Para títulos normales, usar fuzzy matching
+                # For normal titles, use fuzzy matching
                 similarity = calculate_title_similarity(base_query, result_title)
                 if similarity > best_similarity:
                     best_similarity = similarity
                     matched_query = base_query
         
-        # Decidir si aceptar el resultado
+        # Decide if we accept the result
         accept = False
         
-        # Para títulos cortos, REQUIERE palabra completa
-        if any(len(q) <= 4 for q in base_queries):
+        # Check if ANY query (without year) is short
+        has_short_query = any(len(q) <= 4 for q in queries_for_length_check)
+        
+        if has_short_query:
+            # For short queries, REQUIRE complete word match
             if is_strict_match and best_similarity >= min_similarity:
                 accept = True
         else:
-            # Para títulos normales, solo similitud
+            # For normal titles, only similarity
             if best_similarity >= min_similarity:
                 accept = True
         
-        # También aceptar si el título empieza con el query
-        for query in base_queries:
+        # Also accept if the title starts with any query (without year)
+        for query in queries_for_length_check:
             if result_title.lower().startswith(query.lower()):
                 accept = True
                 best_similarity = max(best_similarity, 0.8)
@@ -2456,8 +2481,11 @@ def filter_search_results(results, search_query, min_similarity=0.4):
             result['_similarity'] = best_similarity
             result['_matched_query'] = matched_query
             filtered.append(result)
+        else:
+            rejected_count += 1
+            logger.debug(f"Filter: REJECTED '{result_title}' (similarity: {best_similarity:.2f}, matched: {matched_query})")
     
-    # Ordenar por similitud (más similar primero)
+    # Sort by similarity (most similar first)
     filtered.sort(key=lambda x: x.get('_similarity', 0), reverse=True)
     
     logger.info(f"Filtered results: {len(results)} → {len(filtered)} (removed {len(results) - len(filtered)} false positives)")
@@ -2533,6 +2561,12 @@ def search_indexers(query, settings, tmdb_id=None):
         # Add original query
         query_variants.append(base_query)
         
+        # IMPORTANT: Create variant without year
+        # Many trackers don't include the year in torrent names
+        query_no_year = re.sub(r'\b\d{4}\b', '', base_query).strip()
+        if query_no_year and query_no_year != base_query and query_no_year not in query_variants:
+            query_variants.append(query_no_year)
+        
         # Variant 1: Remove punctuation (: ; , - etc.)
         clean_query = re.sub(r'[:;,\-\–\—]', ' ', base_query)
         clean_query = re.sub(r'\s+', ' ', clean_query).strip()
@@ -2561,6 +2595,13 @@ def search_indexers(query, settings, tmdb_id=None):
         no_dots_no_article = re.sub(r'\s+', ' ', no_dots_no_article).strip()
         if no_dots_no_article not in query_variants:
             query_variants.append(no_dots_no_article)
+        
+        # Variant 6: Query without year + article removed
+        if query_no_year:
+            article_removed_no_year = re.sub(r'^(El|La|Los|Las|The|A|An)\s+', '', query_no_year, flags=re.IGNORECASE).strip()
+            if article_removed_no_year and article_removed_no_year not in query_variants:
+                query_variants.append(article_removed_no_year)
+
     
     logger.info(f"Searching with {len(query_variants)} variants: {query_variants}")
     
