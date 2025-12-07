@@ -8,6 +8,18 @@ from contextlib import asynccontextmanager
 from database import init_db, MoveHistory
 from logic import process_torrents, get_active_torrents, manual_move, mark_as_moved, load_settings, save_settings, get_copy_progress, stop_copy, get_movie_data
 
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("Main")
+
+# VERSION VERIFICATION - This will appear in Home Assistant logs
+logger.info("=" * 80)
+logger.info("🔧 ROVERR VERSION 4.2.90 - COUNTRY FLAG FIX DEPLOYED")
+logger.info("=" * 80)
+
+# Scheduler
+async def scheduler():
+    while True:
         settings = load_settings()
         interval = settings.get('poll_interval', 5) * 60
         
@@ -65,21 +77,28 @@ async def backup_scheduler():
             
         except Exception as e:
             logger.error(f"Error in backup scheduler: {e}")
+        
+        # Check every hour
+        await asyncio.sleep(3600)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    init_db()
+    asyncio.create_task(scheduler())
+    
+    # Import and start RSS scheduler
+    from logic import rss_scheduler
+    asyncio.create_task(rss_scheduler())
+    
+    # Start database backup scheduler (daily at 3 AM)
+    asyncio.create_task(backup_scheduler())
     
     yield
     # Shutdown
 
 app = FastAPI(lifespan=lifespan)
-
-# Middleware to disable caching for JavaScript files (fixes ES6 module caching issue)
-@app.middleware("http")
-async def disable_js_caching(request, call_next):
-    response = await call_next(request)
-    if request.url.path.endswith('.js'):
-        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
-    return response
 
 # API Endpoints
 @app.get("/api/history")
