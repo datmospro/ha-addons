@@ -15,20 +15,22 @@ import { getStatusClass, getStatusIconAndLabel } from './templates.js';
 import { switchView, getCurrentView } from './navigation.js';
 
 /**
- * Converts ISO 3166-1 country code to flag emoji
+ * Converts ISO 3166-1 country code to flag image
+ * Uses flagcdn.com for universal browser compatibility
  * @param {string} code - Two-letter country code (e.g., 'US', 'ES', 'FR')
- * @returns {string} - Flag emoji or empty string if invalid
+ * @returns {string} - Flag image HTML or empty string if invalid
  */
 function countryCodeToFlag(code) {
-    console.log('countryCodeToFlag called with:', code, 'type:', typeof code, 'length:', code?.length);
     if (!code || code.length !== 2) {
-        console.log('Returning empty string - invalid code');
         return '';
     }
-    const codePoints = code.toUpperCase().split('').map(char => 127397 + char.charCodeAt());
-    const flag = String.fromCodePoint(...codePoints);
-    console.log('Generated flag:', flag, 'from codePoints:', codePoints);
-    return flag;
+    const countryCode = code.toLowerCase();
+    // Using flagcdn.com for 20px width flag images
+    return `<img src="https://flagcdn.com/w20/${countryCode}.png" 
+                 srcset="https://flagcdn.com/w40/${countryCode}.png 2x" 
+                 width="20" 
+                 alt="${code} flag" 
+                 style="display: inline-block; vertical-align: middle; margin-right: 4px;">`;
 }
 
 /**
