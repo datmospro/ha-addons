@@ -60,6 +60,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('✓ Auto-refresh started');
 
         console.log('✅ Roverr initialized successfully!');
+        console.log('🔧 Version 4.2.89 - Country Flag Fix Applied - JavaScript is UPDATED');
 
     } catch (error) {
         console.error('❌ Error initializing Roverr:', error);
