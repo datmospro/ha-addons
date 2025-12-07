@@ -14,7 +14,7 @@ logger = logging.getLogger("Main")
 
 # VERSION VERIFICATION - This will appear in Home Assistant logs
 logger.info("=" * 80)
-logger.info("🔧 ROVERR VERSION 4.2.90 - COUNTRY FLAG FIX DEPLOYED")
+logger.info("🔧 ROVERR VERSION 4.2.94 - NO-CACHE MIDDLEWARE ADDED FOR JS FILES")
 logger.info("=" * 80)
 
 # Scheduler
@@ -99,6 +99,16 @@ async def lifespan(app: FastAPI):
     # Shutdown
 
 app = FastAPI(lifespan=lifespan)
+
+# Middleware to disable caching for JavaScript files (fixes ES6 module caching issue)
+@app.middleware("http")
+async def disable_js_caching(request, call_next):
+    response = await call_next(request)
+    if request.url.path.endswith('.js'):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
 
 # API Endpoints
 @app.get("/api/history")
