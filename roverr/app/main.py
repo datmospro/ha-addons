@@ -71,6 +71,16 @@ async def backup_scheduler():
 
 app = FastAPI(lifespan=lifespan)
 
+# Middleware to disable caching for JavaScript files (fixes ES6 module caching issue)
+@app.middleware("http")
+async def disable_js_caching(request, call_next):
+    response = await call_next(request)
+    if request.url.path.endswith('.js'):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
+
 # API Endpoints
 @app.get("/api/history")
 def get_history():
