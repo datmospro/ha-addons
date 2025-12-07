@@ -20,9 +20,15 @@ import { switchView, getCurrentView } from './navigation.js';
  * @returns {string} - Flag emoji or empty string if invalid
  */
 function countryCodeToFlag(code) {
-    if (!code || code.length !== 2) return '';
+    console.log('countryCodeToFlag called with:', code, 'type:', typeof code, 'length:', code?.length);
+    if (!code || code.length !== 2) {
+        console.log('Returning empty string - invalid code');
+        return '';
+    }
     const codePoints = code.toUpperCase().split('').map(char => 127397 + char.charCodeAt());
-    return String.fromCodePoint(...codePoints);
+    const flag = String.fromCodePoint(...codePoints);
+    console.log('Generated flag:', flag, 'from codePoints:', codePoints);
+    return flag;
 }
 
 /**
