@@ -1,0 +1,83 @@
+/* ===================================
+   META BADGES
+   Status, Runtime, Size, Country badges
+   Similar styling to rating badges
+   =================================== */
+
+/* Container for all meta badges */
+.meta-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin: 1.5rem 0;
+}
+
+/* Base badge styling - card-like design */
+.badge {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    transition: transform 0.2s, border-color 0.2s;
+    min-width: fit-content;
+}
+
+.badge:hover {
+    transform: translateY(-2px);
+}
+
+/* Runtime badge */
+.badge.runtime {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+.badge.runtime i {
+    color: var(--accent);
+}
+
+/* Size badge */
+.badge.size {
+    border-color: #10b981;
+    color: var(--text-primary);
+}
+
+.badge.size i {
+    color: #10b981;
+}
+
+/* Country badge */
+.badge.country {
+    border-color: #f59e0b;
+    color: var(--text-primary);
+    padding: 0.65rem 0.9rem;
+}
+
+.badge.country .flag-emoji {
+    display: inline-flex;
+    align-items: center;
+}
+
+.badge.country .flag-emoji img {
+    object-fit: contain;
+}
+
+/* Status badges - keep existing colors from status.css */
+.badge.status {
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .meta-row {
+        gap: 0.75rem;
+    }
+
+    .badge {
+        padding: 0.6rem 0.85rem;
+        font-size: 0.85rem;
+    }
+}
