@@ -3377,6 +3377,12 @@ def fetch_rss_movies(limit=30):
                 torrent_name=entry['title'] # Store original title
             )
             
+            # Notify Telegram: New Movie Found (RSS - Not Auto-Downloaded)
+            if settings.get('telegram_notify_on_new_movie', True):
+                movie_title = metadata.get('title', title) if metadata else title
+                movie_year = metadata.get('year', year) if metadata else year
+                send_telegram_notification(f"🆕 <b>New Movie Found</b>\n\n🎬 {movie_title} ({movie_year})\n📥 Added from RSS.")
+            
             added_count += 1
             added_movies.append(entry['title'])
             
