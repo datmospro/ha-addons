@@ -1512,13 +1512,22 @@ def get_movie_details(torrent_hash, api_key):
         title = movie_details.get('title', clean_torrent_name(name)[0])
         year = movie_details.get('year', clean_torrent_name(name)[1])
         
+        # DEBUG: Log original values
+        logger.info(f"DEBUG PATH CHECK - Original title: '{title}', year: '{year}'")
+        
         # Apply sanitization to title and year to match the actual folder/file names created by manual_move
         # This ensures consistent naming when checking file existence
         sanitized_title = sanitize_path_component(str(title))
         sanitized_year = sanitize_path_component(str(year))
         
+        # DEBUG: Log sanitized values
+        logger.info(f"DEBUG PATH CHECK - Sanitized title: '{sanitized_title}', year: '{sanitized_year}'")
+        
         folder_name = f"{sanitized_title} ({sanitized_year})"
         dest_path = os.path.join(local_dest, folder_name)
+        
+        # DEBUG: Log constructed path
+        logger.info(f"DEBUG PATH CHECK - Constructed dest_path: '{dest_path}'")
         
         # For RSS movies, preserve their DB status and skip torrent-based calculation
         if movie and movie.state == 'rss':
@@ -1541,17 +1550,22 @@ def get_movie_details(torrent_hash, api_key):
             else:
                 # 2. If not downloading, check history
                 if history:
+                    logger.info(f"DEBUG PATH CHECK - History found: status='{history.status}', dest_path='{history.dest_path}'")
                     if history.status == 'success' or history.status == 'manual':
                         status = 'moved' if history.status == 'success' else 'moved_manually'
                         
                         # Use the actual path from history if available
                         if history.dest_path:
                             dest_path = history.dest_path
+                            logger.info(f"DEBUG PATH CHECK - Using path from history: '{dest_path}'")
                         
                         # Verify existence
+                        logger.info(f"DEBUG PATH CHECK - Checking if path exists: '{dest_path}'")
                         if os.path.exists(dest_path):
+                            logger.info(f"DEBUG PATH CHECK - ✓ Path EXISTS: '{dest_path}'")
                             pass # Status remains moved
                         else:
+                            logger.warning(f"DEBUG PATH CHECK - ✗ Path NOT FOUND: '{dest_path}' - Setting status to 'missing'")
                             status = 'missing'
                     elif history.status == 'skipped': status = 'skipped'
                     elif history.status == 'error': status = 'error'
