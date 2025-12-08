@@ -666,7 +666,9 @@ def sync_movies(torrents, api_key):
                                  if match:
                                      title = match.group(1).strip()
                                      year = match.group(2).strip()
-                                     folder_name = f"{title} ({year})"
+                                     sanitized_title = sanitize_path_component(title)
+                                     sanitized_year = sanitize_path_component(year)
+                                     folder_name = f"{sanitized_title} ({sanitized_year})"
                                      dest_path = os.path.join(local_dest, folder_name)
                                      
                                      if os.path.exists(dest_path):
@@ -2010,7 +2012,9 @@ def get_active_torrents(config_ignored=None):
                          if match:
                              title = match.group(1).strip()
                              year = match.group(2).strip()
-                             folder_name = f"{title} ({year})"
+                             sanitized_title = sanitize_path_component(title)
+                             sanitized_year = sanitize_path_component(year)
+                             folder_name = f"{sanitized_title} ({sanitized_year})"
                              dest_path = os.path.join(local_dest, folder_name)
                              
                              if not os.path.exists(dest_path):
