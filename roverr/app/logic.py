@@ -1511,7 +1511,13 @@ def get_movie_details(torrent_hash, api_key):
         
         title = movie_details.get('title', clean_torrent_name(name)[0])
         year = movie_details.get('year', clean_torrent_name(name)[1])
-        folder_name = f"{title} ({year})"
+        
+        # Apply sanitization to title and year to match the actual folder/file names created by manual_move
+        # This ensures consistent naming when checking file existence
+        sanitized_title = sanitize_path_component(str(title))
+        sanitized_year = sanitize_path_component(str(year))
+        
+        folder_name = f"{sanitized_title} ({sanitized_year})"
         dest_path = os.path.join(local_dest, folder_name)
         
         # For RSS movies, preserve their DB status and skip torrent-based calculation
