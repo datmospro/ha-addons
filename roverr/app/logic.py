@@ -2629,6 +2629,25 @@ def search_indexers(query, settings, tmdb_id=None):
             if article_removed_no_year and article_removed_no_year not in query_variants:
                 query_variants.append(article_removed_no_year)
 
+        # NEW Variant 7: Remove ALL articles and common prepositions (not just at start)
+        # This helps when tracker uses different article/preposition placement
+        # e.g., "Chainsaw Man - La película: El arco de Reze" → "Chainsaw Man película arco Reze"
+        no_articles = re.sub(r'\b(el|la|los|las|de|del|un|una|unos|unas|the|a|an|of)\b', ' ', base_query, flags=re.IGNORECASE)
+        no_articles = re.sub(r'[:;,\-\–\—]', ' ', no_articles)  # Also remove punctuation
+        no_articles = re.sub(r'\s+', ' ', no_articles).strip()
+        if no_articles and len(no_articles) > 3 and no_articles not in query_variants:
+            query_variants.append(no_articles)
+        
+        # NEW Variant 8: Ultra-short - Extract only main keywords (words >= 4 chars)
+        # Helps find torrents with very different naming conventions
+        # e.g., "Chainsaw Man - La película: El arco de Reze" → "Chainsaw película arco Reze"
+        words = re.findall(r'\b\w+\b', base_query)
+        keywords = [w for w in words if len(w) >= 4 and not w.isdigit()]  # Skip short words and years
+        if len(keywords) >= 2:  # Only if we have at least 2 keywords
+            ultra_short = ' '.join(keywords)
+            if ultra_short and ultra_short not in query_variants:
+                query_variants.append(ultra_short)
+
     
     logger.info(f"Searching with {len(query_variants)} variants: {query_variants}")
     
