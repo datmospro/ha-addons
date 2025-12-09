@@ -921,16 +921,20 @@ def get_movie_data(torrents, api_key):
                 except Exception as e:
                     logger.error(f"Error re-downloading poster for {m.title}: {e}")
         
+        # Use placeholder for movies without poster (unidentified)
+        poster_url = m.poster_path if m.poster_path else 'posters/placeholder_unidentified.png'
+        
         movies.append({
             "title": m.title,
             "year": m.year,
-            "poster_url": m.poster_path,
+            "poster_url": poster_url,
             "backdrop_url": m.backdrop_path,
             "overview": m.overview,
             "torrent_hash": m.torrent_hash,
             "status": m.status,
             "progress": m.progress,
-            "state": m.state
+            "state": m.state,
+            "size": 0 if (m.state == 'rss' and m.status == 'new') else m.size  # RSS movies not downloaded show 0
         })
         
     # Identify ignored series from active torrents
