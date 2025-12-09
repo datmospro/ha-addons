@@ -629,7 +629,9 @@ def sync_movies(torrents, api_key):
             # Update dynamic fields
             movie.progress = t['progress']
             movie.state = t['state']
-            movie.size = t['size']
+            # Don't update size for RSS movies that haven't been downloaded yet
+            if not (movie.state == 'rss' and movie.status == 'new'):
+                movie.size = t['size']
             
             # Backfill torrent_name if missing
             if not movie.torrent_name:
