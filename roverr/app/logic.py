@@ -1253,7 +1253,7 @@ def get_movie_details(torrent_hash, api_key):
                         "crew": json.loads(movie.crew) if movie.crew else [],
                         "status": movie.status,  # Preserve original status (e.g., 'new')
                         "torrent_hash": torrent_hash,
-                        "size": movie.size,
+                        "size": 0 if movie.status == 'new' else movie.size,  # RSS movies not downloaded yet show 0 (N/A in UI)
                         "progress": movie.progress,
                         "state": movie.state,
                         "source_path": "RSS Feed",
