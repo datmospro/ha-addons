@@ -157,7 +157,9 @@ function renderMovieCards(movies) {
         let card = existingCards.get(movie.torrent_hash);
         const { icon: statusIcon, label: statusLabel } = getStatusIconAndLabel(movie.status);
         const statusClass = getStatusClass(movie.status);
-        const posterSrc = movie.poster_url || 'https://via.placeholder.com/300x450?text=No+Cover';
+        const posterSrc = movie.poster_url
+            ? `${movie.poster_url}?t=${Date.now()}`
+            : 'https://via.placeholder.com/300x450?text=No+Cover';
 
         if (card) {
             // Update existing card
