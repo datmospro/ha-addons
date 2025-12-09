@@ -1433,8 +1433,17 @@ def get_movie_details(torrent_hash, api_key):
             }
         else:
             # No cache, fetch from TMDB
-            logger.info(f"No cache found for {name}, fetching from TMDB")
-            title, year = clean_torrent_name(name)
+            # FIX: For RSS movies or DB entries, use stored title instead of torrent name
+            if movie:
+                # Use DB title if available (e.g., RSS movies)
+                logger.info(f"No cache for '{movie.title}', fetching from TMDB")
+                title = movie.title
+                year = movie.year
+            else:
+                # Extract from torrent name for non-DB torrents
+                logger.info(f"No cache found for {name}, extracting title from torrent name")
+                title, year = clean_torrent_name(name)
+            
             metadata = fetch_complete_movie_metadata(title, year, api_key)
             
             if metadata:
@@ -1493,15 +1502,36 @@ def get_movie_details(torrent_hash, api_key):
                     movie.metadata_updated_at = datetime.now()
                     movie.save()
             else:
-                # Fallback if TMDB fetch fails
-                title, year = clean_torrent_name(name)
+                # TMDB fetch failed - Movie not found
+                logger.warning(f"Movie '{title}' ({year}) not found in TMDB")
+                
+                # Use placeholder image for unidentified movies
+                placeholder_poster = 'posters/placeholder_unidentified.png'
+                
                 movie_details = {
                     "title": title,
                     "year": year,
-                    "overview": "Movie not found in TMDB.",
+                    "overview": "⚠️ This movie could not be identified in TMDB. You can manually identify it using the 'Identify Manually' button.",
+                    "poster_url": placeholder_poster,
+                    "backdrop_url": None,
                     "cast": [],
-                    "crew": []
+                    "crew": [],
+                    "runtime": 0,
+                    "vote_average": 0,
+                    "vote_count": 0,
+                    "genres": [],
+                    "imdb_id": None,
+                    "imdb_rating": None,
+                    "imdb_votes": None,
+                    "tmdb_id": None,
+                    "country_code": None
                 }
+                
+                # Update database to save placeholder
+                if movie:
+                    movie.poster_path = placeholder_poster
+                    movie.overview = movie_details["overview"]
+                    movie.save()
 
         # Calculate Paths & Status (dynamic data from torrent client)
         content_path = t.content_path
