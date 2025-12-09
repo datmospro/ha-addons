@@ -345,7 +345,8 @@ function renderMovieDetails(container, movie, hash) {
                     <span class="badge status ${statusClass}">${statusIcon} ${statusLabel}</span>
                     <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
                     <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${(() => {
-            const showNA = ['new', 'pending', 'downloading', 'error'].includes(movie.status);
+            // Show N/A only for RSS movies without active torrent
+            const showNA = movie.state === 'rss';
             console.log('[SIZE DEBUG]', movie.title, '- state:', movie.state, '- status:', movie.status, '- size:', movie.size, '- showNA:', showNA);
             return showNA ? 'N/A' : formatBytes(movie.size);
         })()}</span>
