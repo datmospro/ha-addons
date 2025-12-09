@@ -342,7 +342,7 @@ function renderMovieDetails(container, movie, hash) {
                 <div class="meta-row">
                     <span class="badge status ${statusClass}">${statusIcon} ${statusLabel}</span>
                     <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
-                    <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${movie.size > 0 ? formatBytes(movie.size) : 'N/A'}</span>
+                    <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${movie.state !== 'rss' ? formatBytes(movie.size) : 'N/A'}</span>
                     ${movie.country_code ? `<span class="badge country" title="${escapeHtml(getCountryName(movie.country_code))}"><span class="flag-emoji">${countryCodeToFlag(movie.country_code)}</span></span>` : ''}
                     <button class="badge trailer-badge" data-hash="${hash}" title="Trailer"><i class="fa-brands fa-youtube"></i></button>
                 </div>
