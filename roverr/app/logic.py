@@ -902,26 +902,28 @@ def get_movie_data(torrents, api_key):
     for m in Movie.select().where((Movie.ignored == False) & ((Movie.watchlist == False) | (Movie.watchlist.is_null()))).order_by(Movie.added_at.desc()):
         # Check if poster file exists, if not try to re-download
         if m.poster_path:
-            poster_full_path = os.path.join(base_dir, m.poster_path)
-            if not os.path.exists(poster_full_path):
-                logger.warning(f"Poster missing for {m.title}, attempting re-download")
-                # Try to get TMDB data and re-download
-                try:
-                    search_url = "https://api.themoviedb.org/3/search/movie"
-                    params = {"api_key": api_key, "query": m.title, "language": get_language(), "year": m.year}
-                    res = requests.get(search_url, params=params, timeout=5)
-                    data = res.json()
-                    
-                    if data.get('results'):
-                        result = data['results'][0]
-                        if result.get('poster_path'):
-                            poster_url = f"https://image.tmdb.org/t/p/w500{result.get('poster_path')}"
-                            new_poster = download_image(poster_url, f"{m.torrent_hash}_poster.jpg", force=True)
-                            if new_poster:
-                                m.poster_path = new_poster
-                                m.save()
-                except Exception as e:
-                    logger.error(f"Error re-downloading poster for {m.title}: {e}\")")
+            # Don't try to re-download the placeholder
+            if 'placeholder_unidentified' not in m.poster_path:
+                poster_full_path = os.path.join(base_dir, m.poster_path)
+                if not os.path.exists(poster_full_path):
+                    logger.warning(f"Poster missing for {m.title}, attempting re-download")
+                    # Try to get TMDB data and re-download
+                    try:
+                        search_url = "https://api.themoviedb.org/3/search/movie"
+                        params = {"api_key": api_key, "query": m.title, "language": get_language(), "year": m.year}
+                        res = requests.get(search_url, params=params, timeout=5)
+                        data = res.json()
+                        
+                        if data.get('results'):
+                            result = data['results'][0]
+                            if result.get('poster_path'):
+                                poster_url = f"https://image.tmdb.org/t/p/w500{result.get('poster_path')}"
+                                new_poster = download_image(poster_url, f"{m.torrent_hash}_poster.jpg", force=True)
+                                if new_poster:
+                                    m.poster_path = new_poster
+                                    m.save()
+                    except Exception as e:
+                        logger.error(f"Error re-downloading poster for {m.title}: {e}\"")")
         
         # Use placeholder for movies without poster (unidentified)
         poster_url = m.poster_path
