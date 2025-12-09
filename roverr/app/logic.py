@@ -921,10 +921,13 @@ def get_movie_data(torrents, api_key):
                 except Exception as e:
                     logger.error(f"Error re-downloading poster for {m.title}: {e}")
         
+        # Use placeholder if no poster exists
+        poster_display = m.poster_path if m.poster_path else 'posters/placeholder_unidentified.png'
+        
         movies.append({
             "title": m.title,
             "year": m.year,
-            "poster_url": m.poster_path,
+            "poster_url": poster_display,
             "backdrop_url": m.backdrop_path,
             "overview": m.overview,
             "torrent_hash": m.torrent_hash,
@@ -3423,6 +3426,10 @@ def fetch_rss_movies(limit=30):
                 if metadata.get('backdrop_path'):
                     backdrop_url = f"https://image.tmdb.org/t/p/w1280{metadata.get('backdrop_path')}"
                     backdrop_local = download_image(backdrop_url, f"{pseudo_hash}_backdrop.jpg")
+            else:
+                # TMDB not found - use placeholder
+                logger.warning(f"TMDB metadata not found for '{title}' ({year}), using placeholder")
+                poster_local = 'posters/placeholder_unidentified.png'
             
             # Create DB Entry
             Movie.create(
