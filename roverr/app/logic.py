@@ -923,7 +923,7 @@ def get_movie_data(torrents, api_key):
                                     m.poster_path = new_poster
                                     m.save()
                     except Exception as e:
-                        logger.error(f"Error re-downloading poster for {m.title}: {e}\"")")
+                        logger.error(f"Error re-downloading poster for {m.title}: {e}")
         
         # Use placeholder for movies without poster (unidentified)
         poster_url = m.poster_path
