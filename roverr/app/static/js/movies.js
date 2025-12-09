@@ -333,7 +333,7 @@ function renderMovieDetails(container, movie, hash) {
         
         <div class="movie-details-layout">
             <div class="movie-poster-large">
-                <img src="${movie.poster_url || 'https://via.placeholder.com/500x750?text=No+Cover'}" alt="${escapeHtml(movie.title)}">
+                <img src="${movie.poster_url || 'https://via.placeholder.com/500x750?text=No+Cover'}${movie.poster_url ? '?t=' + Date.now() : ''}" alt="${escapeHtml(movie.title)}">
             </div>
             <div class="movie-info-panel">
                 <h1>${escapeHtml(movie.title)} <span class="year">(${movie.year || 'N/A'})</span></h1>
