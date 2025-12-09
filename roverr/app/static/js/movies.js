@@ -343,8 +343,9 @@ function renderMovieDetails(container, movie, hash) {
                     <span class="badge status ${statusClass}">${statusIcon} ${statusLabel}</span>
                     <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
                     <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${(() => {
-            console.log('[SIZE DEBUG]', movie.title, '- state:', movie.state, '- size:', movie.size, '- will show:', movie.state !== 'rss' ? formatBytes(movie.size) : 'N/A');
-            return movie.state !== 'rss' ? formatBytes(movie.size) : 'N/A';
+            const showNA = ['new', 'pending', 'downloading', 'error'].includes(movie.status);
+            console.log('[SIZE DEBUG]', movie.title, '- state:', movie.state, '- status:', movie.status, '- size:', movie.size, '- showNA:', showNA);
+            return showNA ? 'N/A' : formatBytes(movie.size);
         })()}</span>
                     ${movie.country_code ? `<span class="badge country" title="${escapeHtml(getCountryName(movie.country_code))}"><span class="flag-emoji">${countryCodeToFlag(movie.country_code)}</span></span>` : ''}
                     <button class="badge trailer-badge" data-hash="${hash}" title="Trailer"><i class="fa-brands fa-youtube"></i></button>
