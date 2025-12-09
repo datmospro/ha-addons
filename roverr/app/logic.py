@@ -921,10 +921,15 @@ def get_movie_data(torrents, api_key):
                                 m.poster_path = new_poster
                                 m.save()
                 except Exception as e:
-                    logger.error(f"Error re-downloading poster for {m.title}: {e}")
+                    logger.error(f"Error re-downloading poster for {m.title}: {e}\")")
         
         # Use placeholder for movies without poster (unidentified)
-        poster_url = m.poster_path if m.poster_path else 'posters/placeholder_unidentified.png'
+        poster_url = m.poster_path
+        if not poster_url:
+            poster_url = 'posters/placeholder_unidentified.png'
+            # Save placeholder to DB so it persists
+            m.poster_path = poster_url
+            m.save()
         
         movies.append({
             "title": m.title,
