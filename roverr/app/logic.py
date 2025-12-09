@@ -625,15 +625,11 @@ def sync_movies(torrents, api_key):
 
             # CAPTURE OLD STATUS BEFORE ANY MODIFICATIONS (Critical for download completion detection)
             old_status = movie.status
-            old_state = movie.state  # Also capture old state for RSS check
 
             # Update dynamic fields
             movie.progress = t['progress']
             movie.state = t['state']
-            # Don't update size for RSS movies that hav en't been downloaded yet
-            # Check old_state because movie.state was just overwritten above
-            if not (old_state == 'rss' and movie.status == 'new'):
-                movie.size = t['size']
+            movie.size = t['size']
             
             # Backfill torrent_name if missing
             if not movie.torrent_name:
@@ -904,48 +900,37 @@ def get_movie_data(torrents, api_key):
     for m in Movie.select().where((Movie.ignored == False) & ((Movie.watchlist == False) | (Movie.watchlist.is_null()))).order_by(Movie.added_at.desc()):
         # Check if poster file exists, if not try to re-download
         if m.poster_path:
-            # Don't try to re-download the placeholder
-            if 'placeholder_unidentified' not in m.poster_path:
-                poster_full_path = os.path.join(base_dir, m.poster_path)
-                if not os.path.exists(poster_full_path):
-                    logger.warning(f"Poster missing for {m.title}, attempting re-download")
-                    # Try to get TMDB data and re-download
-                    try:
-                        search_url = "https://api.themoviedb.org/3/search/movie"
-                        params = {"api_key": api_key, "query": m.title, "language": get_language(), "year": m.year}
-                        res = requests.get(search_url, params=params, timeout=5)
-                        data = res.json()
-                        
-                        if data.get('results'):
-                            result = data['results'][0]
-                            if result.get('poster_path'):
-                                poster_url = f"https://image.tmdb.org/t/p/w500{result.get('poster_path')}"
-                                new_poster = download_image(poster_url, f"{m.torrent_hash}_poster.jpg", force=True)
-                                if new_poster:
-                                    m.poster_path = new_poster
-                                    m.save()
-                    except Exception as e:
-                        logger.error(f"Error re-downloading poster for {m.title}: {e}")
-        
-        # Use placeholder for movies without poster (unidentified)
-        poster_url = m.poster_path
-        if not poster_url:
-            poster_url = 'posters/placeholder_unidentified.png'
-            # Save placeholder to DB so it persists
-            m.poster_path = poster_url
-            m.save()
+            poster_full_path = os.path.join(base_dir, m.poster_path)
+            if not os.path.exists(poster_full_path):
+                logger.warning(f"Poster missing for {m.title}, attempting re-download")
+                # Try to get TMDB data and re-download
+                try:
+                    search_url = "https://api.themoviedb.org/3/search/movie"
+                    params = {"api_key": api_key, "query": m.title, "language": get_language(), "year": m.year}
+                    res = requests.get(search_url, params=params, timeout=5)
+                    data = res.json()
+                    
+                    if data.get('results'):
+                        result = data['results'][0]
+                        if result.get('poster_path'):
+                            poster_url = f"https://image.tmdb.org/t/p/w500{result.get('poster_path')}"
+                            new_poster = download_image(poster_url, f"{m.torrent_hash}_poster.jpg", force=True)
+                            if new_poster:
+                                m.poster_path = new_poster
+                                m.save()
+                except Exception as e:
+                    logger.error(f"Error re-downloading poster for {m.title}: {e}")
         
         movies.append({
             "title": m.title,
             "year": m.year,
-            "poster_url": poster_url,
+            "poster_url": m.poster_path,
             "backdrop_url": m.backdrop_path,
             "overview": m.overview,
             "torrent_hash": m.torrent_hash,
             "status": m.status,
             "progress": m.progress,
-            "state": m.state,
-            "size": 0 if (m.state == 'rss' and m.status == 'new') else m.size  # RSS movies not downloaded show 0
+            "state": m.state
         })
         
     # Identify ignored series from active torrents
@@ -1268,7 +1253,7 @@ def get_movie_details(torrent_hash, api_key):
                         "crew": json.loads(movie.crew) if movie.crew else [],
                         "status": movie.status,  # Preserve original status (e.g., 'new')
                         "torrent_hash": torrent_hash,
-                        "size": 0 if movie.status == 'new' else movie.size,  # RSS movies not downloaded yet show 0 (N/A in UI)
+                        "size": movie.size,
                         "progress": movie.progress,
                         "state": movie.state,
                         "source_path": "RSS Feed",
