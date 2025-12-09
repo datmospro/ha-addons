@@ -625,12 +625,14 @@ def sync_movies(torrents, api_key):
 
             # CAPTURE OLD STATUS BEFORE ANY MODIFICATIONS (Critical for download completion detection)
             old_status = movie.status
+            old_state = movie.state  # Also capture old state for RSS check
 
             # Update dynamic fields
             movie.progress = t['progress']
             movie.state = t['state']
-            # Don't update size for RSS movies that haven't been downloaded yet
-            if not (movie.state == 'rss' and movie.status == 'new'):
+            # Don't update size for RSS movies that hav en't been downloaded yet
+            # Check old_state because movie.state was just overwritten above
+            if not (old_state == 'rss' and movie.status == 'new'):
                 movie.size = t['size']
             
             # Backfill torrent_name if missing
