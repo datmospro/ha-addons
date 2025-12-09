@@ -447,17 +447,54 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False):
     Returns a dictionary with all metadata or None if not found.
     """
     try:
-        # 1. Search for movie
+        # 1. Search for movie with fallback variants
         search_url = "https://api.themoviedb.org/3/search/movie"
-        params = {"api_key": api_key, "query": title, "language": get_language(), "year": year}
-        res = requests.get(search_url, params=params, timeout=5)
-        search_data = res.json()
+        original_lang = get_language()
         
-        if not search_data.get('results'):
-            return None
+        # Generate search variants (ordered from most to least specific)
+        variants = [
+            {"query": title, "year": year, "language": original_lang},  # Original with year
+            {"query": title, "language": original_lang},  # Without year
+        ]
+        
+        # Variant 3: Remove trailing numbers (e.g., "Köln 75" → "Köln")
+        import re
+        title_no_numbers = re.sub(r'\s+\d+$', '', title).strip()
+        if title_no_numbers != title:
+            variants.append({"query": title_no_numbers, "year": year, "language": original_lang})
+        
+        # Variant 4: Try in English
+        if original_lang != 'en-US':
+            variants.append({"query": title, "year": year, "language": "en-US"})
+        
+        # Variant 5: Normalize special characters (ö→o, á→a, etc.)
+        import unicodedata
+        normalized = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('utf-8')
+        if normalized != title and normalized:
+            variants.append({"query": normalized, "year": year, "language": original_lang})
+        
+        # Try each variant until we find results
+        movie_id = None
+        for i, variant in enumerate(variants):
+            params = {"api_key": api_key, **variant}
+            logger.debug(f"TMDB search variant {i+1}/{len(variants)}: query='{variant['query']}', year={variant.get('year', 'None')}, lang={variant['language']}")
             
-        result = search_data['results'][0]
-        movie_id = result['id']
+            res = requests.get(search_url, params=params, timeout=5)
+            search_data = res.json()
+            
+            if search_data.get('results'):
+                # Found results!
+                result = search_data['results'][0]
+                movie_id = result['id']
+                if i > 0:
+                    logger.info(f"TMDB found '{title}' ({year}) using fallback variant {i+1}: '{variant['query']}'")
+                else:
+                    logger.debug(f"TMDB found '{title}' ({year}) using exact search")
+                break
+        
+        if not movie_id:
+            logger.warning(f"TMDB search failed for '{title}' ({year}) after trying {len(variants)} variants")
+            return None
         
         # 2. Get full details
         details_url = f"https://api.themoviedb.org/3/movie/{movie_id}"
