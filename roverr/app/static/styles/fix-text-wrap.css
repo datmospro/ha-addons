@@ -3,13 +3,17 @@
 #view-movie-details {
     width: 100% !important;
     max-width: 100% !important;
-    overflow-x: hidden !important;
+    overflow-x: clip !important;
+    /* 'clip' preserves sticky behavior better than 'hidden' */
+    overflow-y: visible !important;
+    /* Ensure vertical overflow is visible */
 }
 
 #movie-details-content {
     width: 100% !important;
     max-width: 100% !important;
-    overflow-x: hidden !important;
+    overflow-x: clip !important;
+    overflow-y: visible !important;
 }
 
 .movie-details-layout {
