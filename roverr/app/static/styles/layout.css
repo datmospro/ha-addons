@@ -103,8 +103,17 @@
     padding: 0;
 }
 
+/* Movie Details needs special handling because content is injected via JS */
 #view-movie-details {
     padding: 0;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#view-movie-details .movie-details-content {
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .view-header {
