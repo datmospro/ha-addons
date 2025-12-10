@@ -197,6 +197,7 @@
 }
 
 /* ========== Movie Sticky Header ========== */
+/* ========== Movie Sticky Header ========== */
 .movie-sticky-header {
     position: sticky;
     top: 0;
@@ -210,9 +211,9 @@
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     /* Subtle border */
     /* Fix for scrollbar gap */
-    width: calc(100% + 8px);
-    margin-right: -8px;
-    padding-right: 8px;
+    width: calc(100% + 10px);
+    margin-right: -10px;
+    padding-right: 10px;
     /* Compensate for width increase */
     transition: all 0.3s ease;
 }
