@@ -1,22 +1,45 @@
 import os
+import json
 import shutil
 import time
 import threading
 import logging
 import qbittorrentapi
 import re
-import json
 import requests
 import hashlib
+import unicodedata
 from datetime import datetime
 from database import MoveHistory, Movie
 
-# Configure Logging
+# ===== LOGGING CONFIGURATION =====
+
+# Mapping de niveles user-friendly a Python logging
+LOG_LEVELS = {
+    "Basic": logging.WARNING,
+    "Standard": logging.INFO,
+    "Verbose": logging.DEBUG
+}
+
+def get_log_level():
+    """Get log level from Home Assistant options"""
+    try:
+        options_file = "/data/options.json"
+        if os.path.exists(options_file):
+            with open(options_file, 'r') as f:
+                options = json.load(f)
+                level_name = options.get('log_level', 'Standard')
+                return LOG_LEVELS.get(level_name, logging.INFO)
+    except Exception:
+        pass
+    return logging.INFO  # Default fallback
+
+# Configurar logging con nivel dinámico
 logging.basicConfig(
-    level=logging.INFO,
+    level=get_log_level(),
     format='%(levelname)s:%(name)s:%(message)s'
 )
-logger = logging.getLogger("PlexMover")
+logger = logging.getLogger("Roverr")
 
 # Constants
 MANUAL_SEARCH_TAG = "manual-search-autocopy"

@@ -10,11 +10,14 @@ from logic import process_torrents, get_active_torrents, manual_move, mark_as_mo
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("Main")
 
-# VERSION VERIFICATION - This will appear in Home Assistant logs
+# ===== STARTUP BANNER =====
+logger = logging.getLogger("Roverr")
 logger.info("=" * 80)
-logger.info("🔧 ROVERR VERSION 4.2.94 - NO-CACHE MIDDLEWARE ADDED FOR JS FILES")
+logger.info("🚀 ROVERR - MEDIA MANAGER")
+logger.info("=" * 80)
+logger.info(f"📦 Version: 4.3.37")
+logger.info(f"🔧 Log Level: {logging.getLevelName(logger.getEffectiveLevel())}")
 logger.info("=" * 80)
 
 # Scheduler

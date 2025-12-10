@@ -1,5 +1,5 @@
 name: "Roverr"
-version: "4.3.37"
+version: "4.3.38"
 slug: "roverr"
 description: "Your personal media manager. Organizes downloads for Jellyfin, Emby, Kodi, Plex, and other media servers."
 url: "https://github.com/datmospro/ha-addons/tree/main/roverr"
@@ -13,8 +13,10 @@ map:
   - config:rw
   - share:rw
   - media:rw
-options: {}
-schema: {}
+options:
+  log_level: "Standard"
+schema:
+  log_level: "list(Basic|Standard|Verbose)?"
 ports:
   8092/tcp: 8092
 webui: "http://[HOST]:[PORT:8092]"

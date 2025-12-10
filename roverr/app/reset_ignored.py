@@ -1,10 +1,13 @@
+import logging
 from database import Movie, db
+
+logger = logging.getLogger("Roverr")
 
 def reset_ignored():
     db.connect()
     query = Movie.update(ignored=False).where(Movie.ignored == True)
     count = query.execute()
-    print(f"Reset {count} ignored movies to visible.")
+    logger.info(f"✅ Reset {count} ignored movies to visible")
     db.close()
 
 if __name__ == "__main__":
