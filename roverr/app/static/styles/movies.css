@@ -201,9 +201,16 @@
     position: sticky;
     top: 0;
     z-index: 100;
-    background: #1e293b;
-    border-bottom: 2px solid var(--border-color);
+    background: rgba(15, 23, 42, 0.85);
+    /* Semi-transparent dark background */
+    backdrop-filter: blur(12px);
+    /* Blur effect */
+    -webkit-backdrop-filter: blur(12px);
+    /* Safari support */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    /* Subtle border */
     width: 100%;
+    transition: all 0.3s ease;
 }
 
 .header-top {
