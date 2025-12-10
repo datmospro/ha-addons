@@ -3464,6 +3464,7 @@ def fetch_rss_movies(limit=30):
                                     imdb_rating=metadata.get('imdb_rating') if metadata else None,
                                     imdb_votes=metadata.get('imdb_votes') if metadata else None,
                                     tmdb_id=int(entry_tmdb_id) if entry_tmdb_id else None,  # Save TMDB ID for intelligent search
+                                    country_code=metadata.get('country_code') if metadata else None,  # Save country code for flag display
                                     metadata_updated_at=datetime.now(),
                                     torrent_name=torrent_name
                                 )
