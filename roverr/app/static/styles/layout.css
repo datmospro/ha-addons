@@ -105,7 +105,20 @@
 
 #view-movie-details {
     padding: 0;
-    /* Full-width header */
+    height: calc(100vh - 0px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#view-movie-details .movie-sticky-header {
+    flex-shrink: 0;
+}
+
+#view-movie-details .movie-details-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .dashboard-content {

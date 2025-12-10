@@ -315,8 +315,6 @@ function renderMovieDetails(container, movie, hash) {
 
     // Este es el mismo HTML que en app.js líneas 1312-1428
     container.innerHTML = `
-        ${movie.backdrop_url ? `<div class="movie-backdrop" style="background-image: url('${movie.backdrop_url}');"></div>` : ''}
-        
         <div class="movie-sticky-header">
             <div class="header-top">
                 <h2>Movie Details</h2>
@@ -334,6 +332,9 @@ function renderMovieDetails(container, movie, hash) {
                 <button class="btn danger delete-movie-btn" data-hash="${hash}"><i class="fa-solid fa-trash"></i> Remove from Dashboard</button>
             </div>
         </div>
+        
+        <div class="movie-details-content">
+        ${movie.backdrop_url ? `<div class="movie-backdrop" style="background-image: url('${movie.backdrop_url}');"></div>` : ''}
         
         <div class="movie-details-layout">
             <div class="movie-poster-large">
