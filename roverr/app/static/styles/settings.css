@@ -3,14 +3,14 @@
    Tabbed Layout, Cards, Inputs
    =================================== */
 
-/* ========== Settings Layout ========== */
+/* ========== Settings Layout */
 .settings-layout {
-    display: flex;
+    display: grid;
+    grid-template-columns: 250px 1fr;
     gap: 2rem;
     padding: 2rem;
-
-    max-width: 1400px;
-    margin: 0 auto;
+    min-height: calc(100vh - 140px);
+    /* Allow content to grow beyond viewport */
 }
 
 /* ========== Settings Sidebar (Tabs) ========== */
