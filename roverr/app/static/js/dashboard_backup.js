@@ -75,7 +75,6 @@ function setupDashboard() {
         fetchTorrents();
         fetchMovies();
     });
-    document.getElementById('trigger-btn').addEventListener('click', triggerCheck);
     document.getElementById('fetch-rss-btn').addEventListener('click', fetchRSSMovies);
 
     // Sorting Event Listeners
@@ -100,16 +99,6 @@ async function fetchTorrents() {
         renderTorrents();
     } catch (e) {
         console.error("Error fetching torrents:", e);
-    }
-}
-
-async function triggerCheck() {
-    try {
-        await fetch(`${API_BASE}/trigger`, { method: 'POST' });
-        showToast('Auto-check triggered', 'success');
-        fetchTorrents();
-    } catch (e) {
-        showToast('Error triggering check', 'error');
     }
 }
 
