@@ -56,7 +56,11 @@ export function initSettings() {
     // RSS Auto-download toggles
     const rssAutoAdd = document.getElementById('rss-auto-add');
     if (rssAutoAdd) {
-        rssAutoAdd.addEventListener('change', () => toggleAutoDownloadSettings('rss-auto-add', 'rss-auto-download-settings'));
+        rssAutoAdd.addEventListener('change', () => {
+            toggleAutoDownloadSettings('rss-auto-add', 'rss-size-fields');
+            const hint = document.getElementById('rss-size-hint');
+            if (hint) hint.style.display = rssAutoAdd.checked ? 'block' : 'none';
+        });
     }
 
     const editRssAutoAdd = document.getElementById('edit-rss-auto-add');
@@ -419,7 +423,8 @@ function addRSSFeed() {
     maxSizeInput.value = '';
 
     // Reset visibility
-    toggleAutoDownloadSettings('rss-auto-add', 'rss-auto-download-settings');
+    toggleAutoDownloadSettings('rss-auto-add', 'rss-size-fields');
+    document.getElementById('rss-size-hint').style.display = 'none';
 
     state.setSettings(settings);
     renderRSSFeedsList();

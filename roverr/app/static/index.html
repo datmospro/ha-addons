@@ -80,9 +80,11 @@
                         </button>
 
                         <div class="dashboard-actions">
-                        <button id="fetch-rss-btn" class="btn secondary"><i class="fa-solid fa-rss"></i> Fetch RSS</button>
-                        <button id="refresh-btn" class="btn secondary"><i class="fa-solid fa-rotate"></i> Refresh</button>
-                    </div>
+                            <button id="fetch-rss-btn" class="btn secondary"><i class="fa-solid fa-rss"></i> Fetch
+                                RSS</button>
+                            <button id="refresh-btn" class="btn secondary"><i class="fa-solid fa-rotate"></i>
+                                Refresh</button>
+                        </div>
                     </div>
                 </div>
 
@@ -290,16 +292,29 @@
                                         </div>
                                         <div class="checkbox-row">
                                             <input type="checkbox" id="rss-auto-add">
-                                            <label for="rss-auto-add">Auto-add to Dashboard</label>
+                                            <label for="rss-auto-add">Auto-download movies</label>
                                         </div>
                                         <div class="checkbox-row">
                                             <input type="checkbox" id="rss-auto-copy">
-                                            <label for="rss-auto-copy">Auto-copy on completion</label>
+                                            <label for="rss-auto-copy">Auto-copy to destination when download
+                                                completes</label>
                                         </div>
                                     </div>
-                                    <!-- Hidden fields for compatibility -->
-                                    <input type="hidden" id="rss-preferred-size">
-                                    <input type="hidden" id="rss-max-size">
+
+                                    <!-- Size fields container (shown when Auto-download is checked) -->
+                                    <div id="rss-size-fields" class="grid-2" style="display: none; margin-top: 1rem;">
+                                        <div class="input-group">
+                                            <label>Preferred Size (MB)</label>
+                                            <input type="number" id="rss-preferred-size" placeholder="5000" min="0">
+                                        </div>
+                                        <div class="input-group">
+                                            <label>Max Size (MB)</label>
+                                            <input type="number" id="rss-max-size" placeholder="12000" min="0">
+                                        </div>
+                                    </div>
+                                    <small id="rss-size-hint"
+                                        style="display: none; color: var(--text-muted); margin-top: 0.5rem;">Will
+                                        download torrent closest to Preferred Size, up to Max Size.</small>
 
                                     <div class="actions-row">
                                         <button id="test-rss-btn" class="btn warning"><i class="fa-solid fa-plug"></i>
