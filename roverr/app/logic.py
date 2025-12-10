@@ -156,7 +156,7 @@ def sanitize_filename(name):
     Sanitize filename to only include safe characters.
     - Removes leading/trailing spaces
     - Strips disallowed characters: <>:"|?*
-    - Path separators (/ and \)
+    - Path separators (/ and \\)
     - Control characters
     """
     # Remove leading/trailing whitespace
@@ -2851,17 +2851,13 @@ def search_indexers(query, settings, tmdb_id=None):
                     logger.info(f"Found {len(root.findall('.//item'))} results from {name} with query '{variant}'")
                 
                 except Exception as e:
-                    logger.error(f"❌ [RSS] Failed to create DB entry for {title}: {e}")
+                    logger.error(f"❌ [SEARCH] Error searching {name} with variant '{variant}': {e}")
+                    continue
                     
         except Exception as e:
-            logger.error(f"❌ [RSS] Error fetching feed {feed_name}: {e}")
+            logger.error(f"❌ [SEARCH] Error searching indexer {name}: {e}")
+            continue
     
-    # Summary
-    logger.info(f"💾 [RSS] Total entries fetched: {len(all_entries)}")
-    
-    # 2. Deduplicate
-    seen = {}
-    for entry in all_entries:
     # FALLBACK TO ENGLISH IF NO RESULTS FOUND
     # If search in tracker's language returned 0 results and we have TMDB ID,
     # try searching with English title as fallback
