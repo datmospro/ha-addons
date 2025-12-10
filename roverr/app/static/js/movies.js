@@ -268,7 +268,7 @@ function createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel)
  */
 export async function showMovieDetails(hash) {
     switchView('movie-details');
-    const container = document.getElementById('view-movie-details');
+    const container = document.getElementById('movie-details-content');
     container.setAttribute('data-hash', hash);
     container.innerHTML = '<div style="text-align: center; padding: 2rem;">Loading details...</div>';
 
@@ -315,7 +315,9 @@ function renderMovieDetails(container, movie, hash) {
 
     // Este es el mismo HTML que en app.js líneas 1312-1428
     container.innerHTML = `
-        <div class="view-header-sticky">
+        ${movie.backdrop_url ? `<div class="movie-backdrop" style="background-image: url('${movie.backdrop_url}');"></div>` : ''}
+        
+        <div class="movie-sticky-header">
             <div class="header-top">
                 <h2>Movie Details</h2>
                 <button class="btn secondary back-to-dashboard"><i class="fa-solid fa-arrow-left"></i> Back</button>
@@ -332,9 +334,6 @@ function renderMovieDetails(container, movie, hash) {
                 <button class="btn danger delete-movie-btn" data-hash="${hash}"><i class="fa-solid fa-trash"></i> Remove from Dashboard</button>
             </div>
         </div>
-        
-        <div class="view-content-scrollable">
-        ${movie.backdrop_url ? `<div class="movie-backdrop" style="background-image: url('${movie.backdrop_url}');"></div>` : ''}
         
         <div class="movie-details-layout">
             <div class="movie-poster-large">
@@ -440,7 +439,7 @@ function renderMovieDetails(container, movie, hash) {
  * Configura los event listeners de la vista de detalles
  */
 function setupMovieDetailsListeners(hash) {
-    const container = document.getElementById('view-movie-details');
+    const container = document.getElementById('movie-details-content');
 
     const backBtn = container.querySelector('.back-to-dashboard');
     if (backBtn) {
@@ -525,7 +524,7 @@ function startDetailsPolling(hash, initialStatus) {
     lastKnownStatus = initialStatus;
 
     detailsPollInterval = setInterval(async () => {
-        const container = document.getElementById('view-movie-details');
+        const container = document.getElementById('movie-details-content');
         if (getCurrentView() !== 'movie-details' || !container || container.getAttribute('data-hash') !== hash) {
             stopDetailsPolling();
             return;

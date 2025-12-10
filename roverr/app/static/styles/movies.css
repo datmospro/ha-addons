@@ -197,8 +197,14 @@
 }
 
 /* ========== Movie Sticky Header ========== */
-/* Header styles now unified in layout.css as .view-header-sticky */
-
+.movie-sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #1e293b;
+    border-bottom: 2px solid var(--border-color);
+    width: 100%;
+}
 
 .header-top {
     display: flex;

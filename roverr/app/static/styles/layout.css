@@ -88,35 +88,40 @@
     padding: 0;
 }
 
-/* ========== Views - Unified Structure ========== */
+/* ========== Views ========== */
 .view {
     display: none;
-    height: 100vh;
-    overflow: hidden;
 }
 
 .view.active {
     display: block;
+    animation: fadeIn 0.3s ease;
 }
 
-/* Sticky Header - SAME FOR ALL VIEWS */
-.view-header-sticky {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: rgba(30, 41, 59, 0.85);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+/* View-specific padding */
+#view-settings {
+    padding: 0;
 }
 
-/* Scrollable Content - SAME FOR ALL VIEWS */
-.view-content-scrollable {
-    height: 100vh;
-    overflow-y: auto;
-    overflow-x: hidden;
+#view-movie-details {
+    padding: 0;
+    /* Full-width header */
+}
+
+.dashboard-content {
     padding: 2rem;
+}
+
+.view-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.view-header h2 {
+    font-size: 1.8rem;
+    font-weight: 600;
 }
 
 /* Hide original movie details header */
