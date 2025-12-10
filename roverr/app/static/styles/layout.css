@@ -106,14 +106,22 @@
     flex-shrink: 0;
 }
 
-/* Scrollable content area for all views */
+/* Scrollable content wrapper classes - used by all views */
 .dashboard-content,
 .search-content,
-.movie-details-content {
+.movie-details-content,
+.settings-content {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 2rem;
+}
+
+/* For views without explicit content wrapper, make the view itself scrollable after header */
+.view> :not(.movie-sticky-header) {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 /* View-specific padding overrides */
