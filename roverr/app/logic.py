@@ -485,15 +485,20 @@ def scrape_imdb_rating(imdb_id):
             if match:
                 return match.group(2), match.group(1)
     except Exception as e:
-        logger.error(f"Error scraping IMDb: {e}")
+        logger.error(f"Error scraping IMDb for {imdb_id}: {e}")
     return None, None
 
 def fetch_complete_movie_metadata(title, year, api_key, images_only=False):
     """
-    Fetches complete movie metadata from TMDB including cast, crew, and ratings.
-    If images_only=True, skips credits, external_ids and IMDb scraping to be faster.
-    Returns a dictionary with all metadata or None if not found.
+    Fetches complete metadata for a movie from TMDB, including:
+    - Basic details (title, year, runtime, overview, genres)
+    - Cast and crew
+    - IMDb ID and rating
+    - Poster and backdrop images
     """
+    logger.info("=" * 80)
+    logger.info(f"🎬 [TMDB] METADATA FETCH STARTED - '{title}' ({year})")
+    logger.info("=" * 80)
     try:
         # 1. Search for movie with fallback variants
         search_url = "https://api.themoviedb.org/3/search/movie"
@@ -525,7 +530,7 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False):
         movie_id = None
         for i, variant in enumerate(variants):
             params = {"api_key": api_key, **variant}
-            logger.debug(f"TMDB search variant {i+1}/{len(variants)}: query='{variant['query']}', year={variant.get('year', 'None')}, lang={variant['language']}")
+            logger.debug(f"🔧 [TMDB] Variant {i+1}/{len(variants)}: query='{variant['query']}', year={variant.get('year', 'None')}, lang={variant['language']}")
             
             res = requests.get(search_url, params=params, timeout=5)
             search_data = res.json()
@@ -535,13 +540,13 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False):
                 result = search_data['results'][0]
                 movie_id = result['id']
                 if i > 0:
-                    logger.info(f"TMDB found '{title}' ({year}) using fallback variant {i+1}: '{variant['query']}'")
+                    logger.info(f"✅ [TMDB] Found movie using variant #{i+1}: '{variant['query']}'")
                 else:
                     logger.debug(f"TMDB found '{title}' ({year}) using exact search")
                 break
         
         if not movie_id:
-            logger.warning(f"TMDB search failed for '{title}' ({year}) after trying {len(variants)} variants")
+            logger.warning(f"⚠️  [TMDB] No results found for '{title}' ({year}) - tried {len(variants)} variants")
             return None
         
         # 2. Get full details
@@ -624,7 +629,7 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False):
         }
         
     except Exception as e:
-        logger.error(f"Error fetching complete metadata for {title}: {e}")
+        logger.error(f"❌ [TMDB] API error for '{title}' ({year}): {e}")
         return None
 
 def get_movie_videos(tmdb_id, api_key):
@@ -688,11 +693,16 @@ def get_movie_videos(tmdb_id, api_key):
 
 def sync_movies(torrents, api_key):
     """
-    Syncs active torrents with the Movie database.
-    - Adds new movies (fetches TMDB, downloads images).
-    - Updates status/progress for existing movies.
-    - Does NOT delete movies if torrent is missing (independent dashboard).
+    Syncs movies between qBittorrent torrents and the database.
+    Creates new movie entries for torrents not in DB.
+    Updates status for existing movies.
+    Detects completed downloads for auto-copy.
     """
+    logger.info("=" * 80)
+    logger.info("💾 [DB] DATABASE SYNC STARTED")
+    logger.info("=" * 80)
+    
+    logger.info(f"💾 [DB] Processing {len(torrents)} torrent(s)")
     if not api_key:
         return
 
@@ -1591,7 +1601,7 @@ def get_movie_details(torrent_hash, api_key):
                     movie.save()
             else:
                 # TMDB fetch failed - Movie not found
-                logger.warning(f"Movie '{title}' ({year}) not found in TMDB")
+                logger.warning(f"⚠️  [TMDB] No results found for '{title}' ({year})")
                 
                 # Use placeholder image for unidentified movies
                 placeholder_poster = 'posters/placeholder_unidentified.png'
@@ -2178,6 +2188,13 @@ def get_active_torrents(config_ignored=None):
         return []
 
 def manual_move(torrent_hash, config_ignored=None):
+    """
+    Manually triggers a move operation for a specific torrent
+    """
+    logger.info("=" * 80)
+    logger.info(f"📦 [MOVE] MANUAL MOVE STARTED - Hash: {torrent_hash[:8]}...")
+    logger.info("=" * 80)
+    
     settings = load_settings()
     try:
         qb = get_qb_client(settings)
@@ -2270,7 +2287,7 @@ def process_single_torrent(qb, torrent, settings):
         dest_real = os.path.realpath(dest_dir)
         local_real = os.path.realpath(local_dest)
         
-        # Ensure dest_real starts with local_real (must be subdirectory)
+        # Ensure dest_real starts with local_real + os.sep) and dest_real != local_real:
         if not dest_real.startswith(local_real + os.sep) and dest_real != local_real:
             logger.error(f"SECURITY: Path traversal attempt detected! Torrent: {torrent.name}")
             logger.error(f"  Expected base: {local_real}")
@@ -2293,6 +2310,16 @@ def process_single_torrent(qb, torrent, settings):
         os.makedirs(dest_dir, exist_ok=True)
         
         limit = settings.get('copy_speed_limit', 10)
+        logger.info("=" * 80)
+        logger.info(f"📁 [COPY] COPY STARTED")
+        logger.info(f"📁 [COPY] Source: {os.path.basename(source_path)}")
+        logger.info(f"📁 [COPY] Destination: {os.path.basename(dest_dir)}")
+        logger.info("=" * 80)
+        
+        logger.debug(f"🔧 [COPY] Full source path: {source_path}")
+        logger.debug(f"🔧 [COPY] Full destination path: {dest_dir}")
+        logger.debug(f"🔧 [COPY] Speed limit: {limit} MB/s")
+        
         logger.info(f"Using copy speed limit: {limit} MB/s")
         
         # If it's a file
@@ -2640,18 +2667,21 @@ def filter_search_results(results, search_query, min_similarity=0.4):
 
 def search_indexers(query, settings, tmdb_id=None):
     """
-    Search all configured indexers for movies matching the query.
-    If tmdb_id is provided, uses intelligent multi-language search.
-    Returns a list of results with title, year, size, download URL, and indexer name.
+    Searches all configured Prowlarr indexers for a query
     """
     import xml.etree.ElementTree as ET
     import re
     
+    logger.info("=" * 80)
+    logger.info(f"🔍 [SEARCH] INDEXER SEARCH STARTED - Query: '{query}'")
+    logger.info("=" * 80)
+    
     indexers = settings.get('indexers', [])
     if not indexers:
-        logger.warning("No indexers configured")
-        return []
+        logger.warning("⚠️  [SEARCH] No indexers configured")
+        return {"results": [], "total": 0}
     
+    logger.info(f"📡 [SEARCH] Searching {len(indexers)} configured indexer(s)")
     # INTELLIGENT MULTI-LANGUAGE SEARCH
     # If we have TMDB ID, detect indexer languages and search with appropriate titles
     if tmdb_id:
@@ -2903,6 +2933,7 @@ def search_indexers(query, settings, tmdb_id=None):
                             continue
                         
                         for variant in english_variants:
+                            logger.debug(f"🔧 [English Fallback] Trying variant: '{variant}'") # Changed to debug
                             try:
                                 params = {
                                     't': 'movie',
@@ -2911,7 +2942,7 @@ def search_indexers(query, settings, tmdb_id=None):
                                     'cat': categories
                                 }
                                 
-                                logger.info(f"[English Fallback] Searching {name} for '{variant}'")
+                                logger.debug(f"[English Fallback] Searching {name} for '{variant}'") # Changed to debug
                                 response = requests.get(url, params=params, timeout=15)
                                 
                                 if response.status_code != 200:
@@ -3063,15 +3094,15 @@ def select_best_torrent(results, preferred_size_mb, max_size_mb):
         
     return valid_results[0]
 
-def auto_download_movie(title, year, preferred_size, max_size, label=None, tmdb_id=None):
+def auto_download_movie(title, year, preferred_size_gb, max_size_gb, label=None, tmdb_id=None):
     """
-    Searches for a movie and automatically downloads the best torrent.
-    Args:
-        label: Optional tag/label to apply to the torrent (e.g., RSS feed label)
-        tmdb_id: Optional TMDB ID for intelligent multi-language search
+    Automatically searches for and downloads a movie torrent.
     Returns (torrent_hash, torrent_name) if successful, (None, None) otherwise.
     """
-    logger.info(f"Auto-downloading movie: {title} ({year})")
+    logger.info("=" * 80)
+    logger.info(f"📥 [DOWNLOAD] AUTO-DOWNLOAD STARTED - '{title}' ({year})")
+    logger.info("=" * 80)
+    logger.info(f"📥 [DOWNLOAD] Size limits: {preferred_size_gb} GB (preferred) / {max_size_gb} GB (max)")
     
     settings = load_settings()
     
