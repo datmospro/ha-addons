@@ -244,7 +244,7 @@ export function startDashboardAutoRefresh(interval = 2000) {
 /**
  * Ajusta el intervalo de polling según si hay torrents activos
  * - Torrents activos = downloading, copying, o progreso < 100%
- * - Si hay activos: 2s (responsive)
+ * - Si hay activos: 5s (responsive sin parpadeo)
  * - Si NO hay activos: 10s (ahorro de recursos)
  */
 function adjustPollingInterval() {
@@ -255,7 +255,7 @@ function adjustPollingInterval() {
         t.progress < 1
     );
 
-    const newInterval = hasActiveTorrents ? 2000 : 10000;
+    const newInterval = hasActiveTorrents ? 5000 : 10000;
 
     // Solo cambiar si el intervalo es diferente
     if (newInterval !== currentPollingInterval) {
@@ -332,5 +332,5 @@ export function stopDashboardAutoRefresh() {
         clearInterval(state.refreshInterval);
         state.refreshInterval = null;
     }
-    currentPollingInterval = 2000;
+    currentPollingInterval = 5000;
 }

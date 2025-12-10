@@ -151,14 +151,39 @@ def clean_torrent_name(name):
     title = base.replace('.', ' ').strip()
     return title, None
 
+def sanitize_filename(name):
+    """
+    Sanitize filename to only include safe characters.
+    - Removes leading/trailing spaces
+    - Strips disallowed characters: <>:"|?*
+    - Path separators (/ and \)
+    - Control characters
+    """
+    # Remove leading/trailing whitespace
+    name = name.strip()
+    # Remove disallowed characters
+    name = re.sub(r'[<>:"|?*\\/]', '', name)
+    # Replace control characters with underscore
+    name = ''.join(c if unicodedata.category(c)[0] != 'C' else '_' for c in name)
+    # Replace multiple underscores with a single one
+    name = re.sub(r'_{2,}', '_', name)
+    # Trim leading/trailing underscores
+    name = name.strip('_')
+    
+    # Limit length (Windows has 255 char limit per path component)
+    if len(name) > 200:
+        name = name[:200].strip()
+        
+    return name
+
 def sanitize_path_component(name):
     """
     Sanitizes a path component to prevent path traversal attacks.
     
     Only removes security-critical characters:
     - Path traversal sequences (..)
-    - Path separators (/ and \)
-    - Null bytes (\0)
+    - Path separators (/ and \\)
+    - Null bytes (\\0)
     
     Preserves legitimate special characters like colons (:), hyphens (-), etc.
     that are commonly part of movie titles.
@@ -2826,13 +2851,17 @@ def search_indexers(query, settings, tmdb_id=None):
                     logger.info(f"Found {len(root.findall('.//item'))} results from {name} with query '{variant}'")
                 
                 except Exception as e:
-                    logger.error(f"Error searching {name} with variant '{variant}': {e}")
-                    continue
+                    logger.error(f"❌ [RSS] Failed to create DB entry for {title}: {e}")
                     
         except Exception as e:
-            logger.error(f"Error searching indexer {name}: {e}")
-            continue
+            logger.error(f"❌ [RSS] Error fetching feed {feed_name}: {e}")
     
+    # Summary
+    logger.info(f"💾 [RSS] Total entries fetched: {len(all_entries)}")
+    
+    # 2. Deduplicate
+    seen = {}
+    for entry in all_entries:
     # FALLBACK TO ENGLISH IF NO RESULTS FOUND
     # If search in tracker's language returned 0 results and we have TMDB ID,
     # try searching with English title as fallback
@@ -3134,33 +3163,35 @@ def auto_download_movie(title, year, preferred_size, max_size, label=None, tmdb_
 
 def fetch_rss_movies(limit=30):
     """
-    Fetches movies from all configured RSS feeds.
-    - Deduplicates by title and year.
-    - Sorts by publication date (newest first).
-    - Adds new movies to DB with status 'rss_new'.
-    - Returns list of added movies.
+    Fetch movies from all RSS feeds and add them to the database
     """
-    import feedparser
+    logger.info("=" * 80)
+    logger.info("📡 [RSS] RSS FETCH STARTED")
+    logger.info("=" * 80)
     
     settings = load_settings()
-    rss_feeds = settings.get('rss_feeds', [])
+    feeds = settings.get('rss_feeds', [])
     api_key = settings.get('tmdb_api_key')
     
-    if not rss_feeds:
+    if not feeds:
+        logger.warning("⚠️  [RSS] No RSS feeds configured")
         return {"success": False, "message": "No RSS feeds configured"}
         
     # Create map for easy config lookup
-    feed_map = {f.get('name'): f for f in rss_feeds}
-        
+    feed_map = {f.get('name'): f for f in feeds}
+    
+    import feedparser
     all_entries = []
     
     # 1. Fetch from all feeds
-    for feed_config in rss_feeds:
+    logger.info(f"📥 [RSS] Fetching from {len(feeds)} configured feed(s)")
+    for feed_config in feeds:
         url = feed_config.get('url')
+        feed_name = feed_config.get('name', 'Unknown')
         if not url: continue
         
         try:
-            logger.info(f"Fetching RSS: {url}")
+            logger.debug(f"🔧 [RSS] Fetching feed: {feed_name}")
             feed = feedparser.parse(url)
             
             for entry in feed.entries:

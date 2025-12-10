@@ -7,7 +7,7 @@
 export const API_BASE = '/api';
 
 // Polling intervals
-export const DEFAULT_POLL_INTERVAL = 2000; // ms - cuando hay torrents activos
+export const DEFAULT_POLL_INTERVAL = 5000; // ms - cuando hay torrents activos (reducido parpadeo)
 export const IDLE_POLL_INTERVAL = 10000; // ms - cuando NO hay torrents activos
 export const DETAILS_POLL_INTERVAL = 1000; // ms
 export const RSS_COUNTDOWN_INTERVAL = 10000; // ms - actualización del countdown RSS
