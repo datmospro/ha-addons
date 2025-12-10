@@ -288,10 +288,10 @@ function renderRSSFeedsList() {
             <div style="display: flex; flex-direction: column; gap: 0.25rem; overflow: hidden;">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <span style="font-weight: 600;">${feed.name}</span>
-                    ${feed.enabled ? '<span style="color: var(--success); font-size: 0.75rem;">â— Enabled</span>' : '<span style="color: var(--text-muted); font-size: 0.75rem;">â—‹ Disabled</span>'}
+                    ${feed.enabled ? '<span style="color: var(--success); font-size: 0.75rem;"><i class="fa-solid fa-circle" style="font-size: 0.5rem;"></i> Enabled</span>' : '<span style="color: var(--text-muted); font-size: 0.75rem;"><i class="fa-regular fa-circle" style="font-size: 0.5rem;"></i> Disabled</span>'}
                 </div>
                 <span style="font-size: 0.8rem; color: var(--text-secondary); text-overflow: ellipsis; overflow: hidden;">${feed.url}</span>
-                <span style="font-size: 0.75rem; color: var(--text-muted);">Refresh: ${feed.refresh_interval}s ${feed.label ? `â€¢ Label: ${feed.label}` : ''}</span>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Refresh: ${feed.refresh_interval}s ${feed.label ? `&bull; Label: ${feed.label}` : ''}</span>
             </div>
             <div style="display: flex; gap: 0.5rem;">
                 <button class="btn secondary sm edit-rss-btn" data-index="${index}"><i class="fa-solid fa-pencil"></i></button>
