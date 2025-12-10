@@ -268,7 +268,7 @@ function createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel)
  */
 export async function showMovieDetails(hash) {
     switchView('movie-details');
-    const container = document.getElementById('movie-details-content');
+    const container = document.getElementById('view-movie-details');
     container.setAttribute('data-hash', hash);
     container.innerHTML = '<div style="text-align: center; padding: 2rem;">Loading details...</div>';
 
@@ -440,7 +440,7 @@ function renderMovieDetails(container, movie, hash) {
  * Configura los event listeners de la vista de detalles
  */
 function setupMovieDetailsListeners(hash) {
-    const container = document.getElementById('movie-details-content');
+    const container = document.getElementById('view-movie-details');
 
     const backBtn = container.querySelector('.back-to-dashboard');
     if (backBtn) {
@@ -525,7 +525,7 @@ function startDetailsPolling(hash, initialStatus) {
     lastKnownStatus = initialStatus;
 
     detailsPollInterval = setInterval(async () => {
-        const container = document.getElementById('movie-details-content');
+        const container = document.getElementById('view-movie-details');
         if (getCurrentView() !== 'movie-details' || !container || container.getAttribute('data-hash') !== hash) {
             stopDetailsPolling();
             return;
