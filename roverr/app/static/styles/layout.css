@@ -91,47 +91,39 @@
 /* ========== Views ========== */
 .view {
     display: none;
-}
-
-.view.active {
-    display: block;
-    animation: fadeIn 0.3s ease;
-}
-
-/* View-specific padding */
-#view-settings {
-    padding: 0;
-}
-
-/* Movie Details View - Special flex layout for sticky header */
-#view-movie-details {
-    padding: 0;
     height: 100vh;
-    display: flex;
     flex-direction: column;
     overflow: hidden;
 }
 
-#view-movie-details .movie-sticky-header {
+.view.active {
+    display: flex;
+    animation: fadeIn 0.3s ease;
+}
+
+/* All views use the same sticky header structure */
+.view .movie-sticky-header {
     flex-shrink: 0;
 }
 
-#view-movie-details .movie-details-content {
+/* Scrollable content area for all views */
+.dashboard-content,
+.search-content,
+.movie-details-content {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-}
-
-/* Other views use normal flow */
-#view-dashboard,
-#view-search {
-    height: auto;
-    display: block;
-    overflow: visible;
-}
-
-.dashboard-content {
     padding: 2rem;
+}
+
+/* View-specific padding overrides */
+#view-settings {
+    padding: 0;
+}
+
+#view-movie-details .movie-details-content {
+    padding: 0;
+    /* Movie details has its own internal layout padding */
 }
 
 .view-header {
