@@ -98,9 +98,11 @@
     animation: fadeIn 0.3s ease;
 }
 
-/* View-specific padding */
+/* Settings View - needs scrolling for long content */
 #view-settings {
     padding: 0;
+    height: 100vh;
+    overflow-y: auto;
 }
 
 /* Movie Details needs special handling because content is injected via JS */
