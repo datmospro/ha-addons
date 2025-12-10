@@ -9,8 +9,10 @@
     grid-template-columns: 250px 1fr;
     gap: 2rem;
     padding: 2rem;
-    min-height: calc(100vh - 140px);
-    /* Allow content to grow beyond viewport */
+    padding-top: calc(140px + 2rem);
+    /* Space for sticky header */
+    max-width: 1400px;
+    margin: 0 auto;
 }
 
 /* ========== Settings Sidebar (Tabs) ========== */
