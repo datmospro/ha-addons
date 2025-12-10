@@ -88,46 +88,35 @@
     padding: 0;
 }
 
-/* ========== Views ========== */
+/* ========== Views - Unified Structure ========== */
 .view {
     display: none;
-}
-
-.view.active {
-    display: block;
-    animation: fadeIn 0.3s ease;
-}
-
-/* Settings View - needs scrolling for long content */
-#view-settings {
-    padding: 0;
-    height: 100vh;
-    overflow-y: auto;
-}
-
-/* Movie Details needs special handling because content is injected via JS */
-#view-movie-details {
-    padding: 0;
     height: 100vh;
     overflow: hidden;
 }
 
-#view-movie-details .movie-details-content {
+.view.active {
+    display: block;
+}
+
+/* Sticky Header - SAME FOR ALL VIEWS */
+.view-header-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(30, 41, 59, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Scrollable Content - SAME FOR ALL VIEWS */
+.view-content-scrollable {
     height: 100vh;
     overflow-y: auto;
     overflow-x: hidden;
-}
-
-.view-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-}
-
-.view-header h2 {
-    font-size: 1.8rem;
-    font-weight: 600;
+    padding: 2rem;
 }
 
 /* Hide original movie details header */

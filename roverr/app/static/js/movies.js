@@ -315,7 +315,7 @@ function renderMovieDetails(container, movie, hash) {
 
     // Este es el mismo HTML que en app.js líneas 1312-1428
     container.innerHTML = `
-        <div class="movie-sticky-header">
+        <div class="view-header-sticky">
             <div class="header-top">
                 <h2>Movie Details</h2>
                 <button class="btn secondary back-to-dashboard"><i class="fa-solid fa-arrow-left"></i> Back</button>
@@ -333,7 +333,7 @@ function renderMovieDetails(container, movie, hash) {
             </div>
         </div>
         
-        <div class="movie-details-content">
+        <div class="view-content-scrollable">
         ${movie.backdrop_url ? `<div class="movie-backdrop" style="background-image: url('${movie.backdrop_url}');"></div>` : ''}
         
         <div class="movie-details-layout">

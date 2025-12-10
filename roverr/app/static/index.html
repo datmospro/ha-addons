@@ -53,7 +53,7 @@
         <main class="main-content">
             <!-- Dashboard View -->
             <div id="view-dashboard" class="view active">
-                <div class="movie-sticky-header">
+                <div class="view-header-sticky">
                     <div class="header-top">
                         <h2>Dashboard<span id="selection-counter" class="selection-counter"></span></h2>
                         <div style="display: flex; align-items: center; gap: 1.5rem;">
@@ -88,7 +88,7 @@
                     </div>
                 </div>
 
-                <div class="dashboard-content">
+                <div class="view-content-scrollable">
                     <section class="content-card" id="movies-section" style="margin-bottom: 2rem;">
                         <h3>Movies</h3>
                         <div id="movies-grid" class="movies-grid">
@@ -105,7 +105,7 @@
 
             <!-- Search View -->
             <div id="view-search" class="view">
-                <div class="movie-sticky-header">
+                <div class="view-header-sticky">
                     <div class="header-top">
                         <h2>Search Movies</h2>
                     </div>
@@ -114,7 +114,7 @@
                     </div>
                 </div>
 
-                <div class="search-content">
+                <div class="view-content-scrollable">
                     <!-- Search Bar -->
                     <div style="max-width: 700px; margin: 0 auto 3rem auto;">
                         <div style="position: relative; display: flex; gap: 0.75rem; align-items: stretch;">
@@ -134,320 +134,323 @@
                         <!-- Search results here -->
                     </div>
                 </div>
-            </div>
+            </div> <!-- /view-content-scrollable -->
+    </div>
 
-            <!-- Settings View -->
-            <div id="view-settings" class="view">
-                <div class="movie-sticky-header">
-                    <div class="header-top">
-                        <h2>Settings</h2>
-                        <div style="display: flex; align-items: center; gap: 1.5rem;">
-                            <!-- Empty space for alignment -->
-                        </div>
-                    </div>
-                    <div class="movie-action-bar">
-                        <button id="save-settings-btn" class="btn primary">
-                            <i class="fa-solid fa-save"></i> Save Changes
-                        </button>
-                    </div>
+    <!-- Settings View -->
+    <div id="view-settings" class="view">
+        <div class="view-header-sticky">
+            <div class="header-top">
+                <h2>Settings</h2>
+                <div style="display: flex; align-items: center; gap: 1.5rem;">
+                    <!-- Empty space for alignment -->
                 </div>
+            </div>
+            <div class="movie-action-bar">
+                <button id="save-settings-btn" class="btn primary">
+                    <i class="fa-solid fa-save"></i> Save Changes
+                </button>
+            </div>
+        </div>
 
-                <div class="settings-layout">
-                    <!-- Settings Sidebar (Tabs) -->
-                    <aside class="settings-sidebar">
-                        <button class="settings-tab active" data-tab="general">
-                            <i class="fa-solid fa-sliders"></i> General
-                        </button>
-                        <button class="settings-tab" data-tab="connection">
-                            <i class="fa-solid fa-network-wired"></i> Connection
-                        </button>
-                        <button class="settings-tab" data-tab="indexers">
-                            <i class="fa-solid fa-search"></i> Indexers
-                        </button>
-                        <button class="settings-tab" data-tab="rss">
-                            <i class="fa-solid fa-rss"></i> RSS Feeds
-                        </button>
-                        <button class="settings-tab" data-tab="notifications">
-                            <i class="fa-brands fa-telegram"></i> Notifications
-                        </button>
-                        <button class="settings-tab" data-tab="advanced">
-                            <i class="fa-solid fa-microchip"></i> Advanced
-                        </button>
-                    </aside>
+        <div class="view-content-scrollable">
+            <div class="settings-layout">
+                <!-- Settings Sidebar (Tabs) -->
+                <aside class="settings-sidebar">
+                    <button class="settings-tab active" data-tab="general">
+                        <i class="fa-solid fa-sliders"></i> General
+                    </button>
+                    <button class="settings-tab" data-tab="connection">
+                        <i class="fa-solid fa-network-wired"></i> Connection
+                    </button>
+                    <button class="settings-tab" data-tab="indexers">
+                        <i class="fa-solid fa-search"></i> Indexers
+                    </button>
+                    <button class="settings-tab" data-tab="rss">
+                        <i class="fa-solid fa-rss"></i> RSS Feeds
+                    </button>
+                    <button class="settings-tab" data-tab="notifications">
+                        <i class="fa-brands fa-telegram"></i> Notifications
+                    </button>
+                    <button class="settings-tab" data-tab="advanced">
+                        <i class="fa-solid fa-microchip"></i> Advanced
+                    </button>
+                </aside>
 
-                    <!-- Settings Content (Panels) -->
-                    <div class="settings-content">
+                <!-- Settings Content (Panels) -->
+                <div class="settings-content">
 
-                        <!-- Panel: General -->
-                        <div id="tab-general" class="settings-panel active">
-                            <div class="settings-section">
-                                <h3><i class="fa-solid fa-folder-open"></i> Paths</h3>
-                                <p class="section-desc">Configure where your media is downloaded and stored.</p>
+                    <!-- Panel: General -->
+                    <div id="tab-general" class="settings-panel active">
+                        <div class="settings-section">
+                            <h3><i class="fa-solid fa-folder-open"></i> Paths</h3>
+                            <p class="section-desc">Configure where your media is downloaded and stored.</p>
 
+                            <div class="input-group">
+                                <label>Source Path <span class="badge">Downloads</span></label>
+                                <input type="text" id="setting-local-source" placeholder="/path/to/source">
+                                <small>Directory where your torrent client downloads files (e.g., qBittorrent,
+                                    Transmission, Deluge).</small>
+                            </div>
+                            <div class="input-group">
+                                <label>Destination Path <span class="badge">Library</span></label>
+                                <input type="text" id="setting-local-dest" placeholder="/path/to/destination">
+                                <small>Directory where movies will be moved to (your media server library:
+                                    Jellyfin,
+                                    Emby, Kodi, Plex, etc.).</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel: Connection -->
+                    <div id="tab-connection" class="settings-panel">
+                        <div class="settings-section">
+                            <h3><i class="fa-solid fa-download"></i> Torrent Client</h3>
+                            <p class="section-desc">Connection details for your torrent client (qBittorrent and
+                                others).</p>
+
+                            <div class="grid-2">
                                 <div class="input-group">
-                                    <label>Source Path <span class="badge">Downloads</span></label>
-                                    <input type="text" id="setting-local-source" placeholder="/path/to/source">
-                                    <small>Directory where your torrent client downloads files (e.g., qBittorrent,
-                                        Transmission, Deluge).</small>
+                                    <label>Host</label>
+                                    <input type="text" id="setting-qb-host" placeholder="localhost">
                                 </div>
                                 <div class="input-group">
-                                    <label>Destination Path <span class="badge">Library</span></label>
-                                    <input type="text" id="setting-local-dest" placeholder="/path/to/destination">
-                                    <small>Directory where movies will be moved to (your media server library: Jellyfin,
-                                        Emby, Kodi, Plex, etc.).</small>
+                                    <label>Port</label>
+                                    <input type="number" id="setting-qb-port" placeholder="8080">
+                                </div>
+                            </div>
+                            <div class="grid-2">
+                                <div class="input-group">
+                                    <label>Username</label>
+                                    <input type="text" id="setting-qb-user" placeholder="admin">
+                                </div>
+                                <div class="input-group">
+                                    <label>Password</label>
+                                    <input type="password" id="setting-qb-pass" placeholder="adminpass">
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Panel: Connection -->
-                        <div id="tab-connection" class="settings-panel">
-                            <div class="settings-section">
-                                <h3><i class="fa-solid fa-download"></i> Torrent Client</h3>
-                                <p class="section-desc">Connection details for your torrent client (qBittorrent and
-                                    others).</p>
+                    <!-- Panel: Indexers -->
+                    <div id="tab-indexers" class="settings-panel">
+                        <div class="settings-section">
+                            <h3><i class="fa-solid fa-search"></i> Indexer Configuration</h3>
+                            <p class="section-desc">Manage your Prowlarr or Jackett indexers.</p>
 
+                            <div class="input-group card-like">
+                                <label>Add New Indexer</label>
                                 <div class="grid-2">
-                                    <div class="input-group">
-                                        <label>Host</label>
-                                        <input type="text" id="setting-qb-host" placeholder="localhost">
-                                    </div>
-                                    <div class="input-group">
-                                        <label>Port</label>
-                                        <input type="number" id="setting-qb-port" placeholder="8080">
-                                    </div>
+                                    <input type="text" id="indexer-name" placeholder="Name (e.g. MyIndexer)">
+                                    <input type="text" id="indexer-url" placeholder="URL (e.g. https://indexer.com)">
                                 </div>
                                 <div class="grid-2">
-                                    <div class="input-group">
-                                        <label>Username</label>
-                                        <input type="text" id="setting-qb-user" placeholder="admin">
-                                    </div>
-                                    <div class="input-group">
-                                        <label>Password</label>
-                                        <input type="password" id="setting-qb-pass" placeholder="adminpass">
-                                    </div>
+                                    <input type="password" id="indexer-key" placeholder="API Key">
+                                    <input type="text" id="indexer-cats" placeholder="Categories (e.g. 2000,2010)">
                                 </div>
-                            </div>
-                        </div>
-
-                        <!-- Panel: Indexers -->
-                        <div id="tab-indexers" class="settings-panel">
-                            <div class="settings-section">
-                                <h3><i class="fa-solid fa-search"></i> Indexer Configuration</h3>
-                                <p class="section-desc">Manage your Prowlarr or Jackett indexers.</p>
-
-                                <div class="input-group card-like">
-                                    <label>Add New Indexer</label>
-                                    <div class="grid-2">
-                                        <input type="text" id="indexer-name" placeholder="Name (e.g. MyIndexer)">
-                                        <input type="text" id="indexer-url"
-                                            placeholder="URL (e.g. https://indexer.com)">
-                                    </div>
-                                    <div class="grid-2">
-                                        <input type="password" id="indexer-key" placeholder="API Key">
-                                        <input type="text" id="indexer-cats" placeholder="Categories (e.g. 2000,2010)">
-                                    </div>
-                                    <div class="actions-row">
-                                        <button id="test-indexer-btn" class="btn warning"><i
-                                                class="fa-solid fa-plug"></i> Test Connection</button>
-                                        <button id="add-indexer-btn" class="btn secondary"><i
-                                                class="fa-solid fa-plus"></i> Add Indexer</button>
-                                    </div>
-                                </div>
-
-                                <div class="input-group">
-                                    <label>Configured Indexers</label>
-                                    <ul id="indexers-list" class="settings-list">
-                                        <!-- Indexers list -->
-                                        <li class="empty-state">No indexers configured</li>
-                                    </ul>
+                                <div class="actions-row">
+                                    <button id="test-indexer-btn" class="btn warning"><i class="fa-solid fa-plug"></i>
+                                        Test Connection</button>
+                                    <button id="add-indexer-btn" class="btn secondary"><i class="fa-solid fa-plus"></i>
+                                        Add Indexer</button>
                                 </div>
                             </div>
 
-                        </div>
-
-                        <!-- Panel: RSS -->
-                        <div id="tab-rss" class="settings-panel">
-                            <div class="settings-section">
-                                <h3><i class="fa-solid fa-rss"></i> RSS Feeds</h3>
-                                <p class="section-desc">Automate downloads with RSS feeds.</p>
-
-                                <div class="input-group card-like">
-                                    <label>Add New RSS Feed</label>
-                                    <div class="grid-2">
-                                        <input type="text" id="rss-name" placeholder="Name (e.g. New Releases)">
-                                        <input type="text" id="rss-label" placeholder="Label (e.g. action)">
-                                    </div>
-                                    <div class="grid-2">
-                                        <input type="url" id="rss-url" placeholder="RSS URL">
-                                        <input type="number" id="rss-refresh-interval" placeholder="Interval (sec)"
-                                            min="60" value="300">
-                                    </div>
-
-                                    <div class="options-grid">
-                                        <div class="checkbox-row">
-                                            <input type="checkbox" id="rss-enabled" checked>
-                                            <label for="rss-enabled">Enabled</label>
-                                        </div>
-                                        <div class="checkbox-row">
-                                            <input type="checkbox" id="rss-auto-add">
-                                            <label for="rss-auto-add">Auto-download movies</label>
-                                        </div>
-                                        <div class="checkbox-row">
-                                            <input type="checkbox" id="rss-auto-copy">
-                                            <label for="rss-auto-copy">Auto-copy to destination when download
-                                                completes</label>
-                                        </div>
-                                    </div>
-
-                                    <!-- Size fields container (shown when Auto-download is checked) -->
-                                    <div id="rss-size-fields" class="grid-2" style="display: none; margin-top: 1rem;">
-                                        <div class="input-group">
-                                            <label>Preferred Size (MB)</label>
-                                            <input type="number" id="rss-preferred-size" placeholder="5000" min="0">
-                                        </div>
-                                        <div class="input-group">
-                                            <label>Max Size (MB)</label>
-                                            <input type="number" id="rss-max-size" placeholder="12000" min="0">
-                                        </div>
-                                    </div>
-                                    <small id="rss-size-hint"
-                                        style="display: none; color: var(--text-muted); margin-top: 0.5rem;">Will
-                                        download torrent closest to Preferred Size, up to Max Size.</small>
-
-                                    <div class="actions-row">
-                                        <button id="test-rss-btn" class="btn warning"><i class="fa-solid fa-plug"></i>
-                                            Test Feed</button>
-                                        <button id="add-rss-btn" class="btn secondary"><i class="fa-solid fa-plus"></i>
-                                            Add Feed</button>
-                                    </div>
-                                </div>
-
-                                <div class="input-group">
-                                    <label>Configured Feeds</label>
-                                    <ul id="rss-feeds-list" class="settings-list">
-                                        <!-- RSS Feeds list -->
-                                        <li class="empty-state">No RSS feeds configured</li>
-                                    </ul>
-                                </div>
+                            <div class="input-group">
+                                <label>Configured Indexers</label>
+                                <ul id="indexers-list" class="settings-list">
+                                    <!-- Indexers list -->
+                                    <li class="empty-state">No indexers configured</li>
+                                </ul>
                             </div>
                         </div>
 
-                        <!-- Panel: Notifications -->
-                        <div id="tab-notifications" class="settings-panel">
-                            <div class="settings-section">
-                                <h3><i class="fa-brands fa-telegram"></i> Telegram Configuration</h3>
-                                <p class="section-desc">Receive notifications about your downloads and library updates.
-                                </p>
+                    </div>
 
+                    <!-- Panel: RSS -->
+                    <div id="tab-rss" class="settings-panel">
+                        <div class="settings-section">
+                            <h3><i class="fa-solid fa-rss"></i> RSS Feeds</h3>
+                            <p class="section-desc">Automate downloads with RSS feeds.</p>
+
+                            <div class="input-group card-like">
+                                <label>Add New RSS Feed</label>
                                 <div class="grid-2">
-                                    <div class="input-group">
-                                        <label>Bot Token</label>
-                                        <input type="password" id="setting-telegram-token"
-                                            placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
-                                    </div>
-                                    <div class="input-group">
-                                        <label>Chat ID</label>
-                                        <input type="text" id="setting-telegram-chat-id" placeholder="123456789">
-                                    </div>
+                                    <input type="text" id="rss-name" placeholder="Name (e.g. New Releases)">
+                                    <input type="text" id="rss-label" placeholder="Label (e.g. action)">
+                                </div>
+                                <div class="grid-2">
+                                    <input type="url" id="rss-url" placeholder="RSS URL">
+                                    <input type="number" id="rss-refresh-interval" placeholder="Interval (sec)" min="60"
+                                        value="300">
                                 </div>
 
-                                <div class="options-grid" style="margin-top: 1rem;">
+                                <div class="options-grid">
                                     <div class="checkbox-row">
-                                        <input type="checkbox" id="setting-notify-new">
-                                        <label for="setting-notify-new">Notify on New Movie Found</label>
+                                        <input type="checkbox" id="rss-enabled" checked>
+                                        <label for="rss-enabled">Enabled</label>
                                     </div>
                                     <div class="checkbox-row">
-                                        <input type="checkbox" id="setting-notify-download">
-                                        <label for="setting-notify-download">Notify on Download Completed</label>
+                                        <input type="checkbox" id="rss-auto-add">
+                                        <label for="rss-auto-add">Auto-download movies</label>
                                     </div>
                                     <div class="checkbox-row">
-                                        <input type="checkbox" id="setting-notify-move">
-                                        <label for="setting-notify-move">Notify on Movie Moved to Library</label>
+                                        <input type="checkbox" id="rss-auto-copy">
+                                        <label for="rss-auto-copy">Auto-copy to destination when download
+                                            completes</label>
                                     </div>
                                 </div>
+
+                                <!-- Size fields container (shown when Auto-download is checked) -->
+                                <div id="rss-size-fields" class="grid-2" style="display: none; margin-top: 1rem;">
+                                    <div class="input-group">
+                                        <label>Preferred Size (MB)</label>
+                                        <input type="number" id="rss-preferred-size" placeholder="5000" min="0">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Max Size (MB)</label>
+                                        <input type="number" id="rss-max-size" placeholder="12000" min="0">
+                                    </div>
+                                </div>
+                                <small id="rss-size-hint"
+                                    style="display: none; color: var(--text-muted); margin-top: 0.5rem;">Will
+                                    download torrent closest to Preferred Size, up to Max Size.</small>
 
                                 <div class="actions-row">
-                                    <button id="test-telegram-btn" class="btn warning">
-                                        <i class="fa-solid fa-paper-plane"></i> Test Connection
+                                    <button id="test-rss-btn" class="btn warning"><i class="fa-solid fa-plug"></i>
+                                        Test Feed</button>
+                                    <button id="add-rss-btn" class="btn secondary"><i class="fa-solid fa-plus"></i>
+                                        Add Feed</button>
+                                </div>
+                            </div>
+
+                            <div class="input-group">
+                                <label>Configured Feeds</label>
+                                <ul id="rss-feeds-list" class="settings-list">
+                                    <!-- RSS Feeds list -->
+                                    <li class="empty-state">No RSS feeds configured</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel: Notifications -->
+                    <div id="tab-notifications" class="settings-panel">
+                        <div class="settings-section">
+                            <h3><i class="fa-brands fa-telegram"></i> Telegram Configuration</h3>
+                            <p class="section-desc">Receive notifications about your downloads and library
+                                updates.
+                            </p>
+
+                            <div class="grid-2">
+                                <div class="input-group">
+                                    <label>Bot Token</label>
+                                    <input type="password" id="setting-telegram-token"
+                                        placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
+                                </div>
+                                <div class="input-group">
+                                    <label>Chat ID</label>
+                                    <input type="text" id="setting-telegram-chat-id" placeholder="123456789">
+                                </div>
+                            </div>
+
+                            <div class="options-grid" style="margin-top: 1rem;">
+                                <div class="checkbox-row">
+                                    <input type="checkbox" id="setting-notify-new">
+                                    <label for="setting-notify-new">Notify on New Movie Found</label>
+                                </div>
+                                <div class="checkbox-row">
+                                    <input type="checkbox" id="setting-notify-download">
+                                    <label for="setting-notify-download">Notify on Download Completed</label>
+                                </div>
+                                <div class="checkbox-row">
+                                    <input type="checkbox" id="setting-notify-move">
+                                    <label for="setting-notify-move">Notify on Movie Moved to Library</label>
+                                </div>
+                            </div>
+
+                            <div class="actions-row">
+                                <button id="test-telegram-btn" class="btn warning">
+                                    <i class="fa-solid fa-paper-plane"></i> Test Connection
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel: Advanced -->
+                    <div id="tab-advanced" class="settings-panel">
+                        <div class="settings-section">
+                            <h3><i class="fa-solid fa-film"></i> Metadata</h3>
+                            <div class="input-group">
+                                <label>TMDB API Key</label>
+                                <input type="password" id="setting-tmdb-key" placeholder="TMDB API Key">
+                                <small>Required for fetching movie details and artwork.</small>
+                            </div>
+
+                            <div class="input-group">
+                                <label>Language / Idioma</label>
+                                <select id="setting-language">
+                                    <option value="en-US">English (US)</option>
+                                    <option value="es-ES" selected>EspaÃ±ol (EspaÃ±a)</option>
+                                </select>
+                                <small>Language for movie metadata, searches, and file names</small>
+                            </div>
+                        </div>
+
+                        <div class="settings-section">
+                            <h3><i class="fa-solid fa-gauge-high"></i> Performance & Limits</h3>
+                            <div class="input-group">
+                                <label>Copy Speed Limit (MB/s)</label>
+                                <input type="number" id="setting-speed-limit" placeholder="0" min="0">
+                                <small>Set to 0 for unlimited speed.</small>
+                            </div>
+                            <div class="checkbox-row">
+                                <input type="checkbox" id="setting-auto-copy-manual">
+                                <label for="setting-auto-copy-manual">Auto-copy manual search movies</label>
+                            </div>
+                        </div>
+
+                        <div class="settings-section">
+                            <h3><i class="fa-solid fa-ban"></i> Ignored Items</h3>
+                            <div class="flex-between">
+                                <div>
+                                    <label style="margin:0; display:block;">Ignored Movies List</label>
+                                    <small>Manage movies you've hidden from the dashboard.</small>
+                                </div>
+                                <div class="flex-gap">
+                                    <button id="view-ignored-btn" class="btn secondary sm">
+                                        <i class="fa-solid fa-eye"></i> View List
+                                    </button>
+                                    <button id="reset-ignored-btn" class="btn danger sm">
+                                        <i class="fa-solid fa-rotate-left"></i> Reset All
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Panel: Advanced -->
-                        <div id="tab-advanced" class="settings-panel">
-                            <div class="settings-section">
-                                <h3><i class="fa-solid fa-film"></i> Metadata</h3>
-                                <div class="input-group">
-                                    <label>TMDB API Key</label>
-                                    <input type="password" id="setting-tmdb-key" placeholder="TMDB API Key">
-                                    <small>Required for fetching movie details and artwork.</small>
+                        <!-- Watchlist Items -->
+                        <div class="settings-section">
+                            <h3><i class="fa-solid fa-eye"></i> Watchlist Items</h3>
+                            <div class="flex-between">
+                                <div>
+                                    <label style="margin:0; display:block;">Watchlist Movies</label>
+                                    <small>Movies monitoring for correct file size from RSS feeds.</small>
                                 </div>
-
-                                <div class="input-group">
-                                    <label>Language / Idioma</label>
-                                    <select id="setting-language">
-                                        <option value="en-US">English (US)</option>
-                                        <option value="es-ES" selected>EspaÃ±ol (EspaÃ±a)</option>
-                                    </select>
-                                    <small>Language for movie metadata, searches, and file names</small>
-                                </div>
-                            </div>
-
-                            <div class="settings-section">
-                                <h3><i class="fa-solid fa-gauge-high"></i> Performance & Limits</h3>
-                                <div class="input-group">
-                                    <label>Copy Speed Limit (MB/s)</label>
-                                    <input type="number" id="setting-speed-limit" placeholder="0" min="0">
-                                    <small>Set to 0 for unlimited speed.</small>
-                                </div>
-                                <div class="checkbox-row">
-                                    <input type="checkbox" id="setting-auto-copy-manual">
-                                    <label for="setting-auto-copy-manual">Auto-copy manual search movies</label>
-                                </div>
-                            </div>
-
-                            <div class="settings-section">
-                                <h3><i class="fa-solid fa-ban"></i> Ignored Items</h3>
-                                <div class="flex-between">
-                                    <div>
-                                        <label style="margin:0; display:block;">Ignored Movies List</label>
-                                        <small>Manage movies you've hidden from the dashboard.</small>
-                                    </div>
-                                    <div class="flex-gap">
-                                        <button id="view-ignored-btn" class="btn secondary sm">
-                                            <i class="fa-solid fa-eye"></i> View List
-                                        </button>
-                                        <button id="reset-ignored-btn" class="btn danger sm">
-                                            <i class="fa-solid fa-rotate-left"></i> Reset All
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Watchlist Items -->
-                            <div class="settings-section">
-                                <h3><i class="fa-solid fa-eye"></i> Watchlist Items</h3>
-                                <div class="flex-between">
-                                    <div>
-                                        <label style="margin:0; display:block;">Watchlist Movies</label>
-                                        <small>Movies monitoring for correct file size from RSS feeds.</small>
-                                    </div>
-                                    <div class="flex-gap">
-                                        <button id="view-watchlist-btn" class="btn secondary sm">
-                                            <i class="fa-solid fa-list"></i> View List
-                                        </button>
-                                    </div>
+                                <div class="flex-gap">
+                                    <button id="view-watchlist-btn" class="btn secondary sm">
+                                        <i class="fa-solid fa-list"></i> View List
+                                    </button>
                                 </div>
                             </div>
                         </div>
-
                     </div>
-                </div>
-            </div>
-        </main>
+                </div> <!-- /settings-layout -->
+            </div> <!-- /view-content-scrollable -->
+        </div> <!-- /view-settings -->
+    </div>
+    </main>
 
-        <!-- Modals are loaded dynamically from modals/ directory via modal-loader.js -->
+    <!-- Modals are loaded dynamically from modals/ directory via modal-loader.js -->
     </div>
 
     <!-- Main JavaScript - Version parameter forces cache refresh on updates -->
