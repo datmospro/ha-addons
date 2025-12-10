@@ -209,7 +209,11 @@
     /* Safari support */
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     /* Subtle border */
-    width: 100%;
+    /* Fix for scrollbar gap */
+    width: calc(100% + 8px);
+    margin-right: -8px;
+    padding-right: 8px;
+    /* Compensate for width increase */
     transition: all 0.3s ease;
 }
 
