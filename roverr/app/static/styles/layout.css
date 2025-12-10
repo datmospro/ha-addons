@@ -91,8 +91,6 @@
 /* ========== Views ========== */
 .view {
     display: none;
-    height: 100vh;
-    overflow: hidden;
 }
 
 .view.active {
@@ -100,47 +98,13 @@
     animation: fadeIn 0.3s ease;
 }
 
-/* Sticky header with glassmorphism effect - fixed at top */
-.view .movie-sticky-header {
-    position: fixed;
-    top: 0;
-    left: var(--sidebar-width);
-    right: 0;
-    z-index: 100;
-    background: rgba(30, 41, 59, 0.85);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-}
-
-/* Scrollable content wrapper classes - used by all views */
-.dashboard-content,
-.search-content,
-.movie-details-content,
-.settings-content {
-    height: 100vh;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 2rem;
-    /* Add padding-top to account for fixed header height */
-    padding-top: calc(var(--header-height, 140px) + 2rem);
-}
-
-/* For views without explicit content wrapper, make direct children scrollable */
-.view> :not(.movie-sticky-header) {
-    height: 100vh;
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
-/* View-specific padding overrides */
+/* View-specific padding */
 #view-settings {
     padding: 0;
 }
 
-#view-movie-details .movie-details-content {
+#view-movie-details {
     padding: 0;
-    /* Movie details has its own internal layout padding */
 }
 
 .view-header {
