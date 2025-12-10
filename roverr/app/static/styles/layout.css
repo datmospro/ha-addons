@@ -103,9 +103,10 @@
     padding: 0;
 }
 
+/* Movie Details View - Special flex layout for sticky header */
 #view-movie-details {
     padding: 0;
-    height: calc(100vh - 0px);
+    height: 100vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -119,6 +120,14 @@
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
+}
+
+/* Other views use normal flow */
+#view-dashboard,
+#view-search {
+    height: auto;
+    display: block;
+    overflow: visible;
 }
 
 .dashboard-content {
