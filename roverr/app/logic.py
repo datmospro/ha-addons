@@ -1459,6 +1459,12 @@ def get_movie_details(torrent_hash, api_key):
             # Use cached data (instant!)
             logger.info(f"Using cached metadata for {movie.title}")
             
+            # IMPORTANT: If movie was previously ignored, un-ignore it since user is manually downloading it
+            if movie.ignored:
+                logger.info(f"Un-ignoring '{movie.title}' - user manually downloaded it")
+                movie.ignored = False
+                movie.save()
+            
             # Parse JSON fields
             cast = json.loads(movie.cast) if movie.cast else []
             crew = json.loads(movie.crew) if movie.crew else []
