@@ -172,8 +172,12 @@ def get_indexer_stats(indexer_id: int):
 
 
 @app.get("/api/movies")
-def get_movies(api_key: str = Depends(get_api_key)):
-    """Get list of movies, triggering a sync first"""
+def get_movies():
+    settings = load_settings()
+    api_key = settings.get('tmdb_api_key')
+    if not api_key:
+        return {"movies": [], "ignored_series": []}
+    
     torrents = get_active_torrents(None)
     from logic import get_movie_data # Import here to avoid circular dependency if any
     data = get_movie_data(torrents, api_key)
@@ -692,7 +696,7 @@ def remove_watchlist_endpoint(torrent_hash: str):
 
 @app.post("/api/unignore-movie")
 def unignore_movie(data: dict):
-    """Remove a single movie from the ignored list (mark as hidden)"""
+    """Remove a single movie from the ignored list"""
     from database import Movie
     
     try:
@@ -704,13 +708,13 @@ def unignore_movie(data: dict):
         if not movie:
             return {"success": False, "message": "Movie not found"}
         
-        # Mark as hidden so it disappears from dashboard AND ignored list
-        # It will only reappear if logic.py (sync) detects an active torrent for it
+        if not movie.ignored:
+            return {"success": False, "message": "Movie is not ignored"}
+        
         movie.ignored = False
-        movie.hidden = True
         movie.save()
         
-        return {"success": True, "message": "Movie removed from ignored list (and hidden)"}
+        return {"success": True, "message": f"'{movie.title}' removed from ignored list"}
     except Exception as e:
         logger.error(f"Error unignoring movie: {e}")
         return {"success": False, "message": str(e)}
