@@ -197,25 +197,26 @@
 }
 
 /* ========== Movie Sticky Header ========== */
+/* ========== Movie Sticky Header ========== */
 .movie-sticky-header {
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: var(--sidebar-width);
+    right: 0;
     z-index: 100;
-    background: rgba(30, 41, 59, 0.85);
-    /* Sidebar color with transparency */
+    background: rgba(30, 41, 59, 0.95);
+    /* Slightly more opaque for fixed header */
     backdrop-filter: blur(12px);
-    /* Blur effect */
     -webkit-backdrop-filter: blur(12px);
-    /* Safari support */
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    /* Subtle border */
-    /* Subtle border */
-    /* Fix for scrollbar gap: extend width to cover the track */
-    width: calc(100% + 8px);
-    margin-right: -8px;
-    padding-right: 8px;
-    /* Compensate padding for the extension */
     transition: all 0.3s ease;
+}
+
+/* Push content down to prevent overlap with fixed header */
+.movie-sticky-header+* {
+    margin-top: 140px;
+    /* Adjusted to fit typical header height */
+    padding-top: 1rem;
 }
 
 .header-top {

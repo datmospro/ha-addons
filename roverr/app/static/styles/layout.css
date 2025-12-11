@@ -21,23 +21,14 @@
 
 ::-webkit-scrollbar-thumb {
     background: transparent;
-    /* Hidden by default */
+    /* Hidden by default (mimicking previous behavior) */
     border-radius: 4px;
     transition: background 0.3s ease;
 }
 
-/* Show scrollbar when hovering the content */
-.main-content:hover::-webkit-scrollbar-thumb,
-.sidebar:hover::-webkit-scrollbar-thumb,
-.cast-carousel:hover::-webkit-scrollbar-thumb,
-body:hover::-webkit-scrollbar-thumb {
-    background: var(--border);
-    /* Visible on hover */
-}
-
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--text-secondary) !important;
-    /* Brighter on direct grab */
+    background: var(--text-secondary);
+    /* Visible when hovering the scrollbar thumb */
 }
 
 /* ========== Sidebar ========== */
