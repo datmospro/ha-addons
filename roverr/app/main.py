@@ -181,6 +181,18 @@ def get_movies():
     torrents = get_active_torrents(None)
     from logic import get_movie_data # Import here to avoid circular dependency if any
     data = get_movie_data(torrents, api_key)
+    
+    # Inject Copy Progress
+    progress_data = get_copy_progress()
+    if data and 'movies' in data:
+        for movie in data['movies']:
+            t_hash = movie.get('torrent_hash')
+            if t_hash and t_hash in progress_data:
+                prog = progress_data[t_hash]
+                movie['copy_progress'] = prog
+                if prog['status'] == 'copying':
+                    movie['status'] = 'copying'
+    
     return data
 
 @app.post("/api/movie/{torrent_hash}/identify")

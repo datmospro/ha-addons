@@ -204,9 +204,20 @@ function updateMovieCard(card, movie, posterSrc, statusClass, statusIcon, status
     const meta = card.querySelector('.movie-meta');
     meta.innerHTML = `<span>${movie.year || 'N/A'}</span>${movie.size > 0 ? `<span>${formatBytes(movie.size)}</span>` : ''}`;
 
-    const fill = card.querySelector('.progress-bar .fill');
-    fill.className = `fill ${movie.status === 'copying' ? 'copying' : getProgressClass(movie.state)}`;
-    fill.style.width = `${movie.progress * 100}%`;
+    const progressBar = card.querySelector('.progress-bar');
+    if (movie.status === 'moved' || movie.status === 'skipped' || movie.status === 'error') {
+        progressBar.style.display = 'none';
+    } else {
+        progressBar.style.display = 'block';
+        const fill = card.querySelector('.progress-bar .fill');
+        fill.className = `fill ${movie.status === 'copying' ? 'copying' : getProgressClass(movie.state)}`;
+
+        let progressPercent = movie.progress * 100;
+        if (movie.status === 'copying' && movie.copy_progress) {
+            progressPercent = movie.copy_progress.percent;
+        }
+        fill.style.width = `${progressPercent}%`;
+    }
 }
 
 /**
@@ -237,8 +248,10 @@ function createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel)
                 ${movie.size > 0 ? `<span>${formatBytes(movie.size)}</span>` : ''}
             </div>
         </div>
-        <div class="progress-bar">
-            <div class="fill ${movie.status === 'copying' ? 'copying' : getProgressClass(movie.state)}" style="width: ${movie.progress * 100}%"></div>
+        </div>
+        <div class="progress-bar" style="display: ${['moved', 'skipped', 'error'].includes(movie.status) ? 'none' : 'block'}">
+            <div class="fill ${movie.status === 'copying' ? 'copying' : getProgressClass(movie.state)}" 
+                 style="width: ${(movie.status === 'copying' && movie.copy_progress) ? movie.copy_progress.percent : movie.progress * 100}%"></div>
         </div>
     `;
 
