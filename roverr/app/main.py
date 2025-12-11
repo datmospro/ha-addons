@@ -697,24 +697,22 @@ def remove_watchlist_endpoint(torrent_hash: str):
 @app.post("/api/unignore-movie")
 def unignore_movie(data: dict):
     """Remove a single movie from the ignored list"""
-    from database import Movie
+    from logic import delete_movie
     
     try:
         torrent_hash = data.get('hash')
         if not torrent_hash:
             return {"success": False, "message": "No hash provided"}
         
-        movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
-        if not movie:
-            return {"success": False, "message": "Movie not found"}
+        # Completely delete the movie record so it doesn't reappear on dashboard
+        # effectively forgetting it ever existed
+        success = delete_movie(torrent_hash, delete_files=False, ignore_movie=False)
         
-        if not movie.ignored:
-            return {"success": False, "message": "Movie is not ignored"}
-        
-        movie.ignored = False
-        movie.save()
-        
-        return {"success": True, "message": f"'{movie.title}' removed from ignored list"}
+        if success:
+            return {"success": True, "message": "Movie removed from ignored list"}
+        else:
+            return {"success": False, "message": "Failed to remove movie (not found)"}
+
     except Exception as e:
         logger.error(f"Error unignoring movie: {e}")
         return {"success": False, "message": str(e)}
