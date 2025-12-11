@@ -3121,10 +3121,10 @@ def auto_download_movie(title, year, preferred_size_gb, max_size_gb, label=None,
         return None, None
         
     # 2. Select Best Torrent
-    best_torrent = select_best_torrent(results, preferred_size, max_size)
+    best_torrent = select_best_torrent(results, preferred_size_gb, max_size_gb)
     
     if not best_torrent:
-        logger.info(f"No suitable torrent found for {title} within size limits (Max: {max_size}MB)")
+        logger.info(f"No suitable torrent found for {title} within size limits (Max: {max_size_gb}MB)")
         return None, None
         
     logger.info(f"Selected torrent: {best_torrent['title']} ({int(best_torrent['size_mb'])} MB)")
