@@ -214,10 +214,14 @@
 }
 
 /* Push content down to prevent overlap with fixed header */
-.movie-sticky-header+* {
-    margin-top: 140px;
-    /* Adjusted to fit typical header height */
-    padding-top: 1rem;
+/* Push content down to prevent overlap with fixed header */
+.dashboard-content,
+.settings-layout,
+#movie-details-content,
+#search-results,
+#view-search>div:nth-child(2) {
+    padding-top: 160px !important;
+    /* Force content below fixed header */
 }
 
 .header-top {
