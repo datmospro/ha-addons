@@ -172,12 +172,8 @@ def get_indexer_stats(indexer_id: int):
 
 
 @app.get("/api/movies")
-def get_movies():
-    settings = load_settings()
-    api_key = settings.get('tmdb_api_key')
-    if not api_key:
-        return {"movies": [], "ignored_series": []}
-    
+def get_movies(api_key: str = Depends(get_api_key)):
+    """Get list of movies, triggering a sync first"""
     torrents = get_active_torrents(None)
     from logic import get_movie_data # Import here to avoid circular dependency if any
     data = get_movie_data(torrents, api_key)
@@ -696,23 +692,25 @@ def remove_watchlist_endpoint(torrent_hash: str):
 
 @app.post("/api/unignore-movie")
 def unignore_movie(data: dict):
-    """Remove a single movie from the ignored list"""
-    from logic import delete_movie
+    """Remove a single movie from the ignored list (mark as hidden)"""
+    from database import Movie
     
     try:
         torrent_hash = data.get('hash')
         if not torrent_hash:
             return {"success": False, "message": "No hash provided"}
         
-        # Completely delete the movie record so it doesn't reappear on dashboard
-        # effectively forgetting it ever existed
-        success = delete_movie(torrent_hash, delete_files=False, ignore_movie=False)
+        movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
+        if not movie:
+            return {"success": False, "message": "Movie not found"}
         
-        if success:
-            return {"success": True, "message": "Movie removed from ignored list"}
-        else:
-            return {"success": False, "message": "Failed to remove movie (not found)"}
-
+        # Mark as hidden so it disappears from dashboard AND ignored list
+        # It will only reappear if logic.py (sync) detects an active torrent for it
+        movie.ignored = False
+        movie.hidden = True
+        movie.save()
+        
+        return {"success": True, "message": "Movie removed from ignored list (and hidden)"}
     except Exception as e:
         logger.error(f"Error unignoring movie: {e}")
         return {"success": False, "message": str(e)}

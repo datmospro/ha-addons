@@ -53,6 +53,7 @@ class Movie(BaseModel):
     torrent_name = CharField(null=True) # Original torrent name for history linking
     watchlist = BooleanField(default=False) # If True, movie is in watchlist monitoring
     watchlist_expiry = DateTimeField(null=True) # Expiration date for watchlist
+    hidden = BooleanField(default=False) # If True, movie is hidden from dashboard (soft-ignored)
 
 def migrate_db():
     """
@@ -77,7 +78,8 @@ def migrate_db():
         ('ignored', 'BOOLEAN'),
         ('torrent_name', 'TEXT'),
         ('watchlist', 'BOOLEAN'),
-        ('watchlist_expiry', 'DATETIME')
+        ('watchlist_expiry', 'DATETIME'),
+        ('hidden', 'BOOLEAN')
     ]
     
     try:

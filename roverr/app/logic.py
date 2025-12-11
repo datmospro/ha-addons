@@ -885,8 +885,17 @@ def sync_movies(torrents, api_key):
                         backdrop_url = f"https://image.tmdb.org/t/p/w1280{metadata.get('backdrop_path')}"
                         backdrop_local = download_image(backdrop_url, f"{t['hash']}_backdrop.jpg")
                     
-                    # Create DB Entry with complete metadata
-                    if not Movie.select().where(Movie.torrent_hash == t['hash']).exists():
+                    
+                    # Check if movie exists
+                    existing_movie = Movie.get_or_none(Movie.torrent_hash == t['hash'])
+                    
+                    if existing_movie:
+                        # If existing movie is hidden but found in active torrents, unhide it!
+                        if existing_movie.hidden:
+                            logger.info(f"Unhiding movie found in active torrents: {existing_movie.title}")
+                            existing_movie.hidden = False
+                            existing_movie.save()
+                    else:
                         # Determine initial status based on torrent state (instead of hardcoded 'pending')
                         state = t['state']
                         if state in ['metaDL', 'allocating', 'queuedDL']:
@@ -992,7 +1001,7 @@ def get_movie_data(torrents, api_key):
     movies = []
     base_dir = os.path.join(os.path.dirname(__file__), 'static')
     
-    for m in Movie.select().where((Movie.ignored == False) & ((Movie.watchlist == False) | (Movie.watchlist.is_null()))).order_by(Movie.added_at.desc()):
+    for m in Movie.select().where((Movie.ignored == False) & (Movie.hidden == False) & ((Movie.watchlist == False) | (Movie.watchlist.is_null()))).order_by(Movie.added_at.desc()):
         # Check if poster file exists, if not try to re-download
         if m.poster_path:
             poster_full_path = os.path.join(base_dir, m.poster_path)
