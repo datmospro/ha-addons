@@ -202,7 +202,8 @@
     position: fixed;
     top: 0;
     left: var(--sidebar-width);
-    right: 0;
+    /* content + scrollbar width */
+    width: calc(100vw - var(--sidebar-width));
     z-index: 100;
     background: rgba(30, 41, 59, 0.95);
     /* Slightly more opaque for fixed header */
