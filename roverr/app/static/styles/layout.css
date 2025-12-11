@@ -10,8 +10,9 @@
 
 /* Global Scrollbar Styling */
 ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    /* Thinner */
+    height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -19,13 +20,24 @@
 }
 
 ::-webkit-scrollbar-thumb {
+    background: transparent;
+    /* Hidden by default */
+    border-radius: 4px;
+    transition: background 0.3s ease;
+}
+
+/* Show scrollbar when hovering the content */
+.main-content:hover::-webkit-scrollbar-thumb,
+.sidebar:hover::-webkit-scrollbar-thumb,
+.cast-carousel:hover::-webkit-scrollbar-thumb,
+body:hover::-webkit-scrollbar-thumb {
     background: var(--border);
-    border-radius: 5px;
-    border: 2px solid var(--bg-color);
+    /* Visible on hover */
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--text-secondary);
+    background: var(--text-secondary) !important;
+    /* Brighter on direct grab */
 }
 
 /* ========== Sidebar ========== */
