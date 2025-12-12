@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useGame } from '../../context/GameContext';
 import { Trophy, History, CheckCircle, XCircle, ChevronLeft, Edit2, Trash2, Save, X } from 'lucide-react';
 
@@ -238,10 +239,10 @@ export default function TuteSubastado({ matchId, onBack, isReadOnly = false }) {
                 )}
             </div>
 
-            {/* Edit Round Modal */}
-            {editingRound && (
+            {/* Edit Round Modal - Portal to document.body for correct fixed positioning */}
+            {editingRound && createPortal(
                 <div style={{
-                    position: 'fixed', inset: 0, zIndex: 100,
+                    position: 'fixed', inset: 0, zIndex: 9999, // High z-index to ensure visibility
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)'
                 }}>
@@ -364,10 +365,10 @@ export default function TuteSubastado({ matchId, onBack, isReadOnly = false }) {
                                                         scrollSnapAlign: 'center',
                                                         fontSize: isSelected ? '24px' : '16px',
                                                         fontWeight: isSelected ? 'bold' : 'normal',
-                                                        color: isSelected ? 'white' : 'rgba(255, 255, 255, 0.2)',
+                                                        color: isSelected ? 'white' : 'rgba(255, 255, 255, 0.6)', // Increased opacity
                                                         fontFamily: 'monospace',
                                                         transition: 'all 0.2s',
-                                                        opacity: isSelected ? 1 : 0.4,
+                                                        opacity: isSelected ? 1 : 0.6, // Increased opacity
                                                         cursor: 'pointer'
                                                     }}
                                                     onClick={(e) => {
@@ -493,7 +494,8 @@ export default function TuteSubastado({ matchId, onBack, isReadOnly = false }) {
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Finish Confirmation Dialog */}
