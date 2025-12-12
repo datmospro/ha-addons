@@ -243,23 +243,25 @@ export default function TuteSubastado({ matchId, onBack, isReadOnly = false }) {
                 <div style={{
                     position: 'fixed', inset: 0, zIndex: 100,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)'
+                    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)'
                 }}>
                     <div className="glass-panel" style={{
                         width: '90%',
                         maxWidth: '380px',
-                        padding: '20px',
+                        padding: '24px',
                         maxHeight: '90vh',
                         overflowY: 'auto',
-                        background: 'rgba(30, 30, 40, 0.9)',
+                        // Using a semi-transparent dark blue/purple to match the app theme, 
+                        // instead of solid dark grey.
+                        background: 'linear-gradient(135deg, rgba(30, 30, 60, 0.9), rgba(40, 30, 70, 0.95))',
                         border: '1px solid rgba(255,255,255,0.1)',
                         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                        borderRadius: '16px'
+                        borderRadius: '24px'
                     }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                            <h3 style={{ fontSize: '18px', fontWeight: 'bold' }}>Editar Ronda #{editingRound.round}</h3>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                            <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: 'white' }}>Editar Ronda #{editingRound.round}</h3>
                             <button onClick={() => setEditingRound(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
-                                <X size={20} />
+                                <X size={24} />
                             </button>
                         </div>
 
