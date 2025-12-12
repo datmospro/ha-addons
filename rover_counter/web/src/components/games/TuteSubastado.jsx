@@ -245,19 +245,28 @@ export default function TuteSubastado({ matchId, onBack, isReadOnly = false }) {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)'
                 }}>
-                    <div className="glass-panel" style={{ width: '90%', maxWidth: '400px', padding: '24px', maxHeight: '90vh', overflowY: 'auto' }}>
+                    <div className="glass-panel" style={{
+                        width: '90%',
+                        maxWidth: '400px',
+                        padding: '24px',
+                        maxHeight: '90vh',
+                        overflowY: 'auto',
+                        background: '#1e1e2e', // Darker background as per screenshot
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+                    }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                            <h3 style={{ fontSize: '18px', fontWeight: 'bold' }}>Editar Ronda #{editingRound.round}</h3>
-                            <button onClick={() => setEditingRound(null)} style={{ background: 'none', border: 'none', color: 'white', opacity: 0.5 }}>
+                            <h3 style={{ fontSize: '20px', fontWeight: 'bold' }}>Editar Ronda #{editingRound.round}</h3>
+                            <button onClick={() => setEditingRound(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
                                 <X size={24} />
                             </button>
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                             {/* Team Selection */}
                             <div>
-                                <label className="text-xs" style={{ display: 'block', marginBottom: '8px', opacity: 0.6 }}>EQUIPO</label>
-                                <div style={{ display: 'flex', gap: '8px' }}>
+                                <label className="text-xs" style={{ display: 'block', marginBottom: '12px', opacity: 0.6, fontSize: '11px', letterSpacing: '1px' }}>EQUIPO</label>
+                                <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '4px' }}>
                                     {activeMatch.teams.map(team => (
                                         <button
                                             key={team.id}
@@ -265,9 +274,13 @@ export default function TuteSubastado({ matchId, onBack, isReadOnly = false }) {
                                             className="btn"
                                             style={{
                                                 flex: 1,
-                                                padding: '10px',
-                                                background: editingRound.teamId === team.id ? 'linear-gradient(90deg, #3b82f6, #2563eb)' : 'rgba(255,255,255,0.05)',
-                                                border: editingRound.teamId === team.id ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.1)'
+                                                padding: '12px',
+                                                borderRadius: '8px',
+                                                background: editingRound.teamId === team.id ? '#3b82f6' : 'transparent',
+                                                color: editingRound.teamId === team.id ? 'white' : 'rgba(255,255,255,0.4)',
+                                                fontWeight: editingRound.teamId === team.id ? 'bold' : 'normal',
+                                                transition: 'all 0.2s',
+                                                border: 'none'
                                             }}
                                         >
                                             {team.name}
@@ -276,49 +289,126 @@ export default function TuteSubastado({ matchId, onBack, isReadOnly = false }) {
                                 </div>
                             </div>
 
-                            {/* Bid Input */}
+                            {/* Bid Input - Scroll Picker */}
                             <div>
-                                <label className="text-xs" style={{ display: 'block', marginBottom: '8px', opacity: 0.6 }}>APUESTA</label>
-                                <input
-                                    type="number"
-                                    value={editingRound.bid}
-                                    onChange={(e) => setEditingRound({ ...editingRound, bid: parseInt(e.target.value) || 0 })}
-                                    style={{
-                                        width: '100%',
-                                        background: 'rgba(0,0,0,0.3)',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        borderRadius: '8px',
-                                        padding: '12px',
-                                        fontSize: '24px',
-                                        textAlign: 'center',
-                                        color: 'white',
-                                        fontFamily: 'monospace'
-                                    }}
-                                />
+                                <label className="text-xs" style={{ display: 'block', marginBottom: '12px', opacity: 0.6, fontSize: '11px', letterSpacing: '1px' }}>APUESTA</label>
+                                <div style={{
+                                    position: 'relative',
+                                    height: '140px',
+                                    overflow: 'hidden',
+                                    background: 'rgba(0, 0, 0, 0.2)',
+                                    borderRadius: '16px',
+                                    border: '1px solid rgba(255, 255, 255, 0.05)'
+                                }}>
+                                    {/* Selection highlight */}
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '50%',
+                                        left: '0',
+                                        right: '0',
+                                        height: '50px',
+                                        transform: 'translateY(-50%)',
+                                        background: 'linear-gradient(90deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2))',
+                                        borderTop: '1px solid rgba(59, 130, 246, 0.5)',
+                                        borderBottom: '1px solid rgba(59, 130, 246, 0.5)',
+                                        pointerEvents: 'none',
+                                        zIndex: 1
+                                    }} />
+
+                                    {/* Scrollable container */}
+                                    <div
+                                        style={{
+                                            height: '100%',
+                                            overflowY: 'scroll',
+                                            scrollSnapType: 'y mandatory',
+                                            paddingTop: '45px',
+                                            paddingBottom: '45px',
+                                            WebkitOverflowScrolling: 'touch'
+                                        }}
+                                        onScroll={(e) => {
+                                            const scrollTop = e.target.scrollTop;
+                                            const itemHeight = 50; // Adjusted height for this picker
+                                            const index = Math.round(scrollTop / itemHeight);
+                                            const newBid = 70 + (index * 5);
+                                            // Debounce update slightly or check range to avoid jitter
+                                            if (newBid >= 70 && newBid <= 230 && newBid !== editingRound.bid) {
+                                                setEditingRound(prev => ({ ...prev, bid: newBid }));
+                                            }
+                                        }}
+                                        // Auto-scroll to current value on mount
+                                        ref={(el) => {
+                                            if (el && editingRound.bid) {
+                                                const index = (editingRound.bid - 70) / 5;
+                                                // Only scroll if significantly different to prevent fight with user scrolling
+                                                if (Math.abs(el.scrollTop - (index * 50)) > 25) {
+                                                    // el.scrollTop = index * 50; 
+                                                    // Initial scroll handled better by effect usually, 
+                                                    // but we can try to set it once if needed or just let user scroll.
+                                                    // For smoothness, let's leave it manual or simple snap.
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        {Array.from({ length: 33 }, (_, i) => {
+                                            const value = 70 + (i * 5);
+                                            const isSelected = value === editingRound.bid;
+                                            return (
+                                                <div
+                                                    key={value}
+                                                    style={{
+                                                        height: '50px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        scrollSnapAlign: 'center',
+                                                        fontSize: isSelected ? '32px' : '20px',
+                                                        fontWeight: isSelected ? 'bold' : 'normal',
+                                                        color: isSelected ? 'white' : 'rgba(255, 255, 255, 0.2)',
+                                                        fontFamily: 'monospace',
+                                                        transition: 'all 0.2s',
+                                                        opacity: isSelected ? 1 : 0.4,
+                                                        cursor: 'pointer'
+                                                    }}
+                                                    onClick={(e) => {
+                                                        e.currentTarget.parentElement.scrollTop = i * 50;
+                                                    }}
+                                                >
+                                                    {value}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Gradient overlays */}
+                                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '45px', background: 'linear-gradient(to bottom, #1e1e2e, transparent)', pointerEvents: 'none' }} />
+                                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '45px', background: 'linear-gradient(to top, #1e1e2e, transparent)', pointerEvents: 'none' }} />
+                                </div>
                             </div>
 
                             {/* Suit Selection */}
                             <div>
-                                <label className="text-xs" style={{ display: 'block', marginBottom: '8px', opacity: 0.6 }}>PALO</label>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                                <label className="text-xs" style={{ display: 'block', marginBottom: '12px', opacity: 0.6, fontSize: '11px', letterSpacing: '1px' }}>PALO</label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
                                     {suits.map(suit => (
                                         <button
                                             key={suit.id}
                                             type="button"
                                             onClick={() => setEditingRound({ ...editingRound, suit: suit.id })}
                                             style={{
-                                                padding: '10px 4px',
-                                                background: editingRound.suit === suit.id ? `${suit.color}30` : 'rgba(255,255,255,0.05)',
-                                                border: editingRound.suit === suit.id ? `2px solid ${suit.color}` : '1px solid rgba(255,255,255,0.1)',
-                                                borderRadius: '8px',
+                                                padding: '16px 8px',
+                                                background: editingRound.suit === suit.id ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)',
+                                                border: editingRound.suit === suit.id ? `1px solid ${suit.color}` : '1px solid rgba(255,255,255,0.05)',
+                                                borderRadius: '12px',
                                                 cursor: 'pointer',
                                                 display: 'flex',
                                                 flexDirection: 'column',
                                                 alignItems: 'center',
-                                                gap: '2px'
+                                                justifyContent: 'center',
+                                                gap: '4px',
+                                                transition: 'all 0.2s'
                                             }}
                                         >
-                                            <span style={{ fontSize: '20px' }}>{suit.emoji}</span>
+                                            <span style={{ fontSize: '24px' }}>{suit.emoji}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -326,63 +416,73 @@ export default function TuteSubastado({ matchId, onBack, isReadOnly = false }) {
 
                             {/* Success Toggle */}
                             <div>
-                                <label className="text-xs" style={{ display: 'block', marginBottom: '8px', opacity: 0.6 }}>RESULTADO</label>
-                                <div style={{ display: 'flex', gap: '8px' }}>
+                                <label className="text-xs" style={{ display: 'block', marginBottom: '12px', opacity: 0.6, fontSize: '11px', letterSpacing: '1px' }}>RESULTADO</label>
+                                <div style={{ display: 'flex', gap: '12px' }}>
                                     <button
                                         onClick={() => setEditingRound({ ...editingRound, success: true })}
                                         className="btn"
                                         style={{
                                             flex: 1,
-                                            padding: '12px',
-                                            background: editingRound.success ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.05)',
-                                            color: editingRound.success ? '#34d399' : '#9ca3af',
-                                            border: editingRound.success ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.1)',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                                            padding: '16px',
+                                            background: editingRound.success ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255,255,255,0.03)',
+                                            color: editingRound.success ? '#34d399' : 'rgba(255,255,255,0.4)',
+                                            border: editingRound.success ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.05)',
+                                            borderRadius: '12px',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                            transition: 'all 0.2s'
                                         }}
                                     >
-                                        <CheckCircle size={20} /> Conseguido
+                                        <CheckCircle size={20} /> <span style={{ fontWeight: '500' }}>Conseguido</span>
                                     </button>
                                     <button
                                         onClick={() => setEditingRound({ ...editingRound, success: false })}
                                         className="btn"
                                         style={{
                                             flex: 1,
-                                            padding: '12px',
-                                            background: !editingRound.success ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.05)',
-                                            color: !editingRound.success ? '#f87171' : '#9ca3af',
-                                            border: !editingRound.success ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                                            padding: '16px',
+                                            background: !editingRound.success ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255,255,255,0.03)',
+                                            color: !editingRound.success ? '#f87171' : 'rgba(255,255,255,0.4)',
+                                            border: !editingRound.success ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.05)',
+                                            borderRadius: '12px',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                            transition: 'all 0.2s'
                                         }}
                                     >
-                                        <XCircle size={20} /> Fracasado
+                                        <XCircle size={20} /> <span style={{ fontWeight: '500' }}>Fracasado</span>
                                     </button>
                                 </div>
                             </div>
 
                             {/* Actions */}
-                            <div style={{ display: 'flex', gap: '12px', marginTop: '12px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                            <div style={{ display: 'flex', gap: '12px', marginTop: '12px', paddingTop: '24px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                                 <button
                                     onClick={() => handleDeleteRound(editingRound)}
                                     className="btn"
                                     style={{
-                                        padding: '12px',
+                                        padding: '16px',
                                         background: 'rgba(239, 68, 68, 0.1)',
                                         color: '#ef4444',
-                                        border: '1px solid rgba(239, 68, 68, 0.2)'
+                                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                                        borderRadius: '12px',
+                                        transition: 'all 0.2s'
                                     }}
                                 >
-                                    <Trash2 size={20} />
+                                    <Trash2 size={24} />
                                 </button>
                                 <button
                                     onClick={() => handleUpdateRound(editingRound)}
                                     className="btn"
                                     style={{
                                         flex: 1,
-                                        padding: '12px',
+                                        padding: '16px',
                                         background: 'linear-gradient(90deg, #8b5cf6, #a78bfa)',
                                         color: 'white',
                                         fontWeight: 'bold',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                                        border: 'none',
+                                        borderRadius: '12px',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                        fontSize: '16px',
+                                        boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
                                     }}
                                 >
                                     <Save size={20} /> Guardar Cambios
