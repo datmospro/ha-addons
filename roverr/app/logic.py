@@ -3179,7 +3179,14 @@ def select_best_torrent(results, preferred_size_mb, max_size_mb):
     # ✅ NEW: Prioritize similarity score from filter_false_positives
     has_similarity = any('_similarity' in r for r in valid_results)
     
+    logger.debug(f"🔍 select_best_torrent: has_similarity={has_similarity}, total_results={len(valid_results)}")
+    
     if has_similarity:
+        # Log top 5 results with similarity scores before sorting
+        logger.info("📊 Top candidates before sorting:")
+        for i, r in enumerate(valid_results[:5]):
+            logger.info(f"  {i+1}. {r.get('title', 'Unknown')[:60]} - similarity: {r.get('_similarity', 0):.3f}, size: {r.get('size_mb', 0):.0f} MB")
+        
         # Sort by similarity (highest first), then by size preference
         if preferred_size_mb > 0:
             valid_results.sort(
@@ -3191,10 +3198,15 @@ def select_best_torrent(results, preferred_size_mb, max_size_mb):
         else:
             # Just sort by similarity
             valid_results.sort(key=lambda x: x.get('_similarity', 0), reverse=True)
+        
+        # Log selected result
+        selected = valid_results[0]
+        logger.info(f"✅ Selected (by similarity): {selected.get('title', 'Unknown')[:60]} - similarity: {selected.get('_similarity', 0):.3f}")
     else:
         # Legacy behavior: sort by size only
         if preferred_size_mb > 0:
             valid_results.sort(key=lambda x: abs(x['size_mb'] - preferred_size_mb))
+        logger.info(f"⚠️ No similarity scores found, selected by size: {valid_results[0].get('title', 'Unknown')[:60]}")
         
     return valid_results[0]
 
