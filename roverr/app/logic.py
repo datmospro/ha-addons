@@ -2694,6 +2694,17 @@ def filter_search_results(results, search_query, min_similarity=0.4):
             if query_no_year and is_word_match(query_no_year, result_title):
                 # Exact word match found - calculate actual similarity
                 similarity = calculate_title_similarity(base_query, result_title)
+                
+                # ✅ NEW: Boost similarity if year matches
+                # Extract year from base_query
+                year_match = re.search(r'\b(\d{4})\b', base_query)
+                if year_match:
+                    query_year = year_match.group(1)
+                    # Check if result title contains the same year
+                    if query_year in result_title:
+                        similarity += 0.2  # Boost similarity for year match
+                        logger.debug(f"Year boost: '{result_title[:60]}' contains year {query_year}, similarity: {similarity:.3f}")
+                
                 if similarity > best_similarity:
                     best_similarity = similarity
                     matched_query = base_query
