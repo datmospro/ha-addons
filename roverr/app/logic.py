@@ -3241,14 +3241,12 @@ def auto_download_movie(title, year, preferred_size_gb, max_size_gb, label=None,
             logger.info(f"Added torrent to download client: {selected['name']} (hash: {selected['hash'][:8]}...)")
             return selected['hash'], selected['name']
         
-        # Fallback: If no new torrents detected after all retries, get the most recent torrent
-        torrents_after = qb.torrents_info()
-        if torrents_after:
-            latest = sorted(torrents_after, key=lambda x: x.get('added_on', 0), reverse=True)[0]
-            logger.warning(f"Could not detect new torrent after {max_retries} retries, using most recent: {latest['name']}")
-            return latest['hash'], latest['name']
-            
-        logger.warning(f"Torrent added but could not find hash for: {best_torrent['title']}")
+        
+        # ❌ REMOVED UNSAFE FALLBACK: Do not use "most recent" torrent as it may be wrong
+        # If we can't detect the new torrent, it's better to fail than to assign wrong hash
+        logger.error(f"❌ Could not detect new torrent after {max_retries} retries for: {best_torrent['title']}")
+        logger.error(f"⚠️ This movie will NOT be added to the database to prevent data corruption")
+        logger.error(f"💡 Possible causes: Torrent client slow to respond, network issues, or torrent already exists")
         return None, None
         
     except Exception as e:
