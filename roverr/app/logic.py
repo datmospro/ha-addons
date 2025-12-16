@@ -2763,10 +2763,26 @@ def filter_search_results(results, search_query, min_similarity=0.4, year=None):
         for query in queries_for_length_check:
             if result_title.lower().startswith(query.lower()):
                 accept = True
+                # ✅ FIXED: Don't overwrite year-boosted similarity, use max
                 best_similarity = max(best_similarity, 0.8)
                 break
         
+        
         if accept:
+            # ✅ FINAL YEAR BOOST: Apply boost one last time if not already applied
+            # This ensures boost is applied even if similarity came from startswith or other paths
+            # Extract years from search_query (the multi-language query with years)
+            query_years = set(re.findall(r'\b(\d{4})\b', search_query))
+            result_years = set(re.findall(r'\b(\d{4})\b', result_title))
+            
+            # If there's a year match and similarity is less than 1.0, apply boost
+            if query_years & result_years and best_similarity < 1.0:
+                matching_year = list(query_years & result_years)[0]
+                # Only boost if not already boosted (check if similarity is a "round" number like 0.8)
+                if abs(best_similarity - 0.8) < 0.01:  # If it's 0.8, it probably needs boost
+                    best_similarity += 0.2
+                    logger.info(f"🎯 Final year boost: '{result_title[:60]}' contains year {matching_year}, similarity: {best_similarity:.3f}")
+            
             result['_similarity'] = best_similarity
             result['_matched_query'] = matched_query
             filtered.append(result)
