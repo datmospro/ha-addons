@@ -549,60 +549,61 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False, tmdb_
             normalized = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('utf-8')
             if normalized != title and normalized:
                 variants.append({"query": normalized, "year": year, "language": original_lang})
-        
-        for i, variant in enumerate(variants):
-            params = {"api_key": api_key, **variant}
-            logger.debug(f"🔧 [TMDB] Variant {i+1}/{len(variants)}: query='{variant['query']}', year={variant.get('year', 'None')}, lang={variant['language']}")
             
-            res = requests.get(search_url, params=params, timeout=5)
-            search_data = res.json()
-            
-            if search_data.get('results'):
-                # ✅ YEAR VALIDATION: Iterate through results to find year match
-                for result in search_data['results']:
-                    result_year = result.get('release_date', '')[:4] if result.get('release_date') else None
-                    result_title = result.get('title', 'Unknown')
-                    
-                    # If year was provided, validate it matches (tolerance ±1 year)
-                    if year:
-                        if result_year:
-                            try:
-                                year_diff = abs(int(result_year) - int(year))
-                                if year_diff <= 1:
-                                    movie_id = result['id']
-                                    matched_result = result
-                                    logger.info(f"✅ [TMDB] Matched '{result_title}' ({result_year}) - Year validated (diff: {year_diff})")
-                                    break
-                            except (ValueError, TypeError):
-                                continue
-                    else:
-                        # No year provided, take first result but warn
-                        movie_id = result['id']
-                        matched_result = result
-                        logger.warning(f"⚠️ [TMDB] No year provided, using first result: '{result_title}' ({result_year or 'Unknown'})")
-                        break
-                
-                # If we found a match, stop trying variants
-                if movie_id:
-                    if i > 0:
-                        logger.info(f"✅ [TMDB] Found movie using variant #{i+1}: '{variant['query']}'")
-                    break
-        
-        # Fallback: If no year match found but we have results, use first result with warning
-        if not movie_id:
+            # Try each variant until we find results with year validation
             for i, variant in enumerate(variants):
                 params = {"api_key": api_key, **variant}
+                logger.debug(f"🔧 [TMDB] Variant {i+1}/{len(variants)}: query='{variant['query']}', year={variant.get('year', 'None')}, lang={variant['language']}")
+                
                 res = requests.get(search_url, params=params, timeout=5)
                 search_data = res.json()
                 
                 if search_data.get('results'):
-                    result = search_data['results'][0]
-                    movie_id = result['id']
-                    matched_result = result
-                    result_year = result.get('release_date', '')[:4] if result.get('release_date') else 'Unknown'
-                    result_title = result.get('title', 'Unknown')
-                    logger.warning(f"⚠️ [TMDB] No exact year match for '{title}' ({year}). Using best guess: '{result_title}' ({result_year})")
-                    break
+                    # ✅ YEAR VALIDATION: Iterate through results to find year match
+                    for result in search_data['results']:
+                        result_year = result.get('release_date', '')[:4] if result.get('release_date') else None
+                        result_title = result.get('title', 'Unknown')
+                        
+                        # If year was provided, validate it matches (tolerance ±1 year)
+                        if year:
+                            if result_year:
+                                try:
+                                    year_diff = abs(int(result_year) - int(year))
+                                    if year_diff <= 1:
+                                        movie_id = result['id']
+                                        matched_result = result
+                                        logger.info(f"✅ [TMDB] Matched '{result_title}' ({result_year}) - Year validated (diff: {year_diff})")
+                                        break
+                                except (ValueError, TypeError):
+                                    continue
+                        else:
+                            # No year provided, take first result but warn
+                            movie_id = result['id']
+                            matched_result = result
+                            logger.warning(f"⚠️ [TMDB] No year provided, using first result: '{result_title}' ({result_year or 'Unknown'})")
+                            break
+                    
+                    # If we found a match, stop trying variants
+                    if movie_id:
+                        if i > 0:
+                            logger.info(f"✅ [TMDB] Found movie using variant #{i+1}: '{variant['query']}'")
+                        break
+            
+            # Fallback: If no year match found but we have results, use first result with warning
+            if not movie_id:
+                for i, variant in enumerate(variants):
+                    params = {"api_key": api_key, **variant}
+                    res = requests.get(search_url, params=params, timeout=5)
+                    search_data = res.json()
+                    
+                    if search_data.get('results'):
+                        result = search_data['results'][0]
+                        movie_id = result['id']
+                        matched_result = result
+                        result_year = result.get('release_date', '')[:4] if result.get('release_date') else 'Unknown'
+                        result_title = result.get('title', 'Unknown')
+                        logger.warning(f"⚠️ [TMDB] No exact year match for '{title}' ({year}). Using best guess: '{result_title}' ({result_year})")
+                        break
 
         
         if not movie_id:
