@@ -2832,13 +2832,13 @@ def search_indexers(query, settings, tmdb_id=None):
                     
                     # 3. Build query string with all language variants
                     unique_titles = list(set(titles_by_lang.values()))
-                    query = " | ".join(unique_titles)
                     
-                    # ✅ NEW: Append year to query if it was in original query
+                    # ✅ FIXED: Append year to EACH title, not just at the end
                     if original_year:
-                        query = f"{query} {original_year}"
-                        logger.debug(f"Added year to multi-language query: {query}")
+                        unique_titles = [f"{title} {original_year}" for title in unique_titles]
+                        logger.debug(f"Added year to each title: {unique_titles}")
                     
+                    query = " | ".join(unique_titles)
                     logger.info(f"🔍 Multi-language search query: {query}")
                 else:
                     logger.warning("Failed to fetch multi-language titles, falling back to text search")
