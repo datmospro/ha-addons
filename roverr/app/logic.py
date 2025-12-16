@@ -2080,6 +2080,22 @@ def get_movie_titles_in_languages(tmdb_id, languages, api_key):
     titles = {}
     
     try:
+        # ✅ ALWAYS fetch original title first (usually English)
+        try:
+            url = f"https://api.themoviedb.org/3/movie/{tmdb_id}"
+            params = {"api_key": api_key}  # No language = original title
+            response = requests.get(url, params=params, timeout=5)
+            
+            if response.status_code == 200:
+                data = response.json()
+                original_title = data.get('original_title')
+                if original_title:
+                    titles['original'] = original_title
+                    logger.info(f"Fetched original title: '{original_title}'")
+        except Exception as e:
+            logger.warning(f"Could not fetch original title: {e}")
+        
+        # Then fetch requested language translations
         for lang in languages:
             try:
                 url = f"https://api.themoviedb.org/3/movie/{tmdb_id}"
