@@ -2689,9 +2689,17 @@ def filter_search_results(results, search_query, min_similarity=0.4):
         is_strict_match = False
         
         for base_query in base_queries:
+            # ✅ NEW: If the result title contains the exact query as a word, accept it immediately
+            query_no_year = re.sub(r'\b\d{4}\b', '', base_query).strip()
+            if query_no_year and is_word_match(query_no_year, result_title):
+                # Exact word match found - accept with high similarity
+                best_similarity = max(best_similarity, 0.95)
+                matched_query = base_query
+                is_strict_match = True
+                continue
+            
             # For very short titles, verify complete word match
             # But use queries_for_length_check to determine if it's "short"
-            query_no_year = re.sub(r'\b\d{4}\b', '', base_query).strip()
             is_short_query = len(query_no_year) <= 4 if query_no_year else len(base_query) <= 4
             
             if is_short_query:
