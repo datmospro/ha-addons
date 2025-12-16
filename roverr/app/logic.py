@@ -488,7 +488,7 @@ def scrape_imdb_rating(imdb_id):
         logger.error(f"Error scraping IMDb for {imdb_id}: {e}")
     return None, None
 
-def fetch_complete_movie_metadata(title, year, api_key, images_only=False):
+def fetch_complete_movie_metadata(title, year, api_key, images_only=False, tmdb_id=None):
     """
     Fetches complete metadata for a movie from TMDB, including:
     - Basic details (title, year, runtime, overview, genres)
@@ -500,35 +500,55 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False):
     logger.info(f"🎬 [TMDB] METADATA FETCH STARTED - '{title}' ({year})")
     logger.info("=" * 80)
     try:
-        # 1. Search for movie with fallback variants
-        search_url = "https://api.themoviedb.org/3/search/movie"
-        original_lang = get_language()
-        
-        # Generate search variants (ordered from most to least specific)
-        variants = [
-            {"query": title, "year": year, "language": original_lang},  # Original with year
-            {"query": title, "language": original_lang},  # Without year
-        ]
-        
-        # Variant 3: Remove trailing numbers (e.g., "Köln 75" → "Köln")
-        import re
-        title_no_numbers = re.sub(r'\s+\d+$', '', title).strip()
-        if title_no_numbers != title:
-            variants.append({"query": title_no_numbers, "year": year, "language": original_lang})
-        
-        # Variant 4: Try in English
-        if original_lang != 'en-US':
-            variants.append({"query": title, "year": year, "language": "en-US"})
-        
-        # Variant 5: Normalize special characters (ö→o, á→a, etc.)
-        import unicodedata
-        normalized = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('utf-8')
-        if normalized != title and normalized:
-            variants.append({"query": normalized, "year": year, "language": original_lang})
-        
-        # Try each variant until we find results with year validation
         movie_id = None
         matched_result = None
+        
+        # If TMDB ID is provided (e.g., from RSS), use it directly
+        if tmdb_id:
+            logger.info(f"🎯 [TMDB] Using exact TMDB ID: {tmdb_id} (from RSS)")
+            movie_id = int(tmdb_id)
+            # Fetch basic details to get the matched result
+            try:
+                details_url = f"https://api.themoviedb.org/3/movie/{movie_id}"
+                params = {"api_key": api_key, "language": get_language()}
+                res = requests.get(details_url, params=params, timeout=5)
+                if res.status_code == 200:
+                    matched_result = res.json()
+                    logger.info(f"✅ [TMDB] Exact match using ID: '{matched_result.get('title')}' ({matched_result.get('release_date', '')[:4] if matched_result.get('release_date') else 'Unknown'})")
+                else:
+                    logger.warning(f"⚠️ [TMDB] Failed to fetch movie with ID {tmdb_id}, falling back to search")
+                    movie_id = None
+            except Exception as e:
+                logger.warning(f"⚠️ [TMDB] Error fetching movie with ID {tmdb_id}: {e}, falling back to search")
+                movie_id = None
+        
+        # If no TMDB ID or direct fetch failed, search for movie
+        if not movie_id:
+            # 1. Search for movie with fallback variants
+            search_url = "https://api.themoviedb.org/3/search/movie"
+            original_lang = get_language()
+            
+            # Generate search variants (ordered from most to least specific)
+            variants = [
+                {"query": title, "year": year, "language": original_lang},  # Original with year
+                {"query": title, "language": original_lang},  # Without year
+            ]
+            
+            # Variant 3: Remove trailing numbers (e.g., "Köln 75" → "Köln")
+            import re
+            title_no_numbers = re.sub(r'\s+\d+$', '', title).strip()
+            if title_no_numbers != title:
+                variants.append({"query": title_no_numbers, "year": year, "language": original_lang})
+            
+            # Variant 4: Try in English
+            if original_lang != 'en-US':
+                variants.append({"query": title, "year": year, "language": "en-US"})
+            
+            # Variant 5: Normalize special characters (ö→o, á→a, etc.)
+            import unicodedata
+            normalized = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('utf-8')
+            if normalized != title and normalized:
+                variants.append({"query": normalized, "year": year, "language": original_lang})
         
         for i, variant in enumerate(variants):
             params = {"api_key": api_key, **variant}
@@ -3475,7 +3495,7 @@ def fetch_rss_movies(limit=30):
                         # Fetch Metadata (same as non-auto-download path)
                         metadata = None
                         if api_key:
-                            metadata = fetch_complete_movie_metadata(title, year, api_key)
+                            metadata = fetch_complete_movie_metadata(title, year, api_key, tmdb_id=entry_tmdb_id)
                         
                         poster_local = None
                         backdrop_local = None
