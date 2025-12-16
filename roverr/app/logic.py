@@ -3175,13 +3175,26 @@ def select_best_torrent(results, preferred_size_mb, max_size_mb):
     if not valid_results:
         return None
         
-    # 2. Sort by Preferred Size
-    if preferred_size_mb > 0:
-        # Sort by absolute difference from preferred size
-        valid_results.sort(key=lambda x: abs(x['size_mb'] - preferred_size_mb))
+    # 2. Sort by Similarity (if available) then by Preferred Size
+    # ✅ NEW: Prioritize similarity score from filter_false_positives
+    has_similarity = any('_similarity' in r for r in valid_results)
+    
+    if has_similarity:
+        # Sort by similarity (highest first), then by size preference
+        if preferred_size_mb > 0:
+            valid_results.sort(
+                key=lambda x: (
+                    -x.get('_similarity', 0),  # Negative for descending (highest similarity first)
+                    abs(x['size_mb'] - preferred_size_mb)  # Then by size preference
+                )
+            )
+        else:
+            # Just sort by similarity
+            valid_results.sort(key=lambda x: x.get('_similarity', 0), reverse=True)
     else:
-        # If no preference, stick to search result order (usually relevance/seeders)
-        pass
+        # Legacy behavior: sort by size only
+        if preferred_size_mb > 0:
+            valid_results.sort(key=lambda x: abs(x['size_mb'] - preferred_size_mb))
         
     return valid_results[0]
 
