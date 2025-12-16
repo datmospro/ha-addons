@@ -2721,12 +2721,26 @@ def filter_search_results(results, search_query, min_similarity=0.4):
                     is_strict_match = True
                     # Calculate similarity with the full query (including year)
                     similarity = calculate_title_similarity(base_query, result_title)
+                    
+                    # ✅ Year boost for short queries
+                    year_match = re.search(r'\b(\d{4})\b', base_query)
+                    if year_match and year_match.group(1) in result_title:
+                        similarity += 0.2
+                        logger.debug(f"Year boost (short): '{result_title[:60]}' contains year {year_match.group(1)}, similarity: {similarity:.3f}")
+                    
                     if similarity > best_similarity:
                         best_similarity = similarity
                         matched_query = base_query
             else:
                 # For normal titles, use fuzzy matching
                 similarity = calculate_title_similarity(base_query, result_title)
+                
+                # ✅ Year boost for normal queries
+                year_match = re.search(r'\b(\d{4})\b', base_query)
+                if year_match and year_match.group(1) in result_title:
+                    similarity += 0.2
+                    logger.debug(f"Year boost (normal): '{result_title[:60]}' contains year {year_match.group(1)}, similarity: {similarity:.3f}")
+                
                 if similarity > best_similarity:
                     best_similarity = similarity
                     matched_query = base_query
