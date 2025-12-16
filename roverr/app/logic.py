@@ -526,8 +526,10 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False):
         if normalized != title and normalized:
             variants.append({"query": normalized, "year": year, "language": original_lang})
         
-        # Try each variant until we find results
+        # Try each variant until we find results with year validation
         movie_id = None
+        matched_result = None
+        
         for i, variant in enumerate(variants):
             params = {"api_key": api_key, **variant}
             logger.debug(f"🔧 [TMDB] Variant {i+1}/{len(variants)}: query='{variant['query']}', year={variant.get('year', 'None')}, lang={variant['language']}")
@@ -536,14 +538,52 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False):
             search_data = res.json()
             
             if search_data.get('results'):
-                # Found results!
-                result = search_data['results'][0]
-                movie_id = result['id']
-                if i > 0:
-                    logger.info(f"✅ [TMDB] Found movie using variant #{i+1}: '{variant['query']}'")
-                else:
-                    logger.debug(f"TMDB found '{title}' ({year}) using exact search")
-                break
+                # ✅ YEAR VALIDATION: Iterate through results to find year match
+                for result in search_data['results']:
+                    result_year = result.get('release_date', '')[:4] if result.get('release_date') else None
+                    result_title = result.get('title', 'Unknown')
+                    
+                    # If year was provided, validate it matches (tolerance ±1 year)
+                    if year:
+                        if result_year:
+                            try:
+                                year_diff = abs(int(result_year) - int(year))
+                                if year_diff <= 1:
+                                    movie_id = result['id']
+                                    matched_result = result
+                                    logger.info(f"✅ [TMDB] Matched '{result_title}' ({result_year}) - Year validated (diff: {year_diff})")
+                                    break
+                            except (ValueError, TypeError):
+                                continue
+                    else:
+                        # No year provided, take first result but warn
+                        movie_id = result['id']
+                        matched_result = result
+                        logger.warning(f"⚠️ [TMDB] No year provided, using first result: '{result_title}' ({result_year or 'Unknown'})")
+                        break
+                
+                # If we found a match, stop trying variants
+                if movie_id:
+                    if i > 0:
+                        logger.info(f"✅ [TMDB] Found movie using variant #{i+1}: '{variant['query']}'")
+                    break
+        
+        # Fallback: If no year match found but we have results, use first result with warning
+        if not movie_id:
+            for i, variant in enumerate(variants):
+                params = {"api_key": api_key, **variant}
+                res = requests.get(search_url, params=params, timeout=5)
+                search_data = res.json()
+                
+                if search_data.get('results'):
+                    result = search_data['results'][0]
+                    movie_id = result['id']
+                    matched_result = result
+                    result_year = result.get('release_date', '')[:4] if result.get('release_date') else 'Unknown'
+                    result_title = result.get('title', 'Unknown')
+                    logger.warning(f"⚠️ [TMDB] No exact year match for '{title}' ({year}). Using best guess: '{result_title}' ({result_year})")
+                    break
+
         
         if not movie_id:
             logger.warning(f"⚠️  [TMDB] No results found for '{title}' ({year}) - tried {len(variants)} variants")
@@ -3408,123 +3448,127 @@ def fetch_rss_movies(limit=30):
                     for t in existing_torrents:
                         t_title, t_year = clean_torrent_name(t['name'])
                         if t_title.lower() == title.lower() and (not year or str(t_year) == str(year)):
-                            logger.info(f"Movie '{title}' ({year}) already exists in torrent client. Adding to dashboard as RSS entry (no auto-download).")
+                            logger.info(f"Movie '{title}' ({year}) already exists in torrent client. Skipping duplicate RSS entry.")
                             torrent_exists = True
                             break
                     
-                    if not torrent_exists:
-                        # Torrent doesn't exist, proceed with auto-download
-                        logger.info(f"Auto-download enabled for {title} from feed '{entry['feed_name']}' with label '{feed_label}'")
+                    if torrent_exists:
+                        # Skip this entry entirely - no auto-download, no RSS entry
+                        continue
+                    
+                    # Torrent doesn't exist, proceed with auto-download
+                    logger.info(f"Auto-download enabled for {title} from feed '{entry['feed_name']}' with label '{feed_label}'")
+                    
+                    # Get TMDB ID from entry for intelligent multi-language search
+                    entry_tmdb_id = entry.get('tmdb_id')
+                    if entry_tmdb_id:
+                        logger.info(f"Using TMDB ID {entry_tmdb_id} for intelligent multi-language search")
+                    
+                    torrent_hash, torrent_name = auto_download_movie(
+                        title, year, preferred_size, max_size, 
+                        label=feed_label, 
+                        tmdb_id=entry_tmdb_id
+                    )
+                    if torrent_hash:
+                        logger.info(f"Successfully auto-downloaded {title} from RSS. Adding to DB with real hash.")
                         
-                        # Get TMDB ID from entry for intelligent multi-language search
-                        entry_tmdb_id = entry.get('tmdb_id')
-                        if entry_tmdb_id:
-                            logger.info(f"Using TMDB ID {entry_tmdb_id} for intelligent multi-language search")
+                        # Fetch Metadata (same as non-auto-download path)
+                        metadata = None
+                        if api_key:
+                            metadata = fetch_complete_movie_metadata(title, year, api_key)
                         
-                        torrent_hash, torrent_name = auto_download_movie(
-                            title, year, preferred_size, max_size, 
-                            label=feed_label, 
-                            tmdb_id=entry_tmdb_id
-                        )
-                        if torrent_hash:
-                            logger.info(f"Successfully auto-downloaded {title} from RSS. Adding to DB with real hash.")
-                            
-                            # Fetch Metadata (same as non-auto-download path)
-                            metadata = None
-                            if api_key:
-                                metadata = fetch_complete_movie_metadata(title, year, api_key)
-                            
-                            poster_local = None
-                            backdrop_local = None
-                            
-                            if metadata:
-                                # Download Images using torrent hash (not pseudo-hash)
-                                if metadata.get('poster_path'):
-                                    poster_url = f"https://image.tmdb.org/t/p/w500{metadata.get('poster_path')}"
-                                    poster_local = download_image(poster_url, f"{torrent_hash}_poster.jpg")
-                                    
-                                if metadata.get('backdrop_path'):
-                                    backdrop_url = f"https://image.tmdb.org/t/p/w1280{metadata.get('backdrop_path')}"
-                                    backdrop_local = download_image(backdrop_url, f"{torrent_hash}_backdrop.jpg")
-                            
-                            # Create DB Entry with REAL torrent hash
-                            try:
-                                Movie.create(
-                                    torrent_hash=torrent_hash,
-                                    title=metadata.get('title', title) if metadata else title,
-                                    year=metadata.get('year', year) if metadata else year,
-                                    poster_path=poster_local,
-                                    backdrop_path=backdrop_local,
-                                    overview=metadata.get('overview') if metadata else "Auto-downloaded from RSS",
-                                    runtime=metadata.get('runtime') if metadata else 0,
-                                    genres=metadata.get('genres') if metadata else None,
-                                    state='downloading',  # Mark as downloading (not 'rss')
-                                    progress=0.0,
-                                    size=0,
-                                    status='new',
-                                    cast=metadata.get('cast') if metadata else None,
-                                    crew=metadata.get('crew') if metadata else None,
-                                    vote_average=metadata.get('vote_average') if metadata else 0,
-                                    vote_count=metadata.get('vote_count') if metadata else 0,
-                                    imdb_id=metadata.get('imdb_id') if metadata else None,
-                                    imdb_rating=metadata.get('imdb_rating') if metadata else None,
-                                    imdb_votes=metadata.get('imdb_votes') if metadata else None,
-                                    tmdb_id=int(entry_tmdb_id) if entry_tmdb_id else None,  # Save TMDB ID for intelligent search
-                                    country_code=metadata.get('country_code') if metadata else None,  # Save country code for flag display
-                                    metadata_updated_at=datetime.now(),
-                                    torrent_name=torrent_name
-                                )
-                                logger.info(f"Created DB entry for auto-downloaded movie: {title} ({year})")
+                        poster_local = None
+                        backdrop_local = None
+                        
+                        if metadata:
+                            # Download Images using torrent hash (not pseudo-hash)
+                            if metadata.get('poster_path'):
+                                poster_url = f"https://image.tmdb.org/t/p/w500{metadata.get('poster_path')}"
+                                poster_local = download_image(poster_url, f"{torrent_hash}_poster.jpg")
                                 
-                                # Notify Telegram: New Movie Found (RSS Auto-Download)
-                                settings = load_settings()
-                                if settings.get('telegram_notify_on_new_movie', True):
-                                    movie_title = metadata.get('title', title) if metadata else title
-                                    movie_year = metadata.get('year', year) if metadata else year
-                                    send_telegram_notification(f"🆕 <b>New Movie Found</b>\n\n🎬 {movie_title} ({movie_year})\n📥 Auto-downloaded from RSS.")
-                                
-                            except Exception as create_error:
-                                # Handle race condition: sync_movies may have already created this entry
-                                if "UNIQUE constraint failed" in str(create_error):
-                                    logger.info(f"Movie '{title}' ({year}) already added to DB by sync_movies (race condition). Updating with RSS metadata.")
-                                    
-                                    # Update the existing entry with proper metadata
-                                    try:
-                                        existing_movie = Movie.get(Movie.torrent_hash == torrent_hash)
-                                        
-                                        # Update all metadata fields
-                                        existing_movie.title = metadata.get('title', title) if metadata else title
-                                        existing_movie.year = metadata.get('year', year) if metadata else year
-                                        existing_movie.poster_path = poster_local
-                                        existing_movie.backdrop_path = backdrop_local
-                                        existing_movie.overview = metadata.get('overview') if metadata else "Auto-downloaded from RSS"
-                                        existing_movie.runtime = metadata.get('runtime') if metadata else 0
-                                        existing_movie.genres = metadata.get('genres') if metadata else None
-                                        existing_movie.cast = metadata.get('cast') if metadata else None
-                                        existing_movie.crew = metadata.get('crew') if metadata else None
-                                        existing_movie.vote_average = metadata.get('vote_average') if metadata else 0
-                                        existing_movie.vote_count = metadata.get('vote_count') if metadata else 0
-                                        existing_movie.imdb_id = metadata.get('imdb_id') if metadata else None
-                                        existing_movie.imdb_rating = metadata.get('imdb_rating') if metadata else None
-                                        existing_movie.imdb_votes = metadata.get('imdb_votes') if metadata else None
-                                        existing_movie.tmdb_id = int(entry_tmdb_id) if entry_tmdb_id else None  # Save TMDB ID
-                                        existing_movie.metadata_updated_at = datetime.now()
-                                        existing_movie.torrent_name = torrent_name
-                                        
-                                        # Override status to 'new' - this was just auto-downloaded from RSS
-                                        # Fixes race condition where sync_movies assigns incorrect 'pending' status
-                                        existing_movie.status = 'new'
-                                        
-                                        existing_movie.save()
-                                        logger.info(f"Successfully updated existing movie '{title}' ({year}) with RSS metadata")
-                                        
-                                    except Exception as update_error:
-                                        logger.error(f"Failed to update existing movie '{title}' with RSS metadata: {update_error}")
-                                else:
-                                    logger.error(f"Error creating DB entry for '{title}': {create_error}")
+                            if metadata.get('backdrop_path'):
+                                backdrop_url = f"https://image.tmdb.org/t/p/w1280{metadata.get('backdrop_path')}"
+                                backdrop_local = download_image(backdrop_url, f"{torrent_hash}_backdrop.jpg")
+                        
+                        # Create DB Entry with REAL torrent hash
+                        try:
+                            Movie.create(
+                                torrent_hash=torrent_hash,
+                                title=metadata.get('title', title) if metadata else title,
+                                year=metadata.get('year', year) if metadata else year,
+                                poster_path=poster_local,
+                                backdrop_path=backdrop_local,
+                                overview=metadata.get('overview') if metadata else "Auto-downloaded from RSS",
+                                runtime=metadata.get('runtime') if metadata else 0,
+                                genres=metadata.get('genres') if metadata else None,
+                                state='downloading',  # Mark as downloading (not 'rss')
+                                progress=0.0,
+                                size=0,
+                                status='new',
+                                cast=metadata.get('cast') if metadata else None,
+                                crew=metadata.get('crew') if metadata else None,
+                                vote_average=metadata.get('vote_average') if metadata else 0,
+                                vote_count=metadata.get('vote_count') if metadata else 0,
+                                imdb_id=metadata.get('imdb_id') if metadata else None,
+                                imdb_rating=metadata.get('imdb_rating') if metadata else None,
+                                imdb_votes=metadata.get('imdb_votes') if metadata else None,
+                                tmdb_id=int(entry_tmdb_id) if entry_tmdb_id else None,  # Save TMDB ID for intelligent search
+                                country_code=metadata.get('country_code') if metadata else None,  # Save country code for flag display
+                                metadata_updated_at=datetime.now(),
+                                torrent_name=torrent_name
+                            )
+                            logger.info(f"Created DB entry for auto-downloaded movie: {title} ({year})")
                             
-                            added_count += 1
-                            continue  # Skip the normal RSS entry creation path
+                            # Notify Telegram: New Movie Found (RSS Auto-Download)
+                            settings = load_settings()
+                            if settings.get('telegram_notify_on_new_movie', True):
+                                movie_title = metadata.get('title', title) if metadata else title
+                                movie_year = metadata.get('year', year) if metadata else year
+                                send_telegram_notification(f"🆕 <b>New Movie Found</b>\n\n🎬 {movie_title} ({movie_year})\n📥 Auto-downloaded from RSS.")
+                            
+                        except Exception as create_error:
+                            # Handle race condition: sync_movies may have already created this entry
+                            if "UNIQUE constraint failed" in str(create_error):
+                                logger.info(f"Movie '{title}' ({year}) already added to DB by sync_movies (race condition). Updating with RSS metadata.")
+                                
+                                # Update the existing entry with proper metadata
+                                try:
+                                    existing_movie = Movie.get(Movie.torrent_hash == torrent_hash)
+                                    
+                                    # Update all metadata fields
+                                    existing_movie.title = metadata.get('title', title) if metadata else title
+                                    existing_movie.year = metadata.get('year', year) if metadata else year
+                                    existing_movie.poster_path = poster_local
+                                    existing_movie.backdrop_path = backdrop_local
+                                    existing_movie.overview = metadata.get('overview') if metadata else "Auto-downloaded from RSS"
+                                    existing_movie.runtime = metadata.get('runtime') if metadata else 0
+                                    existing_movie.genres = metadata.get('genres') if metadata else None
+                                    existing_movie.cast = metadata.get('cast') if metadata else None
+                                    existing_movie.crew = metadata.get('crew') if metadata else None
+                                    existing_movie.vote_average = metadata.get('vote_average') if metadata else 0
+                                    existing_movie.vote_count = metadata.get('vote_count') if metadata else 0
+                                    existing_movie.imdb_id = metadata.get('imdb_id') if metadata else None
+                                    existing_movie.imdb_rating = metadata.get('imdb_rating') if metadata else None
+                                    existing_movie.imdb_votes = metadata.get('imdb_votes') if metadata else None
+                                    existing_movie.tmdb_id = int(entry_tmdb_id) if entry_tmdb_id else None  # Save TMDB ID
+                                    existing_movie.metadata_updated_at = datetime.now()
+                                    existing_movie.torrent_name = torrent_name
+                                    
+                                    # Override status to 'new' - this was just auto-downloaded from RSS
+                                    # Fixes race condition where sync_movies assigns incorrect 'pending' status
+                                    existing_movie.status = 'new'
+                                    
+                                    existing_movie.save()
+                                    logger.info(f"Successfully updated existing movie '{title}' ({year}) with RSS metadata")
+                                    
+                                except Exception as update_error:
+                                    logger.error(f"Failed to update existing movie '{title}' with RSS metadata: {update_error}")
+                            else:
+                                logger.error(f"Error creating DB entry for '{title}': {create_error}")
+                        
+                        added_count += 1
+                        continue  # Skip the normal RSS entry creation path
+
                 except Exception as e:
                     # Catch errors from torrent client check or auto_download_movie (NOT from Movie.create)
                     logger.error(f"Error in auto-download process: {e}")
