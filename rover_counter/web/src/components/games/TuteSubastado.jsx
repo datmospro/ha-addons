@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useGame } from '../../context/GameContext';
-import { Trophy, History, CheckCircle, XCircle, ChevronLeft } from 'lucide-react';
+import { Trophy, History, CheckCircle, XCircle, ChevronLeft, Edit2, Trash2, Save, X } from 'lucide-react';
 
 export default function TuteSubastado({ matchId, onBack, isReadOnly = false }) {
     const { activeMatches, finishedMatches, updateMatchState, finishMatch } = useGame();
@@ -16,6 +17,7 @@ export default function TuteSubastado({ matchId, onBack, isReadOnly = false }) {
         suit: null
     });
     const [animateScore, setAnimateScore] = useState(null);
+    const [editingRound, setEditingRound] = useState(null);
 
     if (!activeMatch) return null;
 
@@ -126,6 +128,56 @@ export default function TuteSubastado({ matchId, onBack, isReadOnly = false }) {
         setPhase('auction');
     };
 
+    // Helper to recalculate all scores from history
+    const recalculateTeams = (history, currentTeams) => {
+        // Reset scores
+        const resetTeams = currentTeams.map(t => ({ ...t, score: 0 }));
+
+        // Replay history
+        history.forEach(round => {
+            const bid = parseInt(round.bid);
+            const scoringTeamId = round.success ? round.teamId : (
+                // Find the other team
+                resetTeams.find(t => t.id !== round.teamId)?.id
+            );
+
+            const teamIndex = resetTeams.findIndex(t => t.id === scoringTeamId);
+            if (teamIndex !== -1) {
+                resetTeams[teamIndex].score += bid;
+            }
+        });
+
+        return resetTeams;
+    };
+
+    const handleUpdateRound = (updatedRound) => {
+        const newHistory = activeMatch.history.map(r =>
+            r.round === updatedRound.round ? updatedRound : r
+        );
+
+        const newTeams = recalculateTeams(newHistory, activeMatch.teams);
+        updateMatchState(matchId, { teams: newTeams, history: newHistory });
+        setEditingRound(null);
+    };
+
+    const handleDeleteRound = (roundToDelete) => {
+        if (!window.confirm('¿Seguro que quieres eliminar esta ronda?')) return;
+
+        const newHistory = activeMatch.history.filter(r => r.round !== roundToDelete.round);
+
+        // Re-number rounds to keep consistency (optional but good for display)
+        // Note: If we re-number, we might change "round 5" to "round 4" if we deleted 3.
+        // Let's keep it simple for now and re-number to ensure continuity.
+        const reorderedHistory = newHistory.map((r, index) => ({
+            ...r,
+            round: newHistory.length - index // Assuming new-to-old order
+        }));
+
+        const newTeams = recalculateTeams(reorderedHistory, activeMatch.teams);
+        updateMatchState(matchId, { teams: newTeams, history: reorderedHistory });
+        setEditingRound(null);
+    };
+
     if (winner && !isReadOnly) {
         return (
             <div style={{
@@ -186,6 +238,265 @@ export default function TuteSubastado({ matchId, onBack, isReadOnly = false }) {
                     </button>
                 )}
             </div>
+
+            {/* Edit Round Modal - Portal to document.body for correct fixed positioning */}
+            {editingRound && createPortal(
+                <div style={{
+                    position: 'fixed', inset: 0, zIndex: 9999, // High z-index to ensure visibility
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)'
+                }}>
+                    <div className="glass-panel" style={{
+                        width: '90%',
+                        maxWidth: '380px',
+                        padding: '24px',
+                        maxHeight: '90vh',
+                        overflowY: 'auto',
+                        // Using a semi-transparent dark blue/purple to match the app theme, 
+                        // instead of solid dark grey.
+                        background: 'linear-gradient(135deg, rgba(30, 30, 60, 0.9), rgba(40, 30, 70, 0.95))',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                        borderRadius: '24px'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                            <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: 'white' }}>Editar Ronda #{editingRound.round}</h3>
+                            <button onClick={() => setEditingRound(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                            {/* Team Selection */}
+                            <div>
+                                <label className="text-xs" style={{ display: 'block', marginBottom: '12px', opacity: 0.6, fontSize: '11px', letterSpacing: '1px' }}>EQUIPO</label>
+                                <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '4px' }}>
+                                    {activeMatch.teams.map(team => (
+                                        <button
+                                            key={team.id}
+                                            onClick={() => setEditingRound({ ...editingRound, teamId: team.id })}
+                                            className="btn"
+                                            style={{
+                                                flex: 1,
+                                                padding: '12px',
+                                                borderRadius: '8px',
+                                                background: editingRound.teamId === team.id ? '#3b82f6' : 'transparent',
+                                                color: editingRound.teamId === team.id ? 'white' : 'rgba(255,255,255,0.4)',
+                                                fontWeight: editingRound.teamId === team.id ? 'bold' : 'normal',
+                                                transition: 'all 0.2s',
+                                                border: 'none'
+                                            }}
+                                        >
+                                            {team.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Bid Input - Scroll Picker */}
+                            <div>
+                                <label className="text-xs" style={{ display: 'block', marginBottom: '8px', opacity: 0.6, fontSize: '10px' }}>APUESTA</label>
+                                <div style={{
+                                    position: 'relative',
+                                    height: '100px', // More compact
+                                    overflow: 'hidden',
+                                    background: 'rgba(0, 0, 0, 0.2)',
+                                    borderRadius: '12px',
+                                    border: '1px solid rgba(255, 255, 255, 0.05)'
+                                }}>
+                                    {/* Selection highlight */}
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '50%',
+                                        left: '0',
+                                        right: '0',
+                                        height: '40px',
+                                        transform: 'translateY(-50%)',
+                                        background: 'linear-gradient(90deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2))',
+                                        borderTop: '1px solid rgba(59, 130, 246, 0.5)',
+                                        borderBottom: '1px solid rgba(59, 130, 246, 0.5)',
+                                        pointerEvents: 'none',
+                                        zIndex: 1
+                                    }} />
+
+                                    {/* Scrollable container */}
+                                    <div
+                                        style={{
+                                            height: '100%',
+                                            overflowY: 'scroll',
+                                            scrollSnapType: 'y mandatory',
+                                            paddingTop: '30px',
+                                            paddingBottom: '30px',
+                                            WebkitOverflowScrolling: 'touch'
+                                        }}
+                                        ref={(el) => {
+                                            // Auto-scroll on mount using a flag or direct check
+                                            if (el && editingRound && !el.hasScrolledToInitial) {
+                                                const itemHeight = 40;
+                                                const index = Math.round((editingRound.bid - 70) / 5);
+                                                el.scrollTop = index * itemHeight;
+                                                el.hasScrolledToInitial = true;
+                                            }
+                                        }}
+                                        onScroll={(e) => {
+                                            const scrollTop = e.target.scrollTop;
+                                            const itemHeight = 40;
+                                            const index = Math.round(scrollTop / itemHeight);
+                                            // 33 items (70-230)
+                                            if (index >= 0 && index < 33) {
+                                                const validBid = 70 + (index * 5);
+                                                if (validBid !== editingRound.bid) {
+                                                    setEditingRound(prev => ({ ...prev, bid: validBid }));
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        {Array.from({ length: 33 }, (_, i) => {
+                                            const value = 70 + (i * 5);
+                                            const isSelected = value === editingRound.bid;
+                                            return (
+                                                <div
+                                                    key={value}
+                                                    style={{
+                                                        height: '40px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        scrollSnapAlign: 'center',
+                                                        fontSize: isSelected ? '24px' : '16px',
+                                                        fontWeight: isSelected ? 'bold' : 'normal',
+                                                        color: isSelected ? 'white' : 'rgba(255, 255, 255, 0.6)', // Increased opacity
+                                                        fontFamily: 'monospace',
+                                                        transition: 'all 0.2s',
+                                                        opacity: isSelected ? 1 : 0.6, // Increased opacity
+                                                        cursor: 'pointer'
+                                                    }}
+                                                    onClick={(e) => {
+                                                        const container = e.currentTarget.parentElement;
+                                                        const itemHeight = 40;
+                                                        container.scrollTo({
+                                                            top: i * itemHeight,
+                                                            behavior: 'smooth'
+                                                        });
+                                                    }}
+                                                >
+                                                    {value}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Gradient overlays */}
+                                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '30px', background: 'linear-gradient(to bottom, rgba(30,30,40,1), transparent)', pointerEvents: 'none' }} />
+                                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '30px', background: 'linear-gradient(to top, rgba(30,30,40,1), transparent)', pointerEvents: 'none' }} />
+                                </div>
+                            </div>
+
+                            {/* Suit Selection */}
+                            <div>
+                                <label className="text-xs" style={{ display: 'block', marginBottom: '8px', opacity: 0.6, fontSize: '10px' }}>PALO</label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                                    {suits.map(suit => (
+                                        <button
+                                            key={suit.id}
+                                            type="button"
+                                            onClick={() => setEditingRound({ ...editingRound, suit: suit.id })}
+                                            style={{
+                                                padding: '10px 4px',
+                                                background: editingRound.suit === suit.id ? `${suit.color}30` : 'rgba(255,255,255,0.05)',
+                                                border: editingRound.suit === suit.id ? `1px solid ${suit.color}` : '1px solid rgba(255,255,255,0.05)',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '2px'
+                                            }}
+                                        >
+                                            <span style={{ fontSize: '20px' }}>{suit.emoji}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Success Toggle */}
+                            <div>
+                                <label className="text-xs" style={{ display: 'block', marginBottom: '8px', opacity: 0.6, fontSize: '10px' }}>RESULTADO</label>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                        onClick={() => setEditingRound({ ...editingRound, success: true })}
+                                        className="btn"
+                                        style={{
+                                            flex: 1,
+                                            padding: '12px',
+                                            background: editingRound.success ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.05)',
+                                            color: editingRound.success ? '#34d399' : 'rgba(255,255,255,0.4)',
+                                            border: editingRound.success ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.05)',
+                                            borderRadius: '8px',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                            fontSize: '14px'
+                                        }}
+                                    >
+                                        <CheckCircle size={18} /> <span style={{ fontWeight: '500' }}>Conseguido</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setEditingRound({ ...editingRound, success: false })}
+                                        className="btn"
+                                        style={{
+                                            flex: 1,
+                                            padding: '12px',
+                                            background: !editingRound.success ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.05)',
+                                            color: !editingRound.success ? '#f87171' : 'rgba(255,255,255,0.4)',
+                                            border: !editingRound.success ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.05)',
+                                            borderRadius: '8px',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                            fontSize: '14px'
+                                        }}
+                                    >
+                                        <XCircle size={18} /> <span style={{ fontWeight: '500' }}>Fracasado</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div style={{ display: 'flex', gap: '12px', marginTop: '8px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                                <button
+                                    onClick={() => handleDeleteRound(editingRound)}
+                                    className="btn"
+                                    style={{
+                                        padding: '12px',
+                                        background: 'rgba(239, 68, 68, 0.1)',
+                                        color: '#ef4444',
+                                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                                        borderRadius: '8px'
+                                    }}
+                                >
+                                    <Trash2 size={20} />
+                                </button>
+                                <button
+                                    onClick={() => handleUpdateRound(editingRound)}
+                                    className="btn"
+                                    style={{
+                                        flex: 1,
+                                        padding: '12px',
+                                        background: 'linear-gradient(90deg, #8b5cf6, #a78bfa)',
+                                        color: 'white',
+                                        fontWeight: 'bold',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                        fontSize: '14px'
+                                    }}
+                                >
+                                    <Save size={18} /> Guardar Cambios
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
 
             {/* Finish Confirmation Dialog */}
             {showFinishConfirm && (
@@ -591,6 +902,30 @@ export default function TuteSubastado({ matchId, onBack, isReadOnly = false }) {
                                         <span style={{ color: '#fbbf24' }}>🃏 {dealer.name}</span>
                                     )}
                                 </div>
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'flex-end',
+                                    marginTop: '8px',
+                                    paddingTop: '8px',
+                                    borderTop: '1px solid rgba(255,255,255,0.05)'
+                                }}>
+                                    <button
+                                        onClick={() => setEditingRound(entry)}
+                                        style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'rgba(255,255,255,0.4)',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            fontSize: '10px',
+                                            gap: '4px',
+                                        }}
+                                    >
+                                        <Edit2 size={12} /> Editar
+                                    </button>
+                                </div>
+
                             </div>
                         );
                     })}
