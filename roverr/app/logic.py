@@ -2788,6 +2788,13 @@ def search_indexers(query, settings, tmdb_id=None):
     logger.info(f"🔍 [SEARCH] INDEXER SEARCH STARTED - Query: '{query}'")
     logger.info("=" * 80)
     
+    # Extract year from original query BEFORE multi-language conversion
+    original_year = None
+    year_match = re.search(r'\b(\d{4})\b', query)
+    if year_match:
+        original_year = year_match.group(1)
+        logger.debug(f"Extracted year {original_year} from original query")
+    
     indexers = settings.get('indexers', [])
     if not indexers:
         logger.warning("⚠️  [SEARCH] No indexers configured")
@@ -2826,6 +2833,12 @@ def search_indexers(query, settings, tmdb_id=None):
                     # 3. Build query string with all language variants
                     unique_titles = list(set(titles_by_lang.values()))
                     query = " | ".join(unique_titles)
+                    
+                    # ✅ NEW: Append year to query if it was in original query
+                    if original_year:
+                        query = f"{query} {original_year}"
+                        logger.debug(f"Added year to multi-language query: {query}")
+                    
                     logger.info(f"🔍 Multi-language search query: {query}")
                 else:
                     logger.warning("Failed to fetch multi-language titles, falling back to text search")
