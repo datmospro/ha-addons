@@ -2639,7 +2639,7 @@ def is_word_match(search_term, result_title):
     return bool(re.search(pattern, result_title, re.IGNORECASE))
 
 
-def filter_search_results(results, search_query, min_similarity=0.4):
+def filter_search_results(results, search_query, min_similarity=0.4, year=None):
     """
     Filtra resultados de búsqueda para eliminar coincidencias falsas.
     
@@ -2650,6 +2650,7 @@ def filter_search_results(results, search_query, min_similarity=0.4):
         results: Lista de resultados de search_indexers
         search_query: Query original de búsqueda (puede contener múltiples títulos separados por |)
         min_similarity: Umbral mínimo de similitud (0.0 a 1.0)
+        year: Año de la película para aplicar boost de similitud
     
     Returns:
         Lista filtrada de resultados con campo '_similarity' añadido
@@ -2695,15 +2696,10 @@ def filter_search_results(results, search_query, min_similarity=0.4):
                 # Exact word match found - calculate actual similarity
                 similarity = calculate_title_similarity(base_query, result_title)
                 
-                # ✅ NEW: Boost similarity if year matches
-                # Extract year from base_query
-                year_match = re.search(r'\b(\d{4})\b', base_query)
-                if year_match:
-                    query_year = year_match.group(1)
-                    # Check if result title contains the same year
-                    if query_year in result_title:
-                        similarity += 0.2  # Boost similarity for year match
-                        logger.debug(f"Year boost: '{result_title[:60]}' contains year {query_year}, similarity: {similarity:.3f}")
+                # ✅ Year boost using parameter
+                if year and str(year) in result_title:
+                    similarity += 0.2
+                    logger.debug(f"Year boost (word match): '{result_title[:60]}' contains year {year}, similarity: {similarity:.3f}")
                 
                 if similarity > best_similarity:
                     best_similarity = similarity
@@ -2722,11 +2718,10 @@ def filter_search_results(results, search_query, min_similarity=0.4):
                     # Calculate similarity with the full query (including year)
                     similarity = calculate_title_similarity(base_query, result_title)
                     
-                    # ✅ Year boost for short queries
-                    year_match = re.search(r'\b(\d{4})\b', base_query)
-                    if year_match and year_match.group(1) in result_title:
+                    # ✅ Year boost using parameter
+                    if year and str(year) in result_title:
                         similarity += 0.2
-                        logger.debug(f"Year boost (short): '{result_title[:60]}' contains year {year_match.group(1)}, similarity: {similarity:.3f}")
+                        logger.debug(f"Year boost (short): '{result_title[:60]}' contains year {year}, similarity: {similarity:.3f}")
                     
                     if similarity > best_similarity:
                         best_similarity = similarity
@@ -2735,11 +2730,10 @@ def filter_search_results(results, search_query, min_similarity=0.4):
                 # For normal titles, use fuzzy matching
                 similarity = calculate_title_similarity(base_query, result_title)
                 
-                # ✅ Year boost for normal queries
-                year_match = re.search(r'\b(\d{4})\b', base_query)
-                if year_match and year_match.group(1) in result_title:
+                # ✅ Year boost using parameter
+                if year and str(year) in result_title:
                     similarity += 0.2
-                    logger.debug(f"Year boost (normal): '{result_title[:60]}' contains year {year_match.group(1)}, similarity: {similarity:.3f}")
+                    logger.debug(f"Year boost (normal): '{result_title[:60]}' contains year {year}, similarity: {similarity:.3f}")
                 
                 if similarity > best_similarity:
                     best_similarity = similarity
@@ -3127,9 +3121,16 @@ def search_indexers(query, settings, tmdb_id=None):
     
     logger.info(f"Total raw search results before filtering: {len(all_results)}")
     
+    # Extract year from query for similarity boost
+    year_for_boost = None
+    year_match = re.search(r'\b(\d{4})\b', query)
+    if year_match:
+        year_for_boost = year_match.group(1)
+        logger.debug(f"Extracted year {year_for_boost} from query for similarity boost")
+    
     # FILTER RESULTS TO REMOVE FALSE POSITIVES
     # This is critical for short titles like "Eli" which match "película", "rebelión", etc.
-    all_results = filter_search_results(all_results, query, min_similarity=0.4)
+    all_results = filter_search_results(all_results, query, min_similarity=0.4, year=year_for_boost)
     
     logger.info(f"Total filtered search results: {len(all_results)}")
     return all_results

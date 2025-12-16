@@ -1,5 +1,5 @@
 name: "Roverr"
-version: "4.4.42"
+version: "4.4.43"
 slug: "roverr"
 description: "Your personal media manager. Organizes downloads for Jellyfin, Emby, Kodi, Plex, and other media servers."
 url: "https://github.com/datmospro/ha-addons/tree/main/roverr"
