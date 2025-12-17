@@ -1136,7 +1136,8 @@ def get_movie_data(torrents, api_key):
             "torrent_hash": m.torrent_hash,
             "status": m.status,
             "progress": m.progress,
-            "state": m.state
+            "state": m.state,
+            "poster_updated": int(m.metadata_updated_at.timestamp()) if m.metadata_updated_at else 0
         })
         
     # Identify ignored series from active torrents

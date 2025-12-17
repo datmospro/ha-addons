@@ -158,9 +158,10 @@ function renderMovieCards(movies) {
         const { icon: statusIcon, label: statusLabel } = getStatusIconAndLabel(movie.status);
         const statusClass = getStatusClass(movie.status);
 
-        // Use timestamp for cache-busting to ensure fresh images after identify
+        // Use poster_updated timestamp for cache-busting (only changes when poster updates)
+        const cacheKey = movie.poster_updated || movie.torrent_hash.substring(0, 8);
         const posterSrc = movie.poster_url
-            ? `${movie.poster_url}?t=${Date.now()}`
+            ? `${movie.poster_url}?v=${cacheKey}`
             : 'https://via.placeholder.com/300x450?text=No+Cover';
 
         if (card) {
@@ -350,7 +351,7 @@ function renderMovieDetails(container, movie, hash) {
         
         <div class="movie-details-layout">
             <div class="movie-poster-large">
-                <img src="${movie.poster_url ? `${movie.poster_url}?t=${Date.now()}` : 'https://via.placeholder.com/500x750?text=No+Cover'}" alt="${escapeHtml(movie.title)}">
+                <img src="${movie.poster_url ? `${movie.poster_url}?v=${movie.poster_updated || 0}` : 'https://via.placeholder.com/500x750?text=No+Cover'}" alt="${escapeHtml(movie.title)}">
             </div>
             <div class="movie-info-panel">
                 <h1>${escapeHtml(movie.title)} <span class="year">(${movie.year || 'N/A'})</span></h1>
