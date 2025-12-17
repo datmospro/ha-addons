@@ -1659,7 +1659,8 @@ def get_movie_details(torrent_hash, api_key):
                 "imdb_rating": movie.imdb_rating,
                 "imdb_votes": movie.imdb_votes,
                 "tmdb_id": movie.tmdb_id if hasattr(movie, 'tmdb_id') else None,
-                "country_code": movie.country_code if hasattr(movie, 'country_code') else None
+                "country_code": movie.country_code if hasattr(movie, 'country_code') else None,
+                "poster_updated": int(movie.metadata_updated_at.timestamp()) if movie.metadata_updated_at else 0
             }
         else:
             # No cache, fetch from TMDB
@@ -1710,7 +1711,8 @@ def get_movie_details(torrent_hash, api_key):
                     "imdb_rating": metadata.get('imdb_rating'),
                     "imdb_votes": metadata.get('imdb_votes'),
                     "tmdb_id": metadata.get('tmdb_id'),
-                    "country_code": metadata.get('country_code')
+                    "country_code": metadata.get('country_code'),
+                    "poster_updated": int(datetime.now().timestamp())
                 }
                 
                 # Update database with cached metadata
