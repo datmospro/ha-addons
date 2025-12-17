@@ -638,10 +638,20 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False, tmdb_
             logger.warning(f"⚠️  [TMDB] No results found for '{title}' ({year})")
             return None
         
-        # 2. Get full details
+        # 2. Get full details (localized for metadata)
         details_url = f"https://api.themoviedb.org/3/movie/{movie_id}"
         details_res = requests.get(details_url, params={"api_key": api_key, "language": get_language()}, timeout=5)
         details = details_res.json()
+        
+        # ✅ FIX: Fetch without language to get original poster (not localized)
+        # Sometimes TMDB returns different poster for localized vs original
+        original_res = requests.get(details_url, params={"api_key": api_key}, timeout=5)
+        if original_res.status_code == 200:
+            original_details = original_res.json()
+            if original_details.get('poster_path'):
+                details['poster_path'] = original_details['poster_path']
+            if original_details.get('backdrop_path'):
+                details['backdrop_path'] = original_details['backdrop_path']
         
         # If we only need images, return early
         if images_only:
@@ -1139,7 +1149,7 @@ def identify_movie(torrent_hash, tmdb_id, api_key):
         return False, "Movie not found in dashboard"
         
     try:
-        # Fetch complete details from TMDB
+        # Fetch complete details from TMDB (localized for metadata)
         url = f"https://api.themoviedb.org/3/movie/{tmdb_id}"
         params = {"api_key": api_key, "language": get_language()}
         res = requests.get(url, params=params, timeout=5)
@@ -1148,6 +1158,19 @@ def identify_movie(torrent_hash, tmdb_id, api_key):
             return False, "TMDB ID not found"
             
         details = res.json()
+        
+        # ✅ FIX: Also fetch without language to get original poster (not localized)
+        # Sometimes TMDB returns different poster for localized vs original
+        original_params = {"api_key": api_key}  # No language = original poster
+        original_res = requests.get(url, params=original_params, timeout=5)
+        if original_res.status_code == 200:
+            original_details = original_res.json()
+            # Use original poster/backdrop since localized versions may differ
+            if original_details.get('poster_path'):
+                details['poster_path'] = original_details['poster_path']
+            if original_details.get('backdrop_path'):
+                details['backdrop_path'] = original_details['backdrop_path']
+            logger.info(f"🖼️ [IDENTIFY] Using original poster: {details.get('poster_path')}")
         
         # Get credits (cast & crew)
         credits_url = f"https://api.themoviedb.org/3/movie/{tmdb_id}/credits"
