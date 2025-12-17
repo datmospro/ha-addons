@@ -412,8 +412,15 @@
 
 /* Clickable rating badges (links to TMDB/IMDB) */
 a.rating-badge,
-a.rating-badge * {
+a.rating-badge:link,
+a.rating-badge:visited,
+a.rating-badge:hover,
+a.rating-badge:active,
+a.rating-badge *,
+a.rating-badge div {
     text-decoration: none !important;
+    border-bottom: none !important;
+    color: inherit !important;
     cursor: pointer;
 }
 
