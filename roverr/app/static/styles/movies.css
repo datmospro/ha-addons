@@ -411,8 +411,9 @@
 }
 
 /* Clickable rating badges (links to TMDB/IMDB) */
-a.rating-badge {
-    text-decoration: none;
+a.rating-badge,
+a.rating-badge * {
+    text-decoration: none !important;
     cursor: pointer;
 }
 
