@@ -433,12 +433,21 @@ def download_image(url, filename, force=False):
         # If file exists and not forcing, skip download (cache)
         if os.path.exists(save_path) and not force:
             return f"posters/{filename}"
-            
+        
+        # Log the download attempt
+        old_size = os.path.getsize(save_path) if os.path.exists(save_path) else 0
+        logger.info(f"🖼️ [DOWNLOAD] Downloading: {url}")
+        logger.info(f"🖼️ [DOWNLOAD] Saving to: {save_path} (force={force}, old_size={old_size})")
+        
         res = requests.get(url, stream=True, timeout=10)
         if res.status_code == 200:
             with open(save_path, 'wb') as f:
                 shutil.copyfileobj(res.raw, f)
+            new_size = os.path.getsize(save_path)
+            logger.info(f"🖼️ [DOWNLOAD] Success! New size: {new_size} bytes")
             return f"posters/{filename}"
+        else:
+            logger.error(f"🖼️ [DOWNLOAD] Failed! HTTP status: {res.status_code}")
     except Exception as e:
         logger.error(f"Error downloading image {url}: {e}")
     
