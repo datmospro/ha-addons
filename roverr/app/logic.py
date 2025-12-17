@@ -1210,11 +1210,15 @@ def identify_movie(torrent_hash, tmdb_id, api_key):
         movie.imdb_votes = imdb_votes
         movie.country_code = country_code
         movie.metadata_updated_at = datetime.now()
+        movie.tmdb_id = tmdb_id  # ✅ FIX: Save TMDB ID
         
-        # Update Images
+        # Update Images - force re-download with new TMDB data
+        logger.info(f"🖼️ [IDENTIFY] Downloading new images for '{movie.title}' from TMDB ID {tmdb_id}")
         if details.get('poster_path'):
             poster_url = f"https://image.tmdb.org/t/p/w500{details.get('poster_path')}"
+            logger.info(f"🖼️ [IDENTIFY] Poster URL: {poster_url}")
             movie.poster_path = download_image(poster_url, f"{torrent_hash}_poster.jpg", force=True)
+            logger.info(f"🖼️ [IDENTIFY] Poster saved to: {movie.poster_path}")
             
         if details.get('backdrop_path'):
             backdrop_url = f"https://image.tmdb.org/t/p/w1280{details.get('backdrop_path')}"
