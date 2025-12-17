@@ -2769,23 +2769,34 @@ def filter_search_results(results, search_query, min_similarity=0.4, year=None):
         
         
         if accept:
-            # ✅ FINAL YEAR BOOST: Apply boost one last time if not already applied
-            # This ensures boost is applied even if similarity came from startswith or other paths
+            # ✅ FINAL YEAR BOOST/PENALTY: Apply based on year match
             # Extract years from search_query (the multi-language query with years)
-            query_years = set(re.findall(r'\b(\d{4})\b', search_query))
-            result_years = set(re.findall(r'\b(\d{4})\b', result_title))
+            query_years = set(re.findall(r'\b(19|20)\d{2}\b', search_query))
+            result_years = set(re.findall(r'\b(19|20)\d{2}\b', result_title))
             
-            # If there's a year match and similarity is less than 1.0, apply boost
-            if query_years & result_years and best_similarity < 1.0:
-                matching_year = list(query_years & result_years)[0]
-                # Only boost if not already boosted (check if similarity is a "round" number like 0.8)
-                if abs(best_similarity - 0.8) < 0.01:  # If it's 0.8, it probably needs boost
-                    best_similarity += 0.2
-                    logger.info(f"🎯 Final year boost: '{result_title[:60]}' contains year {matching_year}, similarity: {best_similarity:.3f}")
+            if query_years:
+                if query_years & result_years:
+                    # Year match - apply boost if not already at 1.0
+                    matching_year = list(query_years & result_years)[0]
+                    if best_similarity < 1.0 and abs(best_similarity - 0.8) < 0.01:
+                        best_similarity += 0.2
+                        logger.info(f"🎯 Final year boost: '{result_title[:60]}' contains year {matching_year}, similarity: {best_similarity:.3f}")
+                elif result_years:
+                    # Result has a DIFFERENT year - apply penalty
+                    wrong_year = list(result_years)[0]
+                    query_year = list(query_years)[0]
+                    best_similarity -= 0.15
+                    logger.info(f"📉 Year penalty: '{result_title[:60]}' has year {wrong_year} (expected {query_year}), similarity: {best_similarity:.3f}")
             
             result['_similarity'] = best_similarity
             result['_matched_query'] = matched_query
             filtered.append(result)
+            
+            # ✅ EARLY EXIT: Stop if we have enough perfect matches
+            perfect_matches = len([r for r in filtered if r.get('_similarity', 0) >= 0.95])
+            if perfect_matches >= 3:
+                logger.info(f"🚀 Early exit: found {perfect_matches} perfect matches (≥0.95), skipping remaining {len(results) - len(filtered)} results")
+                break
         else:
             rejected_count += 1
             logger.debug(f"Filter: REJECTED '{result_title}' (similarity: {best_similarity:.2f}, matched: {matched_query})")
@@ -3003,10 +3014,19 @@ def search_indexers(query, settings, tmdb_id=None):
                             # Extract year from title if possible
                             year = None
                             
-                            # Try to extract year from title (common formats: "Movie (2024)" or "Movie 2024")
-                            year_match = re.search(r'\((\d{4})\)|\s(\d{4})(?:\s|$)', title_text)
-                            if year_match:
-                                year = year_match.group(1) or year_match.group(2)
+                            # ✅ IMPROVED: Multiple patterns for year extraction
+                            # Handles: (2023), [2023], .2023., space before + space/dot/end after
+                            year_patterns = [
+                                r'\((\d{4})\)',           # (2023)
+                                r'\[(\d{4})\]',           # [2023]
+                                r'\.(\d{4})\.',           # .2023.
+                                r'\s(\d{4})(?:[\s\.]|$)', # space before, space/dot/end after
+                            ]
+                            for pattern in year_patterns:
+                                match = re.search(pattern, title_text)
+                                if match:
+                                    year = match.group(1)
+                                    break
                             
                             result = {
                                 'title': title_text,
@@ -3112,9 +3132,18 @@ def search_indexers(query, settings, tmdb_id=None):
                                             continue
                                         
                                         year = None
-                                        year_match = re.search(r'\((\d{4})\)|\s(\d{4})(?:\s|$)', title_text)
-                                        if year_match:
-                                            year = year_match.group(1) or year_match.group(2)
+                                        # ✅ IMPROVED: Multiple patterns for year extraction
+                                        year_patterns = [
+                                            r'\((\d{4})\)',           # (2023)
+                                            r'\[(\d{4})\]',           # [2023]
+                                            r'\.(\d{4})\.',           # .2023.
+                                            r'\s(\d{4})(?:[\s\.]|$)', # space before, space/dot/end after
+                                        ]
+                                        for pattern in year_patterns:
+                                            match = re.search(pattern, title_text)
+                                            if match:
+                                                year = match.group(1)
+                                                break
                                         
                                         result = {
                                             'title': title_text,
