@@ -393,17 +393,23 @@ function renderMovieDetails(container, movie, hash) {
                 <div class="ratings-section">
                     <h3>Ratings</h3>
                     <div class="ratings-grid">
+                        ${movie.tmdb_id ? `
+                        <a href="https://www.themoviedb.org/movie/${movie.tmdb_id}" target="_blank" rel="noopener" class="rating-badge tmdb clickable" title="View on TMDB">
+                            <div class="rating-source">TMDB</div>
+                            <div class="rating-value">${movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A'}</div>
+                            <div class="rating-count">${movie.vote_count ? `${movie.vote_count} votes` : ''}</div>
+                        </a>` : `
                         <div class="rating-badge tmdb">
                             <div class="rating-source">TMDB</div>
                             <div class="rating-value">${movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A'}</div>
                             <div class="rating-count">${movie.vote_count ? `${movie.vote_count} votes` : ''}</div>
-                        </div>
+                        </div>`}
                         ${movie.imdb_id ? `
-                        <div class="rating-badge imdb">
+                        <a href="https://www.imdb.com/title/${movie.imdb_id}" target="_blank" rel="noopener" class="rating-badge imdb clickable" title="View on IMDb">
                             <div class="rating-source">IMDb</div>
                             <div class="rating-value">${movie.imdb_rating || 'N/A'}</div>
                             <div class="rating-count">${movie.imdb_votes ? `${movie.imdb_votes} votes` : ''}</div>
-                        </div>` : ''}
+                        </a>` : ''}
                     </div>
                 </div>
                 
