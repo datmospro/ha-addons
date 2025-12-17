@@ -71,6 +71,26 @@ RSS_LAST_FETCH = {} # {feed_url: timestamp} - Track last fetch time for each RSS
 RESERVED_SPACE = {} # {dest_path: reserved_bytes} - Track space reserved by active copies
 SPACE_LOCK = threading.Lock() # Thread-safe access to RESERVED_SPACE
 
+# ✅ PHASE 2: TMDB Search Cache
+_TMDB_SEARCH_CACHE = {}  # {cache_key: (timestamp, result)}
+TMDB_CACHE_TTL = 3600  # 1 hour cache TTL
+
+def get_cached_tmdb_result(title, year):
+    """Get cached TMDB search result if available and not expired."""
+    cache_key = f"{title.lower().strip()}_{year}"
+    if cache_key in _TMDB_SEARCH_CACHE:
+        timestamp, result = _TMDB_SEARCH_CACHE[cache_key]
+        if time.time() - timestamp < TMDB_CACHE_TTL:
+            logger.debug(f"🗄️ TMDB cache hit for '{title}' ({year})")
+            return result
+    return None
+
+def cache_tmdb_result(title, year, result):
+    """Cache a TMDB search result."""
+    cache_key = f"{title.lower().strip()}_{year}"
+    _TMDB_SEARCH_CACHE[cache_key] = (time.time(), result)
+    logger.debug(f"🗄️ TMDB result cached for '{title}' ({year})")
+
 def send_telegram_notification(message):
     """
     Sends a notification to the configured Telegram chat.
@@ -524,90 +544,98 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False, tmdb_
         
         # If no TMDB ID or direct fetch failed, search for movie
         if not movie_id:
-            # 1. Search for movie with fallback variants
-            search_url = "https://api.themoviedb.org/3/search/movie"
-            original_lang = get_language()
-            
-            # Generate search variants (ordered from most to least specific)
-            variants = [
-                {"query": title, "year": year, "language": original_lang},  # Original with year
-                {"query": title, "language": original_lang},  # Without year
-            ]
-            
-            # Variant 3: Remove trailing numbers (e.g., "Köln 75" → "Köln")
-            import re
-            title_no_numbers = re.sub(r'\s+\d+$', '', title).strip()
-            if title_no_numbers != title:
-                variants.append({"query": title_no_numbers, "year": year, "language": original_lang})
-            
-            # Variant 4: Try in English
-            if original_lang != 'en-US':
-                variants.append({"query": title, "year": year, "language": "en-US"})
-            
-            # Variant 5: Normalize special characters (ö→o, á→a, etc.)
-            import unicodedata
-            normalized = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('utf-8')
-            if normalized != title and normalized:
-                variants.append({"query": normalized, "year": year, "language": original_lang})
-            
-            # Try each variant until we find results with year validation
-            for i, variant in enumerate(variants):
-                params = {"api_key": api_key, **variant}
-                logger.debug(f"🔧 [TMDB] Variant {i+1}/{len(variants)}: query='{variant['query']}', year={variant.get('year', 'None')}, lang={variant['language']}")
+            # ✅ PHASE 2: Check cache first
+            cached = get_cached_tmdb_result(title, year)
+            if cached:
+                movie_id = cached.get('id')
+                matched_result = cached
+                logger.info(f"✅ [TMDB] Using cached result: '{cached.get('title')}' ({cached.get('release_date', '')[:4] if cached.get('release_date') else 'Unknown'})")
+            else:
+                # 1. Search for movie with fallback variants
+                search_url = "https://api.themoviedb.org/3/search/movie"
+                original_lang = get_language()
                 
-                res = requests.get(search_url, params=params, timeout=5)
-                search_data = res.json()
+                # Generate search variants (ordered from most to least specific)
+                variants = [
+                    {"query": title, "year": year, "language": original_lang},  # Original with year
+                    {"query": title, "language": original_lang},  # Without year
+                ]
                 
-                if search_data.get('results'):
-                    # ✅ YEAR VALIDATION: Iterate through results to find year match
-                    for result in search_data['results']:
-                        result_year = result.get('release_date', '')[:4] if result.get('release_date') else None
-                        result_title = result.get('title', 'Unknown')
-                        
-                        # If year was provided, validate it matches (tolerance ±1 year)
-                        if year:
-                            if result_year:
-                                try:
-                                    year_diff = abs(int(result_year) - int(year))
-                                    if year_diff <= 1:
-                                        movie_id = result['id']
-                                        matched_result = result
-                                        logger.info(f"✅ [TMDB] Matched '{result_title}' ({result_year}) - Year validated (diff: {year_diff})")
-                                        break
-                                except (ValueError, TypeError):
-                                    continue
-                        else:
-                            # No year provided, take first result but warn
-                            movie_id = result['id']
-                            matched_result = result
-                            logger.warning(f"⚠️ [TMDB] No year provided, using first result: '{result_title}' ({result_year or 'Unknown'})")
-                            break
-                    
-                    # If we found a match, stop trying variants
-                    if movie_id:
-                        if i > 0:
-                            logger.info(f"✅ [TMDB] Found movie using variant #{i+1}: '{variant['query']}'")
-                        break
-            
-            # Fallback: If no year match found but we have results, use first result with warning
-            if not movie_id:
+                # Variant 3: Remove trailing numbers (e.g., "Köln 75" → "Köln")
+                import re
+                title_no_numbers = re.sub(r'\s+\d+$', '', title).strip()
+                if title_no_numbers != title:
+                    variants.append({"query": title_no_numbers, "year": year, "language": original_lang})
+                
+                # Variant 4: Try in English
+                if original_lang != 'en-US':
+                    variants.append({"query": title, "year": year, "language": "en-US"})
+                
+                # Variant 5: Normalize special characters (ö→o, á→a, etc.)
+                import unicodedata
+                normalized = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('utf-8')
+                if normalized != title and normalized:
+                    variants.append({"query": normalized, "year": year, "language": original_lang})
+                
+                # ✅ PHASE 2: Single loop with integrated fallback (was two separate loops)
+                fallback_result = None  # Store first result as fallback
+                
                 for i, variant in enumerate(variants):
                     params = {"api_key": api_key, **variant}
-                    res = requests.get(search_url, params=params, timeout=5)
+                    logger.debug(f"🔧 [TMDB] Variant {i+1}/{len(variants)}: query='{variant['query']}', year={variant.get('year', 'None')}, lang={variant['language']}")
+                    
+                    res = requests.get(search_url, params=params, timeout=10)  # Increased timeout
                     search_data = res.json()
                     
                     if search_data.get('results'):
-                        result = search_data['results'][0]
-                        movie_id = result['id']
-                        matched_result = result
-                        result_year = result.get('release_date', '')[:4] if result.get('release_date') else 'Unknown'
-                        result_title = result.get('title', 'Unknown')
-                        logger.warning(f"⚠️ [TMDB] No exact year match for '{title}' ({year}). Using best guess: '{result_title}' ({result_year})")
-                        break
+                        for result in search_data['results']:
+                            result_year = result.get('release_date', '')[:4] if result.get('release_date') else None
+                            result_title = result.get('title', 'Unknown')
+                            
+                            # Store first result as fallback (in case no year match)
+                            if not fallback_result:
+                                fallback_result = result
+                            
+                            # If year was provided, validate it matches (tolerance ±1 year)
+                            if year:
+                                if result_year:
+                                    try:
+                                        year_diff = abs(int(result_year) - int(year))
+                                        if year_diff <= 1:
+                                            movie_id = result['id']
+                                            matched_result = result
+                                            logger.info(f"✅ [TMDB] Matched '{result_title}' ({result_year}) - Year validated (diff: {year_diff})")
+                                            break
+                                    except (ValueError, TypeError):
+                                        continue
+                            else:
+                                # No year provided, take first result
+                                movie_id = result['id']
+                                matched_result = result
+                                logger.warning(f"⚠️ [TMDB] No year provided, using first result: '{result_title}' ({result_year or 'Unknown'})")
+                                break
+                        
+                        # If we found a match, stop trying variants
+                        if movie_id:
+                            if i > 0:
+                                logger.info(f"✅ [TMDB] Found movie using variant #{i+1}: '{variant['query']}'")
+                            break
+                
+                # Use fallback if no exact year match found
+                if not movie_id and fallback_result:
+                    movie_id = fallback_result['id']
+                    matched_result = fallback_result
+                    result_year = fallback_result.get('release_date', '')[:4] if fallback_result.get('release_date') else 'Unknown'
+                    result_title = fallback_result.get('title', 'Unknown')
+                    logger.warning(f"⚠️ [TMDB] No exact year match for '{title}' ({year}). Using best guess: '{result_title}' ({result_year})")
+                
+                # ✅ PHASE 2: Cache the result
+                if matched_result:
+                    cache_tmdb_result(title, year, matched_result)
 
         
         if not movie_id:
-            logger.warning(f"⚠️  [TMDB] No results found for '{title}' ({year}) - tried {len(variants)} variants")
+            logger.warning(f"⚠️  [TMDB] No results found for '{title}' ({year})")
             return None
         
         # 2. Get full details
@@ -2953,6 +2981,12 @@ def search_indexers(query, settings, tmdb_id=None):
             if ultra_short and ultra_short not in query_variants:
                 query_variants.append(ultra_short)
 
+    # ✅ PHASE 2: Limit search variants to reduce API calls
+    # Keep only the most useful variants (original + no year + 2 best alternates)
+    MAX_VARIANTS = 4
+    if len(query_variants) > MAX_VARIANTS:
+        logger.debug(f"🔄 Reducing {len(query_variants)} variants to {MAX_VARIANTS} to save API calls")
+        query_variants = query_variants[:MAX_VARIANTS]
     
     logger.info(f"Searching with {len(query_variants)} variants: {query_variants}")
     
