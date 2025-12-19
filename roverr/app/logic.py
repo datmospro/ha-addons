@@ -2138,26 +2138,6 @@ def get_movie_titles_in_languages(tmdb_id, languages, api_key):
     Returns:
         Dict con títulos por idioma: {'es-ES': 'El Concursante', 'en-US': 'The Contestant'}
     """
-    import unicodedata
-    
-    def is_latin_script(text):
-        """Check if text is primarily Latin script (for Spanish/English/French etc.)"""
-        if not text:
-            return False
-        latin_chars = 0
-        total_chars = 0
-        for char in text:
-            if char.isalpha():
-                total_chars += 1
-                # Check if character is Latin
-                try:
-                    name = unicodedata.name(char, '')
-                    if 'LATIN' in name:
-                        latin_chars += 1
-                except:
-                    pass
-        return total_chars > 0 and latin_chars / total_chars > 0.5
-    
     # Usar caché para evitar consultas repetidas
     cache_key = f"{tmdb_id}_{'-'.join(sorted(languages))}"
     if cache_key in _TITLE_CACHE:
@@ -2165,7 +2145,6 @@ def get_movie_titles_in_languages(tmdb_id, languages, api_key):
         return _TITLE_CACHE[cache_key]
     
     titles = {}
-    english_title = None
     
     try:
         # ✅ ALWAYS fetch original title first (usually English)
@@ -2180,21 +2159,8 @@ def get_movie_titles_in_languages(tmdb_id, languages, api_key):
                 if original_title:
                     titles['original'] = original_title
                     logger.info(f"Fetched original title: '{original_title}'")
-                # Also get English title for fallback
-                english_title = data.get('title')  # Without language param, often returns English
         except Exception as e:
             logger.warning(f"Could not fetch original title: {e}")
-        
-        # Fetch English title explicitly for fallback
-        if not english_title or not is_latin_script(english_title):
-            try:
-                url = f"https://api.themoviedb.org/3/movie/{tmdb_id}"
-                params = {"api_key": api_key, "language": "en-US"}
-                response = requests.get(url, params=params, timeout=5)
-                if response.status_code == 200:
-                    english_title = response.json().get('title')
-            except:
-                pass
         
         # Then fetch requested language translations
         for lang in languages:
@@ -2206,21 +2172,9 @@ def get_movie_titles_in_languages(tmdb_id, languages, api_key):
                 if response.status_code == 200:
                     data = response.json()
                     title = data.get('title')
-                    
-                    # ✅ FIX: Check if title is usable for Latin-based language searches
-                    # If TMDB returns non-Latin chars (Korean, Chinese, etc.) for es-ES/en-US,
-                    # use English fallback instead
                     if title:
-                        if is_latin_script(title):
-                            titles[lang] = title
-                            logger.info(f"Fetched title for {lang}: '{title}'")
-                        else:
-                            # Non-Latin title for Latin language - use English fallback
-                            if english_title and is_latin_script(english_title):
-                                titles[lang] = english_title
-                                logger.warning(f"⚠️ TMDB returned non-Latin '{title}' for {lang}, using English fallback: '{english_title}'")
-                            else:
-                                logger.warning(f"⚠️ No usable title for {lang} (got non-Latin: '{title}')")
+                        titles[lang] = title
+                        logger.info(f"Fetched title for {lang}: '{title}'")
                 else:
                     logger.warning(f"Failed to fetch title for {lang}, status: {response.status_code}")
                     
@@ -2977,16 +2931,6 @@ def search_indexers(query, settings, tmdb_id=None):
                     
                     # 3. Build query string with all language variants
                     unique_titles = list(set(titles_by_lang.values()))
-                    
-                    # ✅ FIX: Also include original query title as fallback
-                    # This ensures we search with user's title even if TMDB returns different
-                    original_title_clean = original_query.split('|')[0].strip()
-                    # Remove year if present
-                    import re
-                    original_title_clean = re.sub(r'\s+\d{4}$', '', original_title_clean).strip()
-                    if original_title_clean and original_title_clean not in unique_titles:
-                        unique_titles.insert(0, original_title_clean)  # Put user's query first
-                        logger.info(f"📌 Added user query title as priority: '{original_title_clean}'")
                     
                     # ✅ FIXED: Append year to EACH title, not just at the end
                     if original_year:
