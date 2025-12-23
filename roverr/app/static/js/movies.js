@@ -659,6 +659,13 @@ async function stopCopy(hash) {
     }
 }
 
+// Context for manual search - stores current movie info for custom searches
+let manualSearchContext = {
+    hash: null,
+    title: '',
+    tmdbId: null
+};
+
 async function handleManualSearch(hash) {
     const movie = await getMovieDetails(hash);
     if (movie.error) {
@@ -666,17 +673,43 @@ async function handleManualSearch(hash) {
         return;
     }
 
+    // Store context for custom searches
+    manualSearchContext = {
+        hash: hash,
+        title: movie.title,
+        tmdbId: movie.tmdb_id
+    };
+
     const modal = document.getElementById('manual-search-modal');
     const titleEl = modal.querySelector('.modal-title');
+    const searchInput = document.getElementById('manual-search-input');
+    const searchSubmitBtn = document.getElementById('manual-search-submit-btn');
     const loadingEl = document.getElementById('manual-search-loading');
     const resultsEl = document.getElementById('manual-search-results');
 
     titleEl.textContent = `Manual Search: ${movie.title}`;
+    
+    // Set input to movie title
+    searchInput.value = movie.title;
+    
     resultsEl.innerHTML = '';
     loadingEl.style.display = 'block';
     modal.classList.add('active');
 
-    // Search with title and optionally tmdb_id for intelligent multi-language search
+    // Setup search button listener (remove previous to avoid duplicates)
+    const newSearchBtn = searchSubmitBtn.cloneNode(true);
+    searchSubmitBtn.parentNode.replaceChild(newSearchBtn, searchSubmitBtn);
+    newSearchBtn.addEventListener('click', () => performCustomSearch());
+    
+    // Setup Enter key listener for input
+    searchInput.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            performCustomSearch();
+        }
+    };
+
+    // Perform initial search with title and optionally tmdb_id for intelligent multi-language search
     const data = await searchIndexers(movie.title, movie.tmdb_id);
     loadingEl.style.display = 'none';
 
@@ -686,11 +719,51 @@ async function handleManualSearch(hash) {
     }
 
     if (data.results.length === 0) {
-        resultsEl.innerHTML = `<div style="grid-column: 1/-1; text-align: center;">No results found.</div>`;
+        resultsEl.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--text-muted);">
+            <i class="fa-solid fa-search" style="font-size: 2rem; opacity: 0.5; margin-bottom: 0.5rem;"></i>
+            <p>No results found for "<strong>${escapeHtml(movie.title)}</strong>"</p>
+            <p style="font-size: 0.9rem; margin-top: 0.5rem;">Try modifying the search query above and click Search.</p>
+        </div>`;
         return;
     }
 
     renderManualSearchResults(resultsEl, data.results, movie.title, hash);
+}
+
+async function performCustomSearch() {
+    const searchInput = document.getElementById('manual-search-input');
+    const loadingEl = document.getElementById('manual-search-loading');
+    const resultsEl = document.getElementById('manual-search-results');
+    
+    const customQuery = searchInput.value.trim();
+    if (!customQuery) {
+        showToast('Please enter a search query', 'warning');
+        return;
+    }
+
+    resultsEl.innerHTML = '';
+    loadingEl.style.display = 'block';
+
+    // Search with custom query (no tmdb_id to allow free-form search)
+    const data = await searchIndexers(customQuery);
+    loadingEl.style.display = 'none';
+
+    if (!data.success) {
+        resultsEl.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--danger);">Error: ${data.message}</div>`;
+        return;
+    }
+
+    if (data.results.length === 0) {
+        resultsEl.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--text-muted);">
+            <i class="fa-solid fa-search" style="font-size: 2rem; opacity: 0.5; margin-bottom: 0.5rem;"></i>
+            <p>No results found for "<strong>${escapeHtml(customQuery)}</strong>"</p>
+            <p style="font-size: 0.9rem; margin-top: 0.5rem;">Try a different search query.</p>
+        </div>`;
+        return;
+    }
+
+    // Use original movie title for download association
+    renderManualSearchResults(resultsEl, data.results, manualSearchContext.title, manualSearchContext.hash);
 }
 
 function renderManualSearchResults(container, results, movieTitle, originalHash) {
