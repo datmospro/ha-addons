@@ -198,6 +198,12 @@ function updateMovieCard(card, movie, posterSrc, statusClass, statusIcon, status
     const overlay = card.querySelector('.overlay-status');
     overlay.className = `overlay-status ${statusClass}`;
     overlay.innerHTML = `${statusIcon} ${statusLabel}`;
+    // Update tooltip for 'new' status with reason
+    if (movie.status === 'new' && movie.status_reason) {
+        overlay.setAttribute('title', movie.status_reason);
+    } else {
+        overlay.removeAttribute('title');
+    }
 
     const title = card.querySelector('.movie-title');
     if (title.textContent !== movie.title) title.textContent = movie.title;
@@ -238,7 +244,7 @@ function createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel)
         <input type="checkbox" class="movie-card-checkbox">
         <div class="poster-wrapper">
             <img src="${posterSrc}" alt="${escapeHtml(movie.title)}" loading="lazy">
-            <div class="overlay-status ${statusClass}">
+            <div class="overlay-status ${statusClass}"${movie.status === 'new' && movie.status_reason ? ` title="${escapeHtml(movie.status_reason)}"` : ''}>
                 ${statusIcon} ${statusLabel}
             </div>
         </div>
@@ -358,7 +364,7 @@ function renderMovieDetails(container, movie, hash) {
                 
                 
                 <div class="meta-row">
-                    <span class="badge status ${statusClass}">${statusIcon} ${statusLabel}</span>
+                    <span class="badge status ${statusClass}"${movie.status === 'new' && movie.status_reason ? ` title="${escapeHtml(movie.status_reason)}"` : ''}>${statusIcon} ${statusLabel}</span>
                     <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
                     <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${(() => {
             const showNA = movie.status === 'new';
@@ -688,10 +694,10 @@ async function handleManualSearch(hash) {
     const resultsEl = document.getElementById('manual-search-results');
 
     titleEl.textContent = `Manual Search: ${movie.title}`;
-    
+
     // Set input to movie title
     searchInput.value = movie.title;
-    
+
     resultsEl.innerHTML = '';
     loadingEl.style.display = 'block';
     modal.classList.add('active');
@@ -700,7 +706,7 @@ async function handleManualSearch(hash) {
     const newSearchBtn = searchSubmitBtn.cloneNode(true);
     searchSubmitBtn.parentNode.replaceChild(newSearchBtn, searchSubmitBtn);
     newSearchBtn.addEventListener('click', () => performCustomSearch());
-    
+
     // Setup Enter key listener for input
     searchInput.onkeydown = (e) => {
         if (e.key === 'Enter') {
@@ -734,7 +740,7 @@ async function performCustomSearch() {
     const searchInput = document.getElementById('manual-search-input');
     const loadingEl = document.getElementById('manual-search-loading');
     const resultsEl = document.getElementById('manual-search-results');
-    
+
     const customQuery = searchInput.value.trim();
     if (!customQuery) {
         showToast('Please enter a search query', 'warning');

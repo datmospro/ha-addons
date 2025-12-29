@@ -1135,8 +1135,10 @@ def get_movie_data(torrents, api_key):
             "overview": m.overview,
             "torrent_hash": m.torrent_hash,
             "status": m.status,
+            "status_reason": m.status_reason if hasattr(m, 'status_reason') else None,
             "progress": m.progress,
             "state": m.state,
+            "size": m.size,
             "poster_updated": int(m.metadata_updated_at.timestamp()) if m.metadata_updated_at else 0
         })
         
@@ -1660,7 +1662,8 @@ def get_movie_details(torrent_hash, api_key):
                 "imdb_votes": movie.imdb_votes,
                 "tmdb_id": movie.tmdb_id if hasattr(movie, 'tmdb_id') else None,
                 "country_code": movie.country_code if hasattr(movie, 'country_code') else None,
-                "poster_updated": int(movie.metadata_updated_at.timestamp()) if movie.metadata_updated_at else 0
+                "poster_updated": int(movie.metadata_updated_at.timestamp()) if movie.metadata_updated_at else 0,
+                "status_reason": movie.status_reason if hasattr(movie, 'status_reason') else None
             }
         else:
             # No cache, fetch from TMDB
@@ -3433,7 +3436,7 @@ def select_best_torrent(results, preferred_size_mb, max_size_mb):
 def auto_download_movie(title, year, preferred_size_gb, max_size_gb, label=None, tmdb_id=None):
     """
     Automatically searches for and downloads a movie torrent.
-    Returns (torrent_hash, torrent_name) if successful, (None, None) otherwise.
+    Returns (torrent_hash, torrent_name, reason) - reason is None on success, error message on failure.
     """
     logger.info("=" * 80)
     logger.info(f"📥 [DOWNLOAD] AUTO-DOWNLOAD STARTED - '{title}' ({year})")
@@ -3448,14 +3451,14 @@ def auto_download_movie(title, year, preferred_size_gb, max_size_gb, label=None,
     
     if not results:
         logger.info(f"No search results found for: {query}")
-        return None, None
+        return None, None, "No torrents found"
         
     # 2. Select Best Torrent
     best_torrent = select_best_torrent(results, preferred_size_gb, max_size_gb)
     
     if not best_torrent:
         logger.info(f"No suitable torrent found for {title} within size limits (Max: {max_size_gb}MB)")
-        return None, None
+        return None, None, f"No torrent within size limits (max: {max_size_gb} GB)"
         
     logger.info(f"Selected torrent: {best_torrent['title']} ({int(best_torrent['size_mb'])} MB)")
     
@@ -3508,7 +3511,7 @@ def auto_download_movie(title, year, preferred_size_gb, max_size_gb, label=None,
             # Use matching torrent if found, otherwise use the first new torrent
             selected = matching_torrent or new_torrents[0]
             logger.info(f"Added torrent to download client: {selected['name']} (hash: {selected['hash'][:8]}...)")
-            return selected['hash'], selected['name']
+            return selected['hash'], selected['name'], None  # Success - no reason needed
         
         
         # ❌ REMOVED UNSAFE FALLBACK: Do not use "most recent" torrent as it may be wrong
@@ -3516,11 +3519,11 @@ def auto_download_movie(title, year, preferred_size_gb, max_size_gb, label=None,
         logger.error(f"❌ Could not detect new torrent after {max_retries} retries for: {best_torrent['title']}")
         logger.error(f"⚠️ This movie will NOT be added to the database to prevent data corruption")
         logger.error(f"💡 Possible causes: Torrent client slow to respond, network issues, or torrent already exists")
-        return None, None
+        return None, None, "Torrent client did not respond"
         
     except Exception as e:
         logger.error(f"Error adding torrent to download client: {e}")
-        return None, None
+        return None, None, f"Download client error: {str(e)}"
 
 def fetch_rss_movies(limit=30):
     """
@@ -3752,7 +3755,7 @@ def fetch_rss_movies(limit=30):
                     if entry_tmdb_id:
                         logger.info(f"Using TMDB ID {entry_tmdb_id} for intelligent multi-language search")
                     
-                    torrent_hash, torrent_name = auto_download_movie(
+                    torrent_hash, torrent_name, download_reason = auto_download_movie(
                         title, year, preferred_size, max_size, 
                         label=feed_label, 
                         tmdb_id=entry_tmdb_id
@@ -3857,6 +3860,63 @@ def fetch_rss_movies(limit=30):
                         added_count += 1
                         continue  # Skip the normal RSS entry creation path
 
+                    else:
+                        # Auto-download failed - create RSS entry with reason
+                        logger.info(f"Auto-download failed for {title}: {download_reason}. Creating RSS entry.")
+                        
+                        # Fetch Metadata for the failed entry
+                        metadata = None
+                        if api_key:
+                            metadata = fetch_complete_movie_metadata(title, year, api_key, tmdb_id=entry_tmdb_id)
+                        
+                        poster_local = None
+                        backdrop_local = None
+                        
+                        if metadata:
+                            if metadata.get('poster_path'):
+                                poster_url = f"https://image.tmdb.org/t/p/w500{metadata.get('poster_path')}"
+                                poster_local = download_image(poster_url, f"{pseudo_hash}_poster.jpg")
+                            if metadata.get('backdrop_path'):
+                                backdrop_url = f"https://image.tmdb.org/t/p/w1280{metadata.get('backdrop_path')}"
+                                backdrop_local = download_image(backdrop_url, f"{pseudo_hash}_backdrop.jpg")
+                        else:
+                            poster_local = 'posters/placeholder_unidentified.png'
+                        
+                        Movie.create(
+                            torrent_hash=pseudo_hash,
+                            title=metadata.get('title', title) if metadata else title,
+                            year=metadata.get('year', year) if metadata else year,
+                            poster_path=poster_local,
+                            backdrop_path=backdrop_local,
+                            overview=metadata.get('overview') if metadata else "Imported from RSS",
+                            runtime=metadata.get('runtime') if metadata else 0,
+                            genres=metadata.get('genres') if metadata else None,
+                            state='rss',
+                            progress=0.0,
+                            size=0,
+                            status='new',
+                            status_reason=download_reason,  # Save the reason for failure
+                            cast=metadata.get('cast') if metadata else None,
+                            crew=metadata.get('crew') if metadata else None,
+                            vote_average=metadata.get('vote_average') if metadata else 0,
+                            vote_count=metadata.get('vote_count') if metadata else 0,
+                            imdb_id=metadata.get('imdb_id') if metadata else None,
+                            imdb_rating=metadata.get('imdb_rating') if metadata else None,
+                            imdb_votes=metadata.get('imdb_votes') if metadata else None,
+                            tmdb_id=int(entry_tmdb_id) if entry_tmdb_id else None,
+                            metadata_updated_at=datetime.now(),
+                            torrent_name=entry['title']
+                        )
+                        
+                        if settings.get('telegram_notify_on_new_movie', True):
+                            movie_title = metadata.get('title', title) if metadata else title
+                            movie_year = metadata.get('year', year) if metadata else year
+                            send_telegram_notification(f"🆕 <b>New Movie Found</b>\n\n🎬 {movie_title} ({movie_year})\n⚠️ {download_reason}")
+                        
+                        added_count += 1
+                        added_movies.append(entry['title'])
+                        continue
+
                 except Exception as e:
                     # Catch errors from torrent client check or auto_download_movie (NOT from Movie.create)
                     logger.error(f"Error in auto-download process: {e}")
@@ -3888,7 +3948,7 @@ def fetch_rss_movies(limit=30):
                 logger.warning(f"TMDB metadata not found for '{title}' ({year}), using placeholder")
                 poster_local = 'posters/placeholder_unidentified.png'
             
-            # Create DB Entry
+            # Create DB Entry (for feeds without auto_add)
             Movie.create(
                 torrent_hash=pseudo_hash,
                 title=metadata.get('title', title) if metadata else title,
@@ -3902,6 +3962,7 @@ def fetch_rss_movies(limit=30):
                 progress=0.0,
                 size=0,
                 status='new', # Changed from 'rss_new' to 'new' per user request
+                status_reason="Auto-download disabled for this feed",  # Reason for 'new' status
                 cast=metadata.get('cast') if metadata else None,
                 crew=metadata.get('crew') if metadata else None,
                 vote_average=metadata.get('vote_average') if metadata else 0,
