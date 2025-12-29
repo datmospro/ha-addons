@@ -2908,11 +2908,8 @@ def filter_search_results(results, search_query, min_similarity=0.4, year=None):
             result['_matched_query'] = matched_query
             filtered.append(result)
             
-            # ✅ EARLY EXIT: Stop if we have enough perfect matches
-            perfect_matches = len([r for r in filtered if r.get('_similarity', 0) >= 0.95])
-            if perfect_matches >= 3:
-                logger.info(f"🚀 Early exit: found {perfect_matches} perfect matches (≥0.95), skipping remaining {len(results) - len(filtered)} results")
-                break
+            # NOTE: Early exit removed - it was causing size filtering issues
+            # by stopping before processing smaller valid torrents
         else:
             rejected_count += 1
             logger.debug(f"Filter: REJECTED '{result_title}' (similarity: {best_similarity:.2f}, matched: {matched_query})")
@@ -3458,7 +3455,7 @@ def auto_download_movie(title, year, preferred_size_gb, max_size_gb, label=None,
     
     if not best_torrent:
         logger.info(f"No suitable torrent found for {title} within size limits (Max: {max_size_gb}MB)")
-        return None, None, f"No torrent within size limits (max: {max_size_gb} GB)"
+        return None, None, f"No torrent within size limits (max: {max_size_gb} MB)"
         
     logger.info(f"Selected torrent: {best_torrent['title']} ({int(best_torrent['size_mb'])} MB)")
     
