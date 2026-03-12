@@ -2345,12 +2345,20 @@ def get_active_torrents(config_ignored=None):
         # Get all torrents
         torrents = qb.torrents_info()
         
+        # Get global progress data
+        progress_data = get_copy_progress()
+        
         results = []
         for t in torrents:
-            # Check DB status
-            history = MoveHistory.select().where(MoveHistory.torrent_name == t.name).order_by(MoveHistory.timestamp.desc()).first()
-            
-            status = 'pending'
+            # First priority: Is it currently copying?
+            if t.hash in progress_data and progress_data[t.hash].get('status') == 'copying':
+                status = 'copying'
+                history = None # Skip history checks if it's currently actively copying
+            else:
+                # Check DB status
+                history = MoveHistory.select().where(MoveHistory.torrent_name == t.name).order_by(MoveHistory.timestamp.desc()).first()
+                status = 'pending'
+                
             if history:
                 if history.status == 'success' or history.status == 'manual':
                     # Verify existence

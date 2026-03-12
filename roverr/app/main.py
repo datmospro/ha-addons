@@ -190,6 +190,7 @@ def get_movies():
             if t_hash and t_hash in progress_data:
                 prog = progress_data[t_hash]
                 movie['copy_progress'] = prog
+                # Force status to 'copying' so the frontend shows the progress bar
                 if prog['status'] == 'copying':
                     movie['status'] = 'copying'
     
@@ -225,6 +226,7 @@ def get_movie_details_endpoint(torrent_hash: str):
     if torrent_hash in progress_data:
         prog = progress_data[torrent_hash]
         details['copy_progress'] = prog
+        # Force status to 'copying' so the frontend shows the progress bar
         if prog['status'] == 'copying':
             details['status'] = 'copying'
             
