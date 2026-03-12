@@ -2054,6 +2054,10 @@ def save_settings(settings):
     with open(SETTINGS_FILE, 'w') as f:
         json.dump(settings, f, indent=4)
 
+# Cache for Prowlarr stats to avoid repeated API calls
+_PROWLARR_STATS_CACHE = {}  # {indexer_url: (timestamp, stats_dict)}
+PROWLARR_CACHE_TTL = 86400  # 24 hours cache TTL
+
 def get_prowlarr_stats(indexer_config):
     """
     Consulta Prowlarr para obtener trackers configurados y sus idiomas.
@@ -2077,6 +2081,14 @@ def get_prowlarr_stats(indexer_config):
                 'success': False,
                 'message': 'Missing URL or API key'
             }
+            
+        # Check cache early
+        cache_key = url
+        if cache_key in _PROWLARR_STATS_CACHE:
+            timestamp, cached_stats = _PROWLARR_STATS_CACHE[cache_key]
+            if time.time() - timestamp < PROWLARR_CACHE_TTL:
+                logger.debug(f"🗄️ Prowlarr stats cache hit for {url}")
+                return cached_stats
         
         # Detectar si la URL es de Prowlarr (formato: http://host:port/N/api)
         # Remover la parte "/api" y el número de indexer si existe
@@ -2127,12 +2139,17 @@ def get_prowlarr_stats(indexer_config):
         
         logger.info(f"Found {tracker_count} active trackers with languages: {languages}")
         
-        return {
+        result = {
             'success': True,
             'tracker_count': tracker_count,
             'languages': sorted(list(languages)),
             'trackers': tracker_details
         }
+        
+        # Save to cache
+        _PROWLARR_STATS_CACHE[cache_key] = (time.time(), result)
+        
+        return result
         
     except requests.exceptions.Timeout:
         logger.error("Timeout connecting to Prowlarr")
@@ -2681,6 +2698,9 @@ def process_single_torrent(qb, torrent, settings):
         # If it's a directory
         elif os.path.isdir(source_path):
             logger.info(f"Source is a directory: {source_path}")
+            
+            # Ensure the base directory exists BEFORE checking disk space, as shutil.disk_usage will crash if the directory does not exist yet for directory-based torrents.
+            os.makedirs(dest_dir, exist_ok=True)
             
             # Check and reserve disk space BEFORE copying
             success, message, details = check_and_reserve_disk_space(source_path, dest_dir)
