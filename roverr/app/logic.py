@@ -2598,7 +2598,7 @@ def process_single_torrent(qb, torrent, settings):
                 
                 resp = requests.post(f"http://{host}:{port}/copy", json=payload, timeout=5)
                 
-                if resp.status_code == 200:
+                if resp.status_code in [200, 202]:
                     data = resp.json()
                     if data.get("status") == "started" or data.get("status") == "already_running":
                         logger.info(f"Receptor accepted copy task for {torrent.hash}")

@@ -130,6 +130,7 @@ def api_get_torrents():
     progress_data = get_copy_progress()
     
     # Merge progress data
+    logger.info(f"[API Torrents] Current COPY_PROGRESS keys: {list(progress_data.keys())}")
     for t in torrents:
         if t['hash'] in progress_data:
             prog = progress_data[t['hash']]
@@ -184,6 +185,7 @@ def get_movies():
     
     # Inject Copy Progress
     progress_data = get_copy_progress()
+    logger.info(f"[API Movies] Injecting progress. Current COPY_PROGRESS keys: {list(progress_data.keys())}")
     if data and 'movies' in data:
         for movie in data['movies']:
             t_hash = movie.get('torrent_hash')
@@ -193,6 +195,7 @@ def get_movies():
                 # Force status to 'copying' so the frontend shows the progress bar
                 if prog['status'] == 'copying':
                     movie['status'] = 'copying'
+                    logger.info(f"[API Movies] Forcing status to copying for {t_hash}")
     
     return data
 
