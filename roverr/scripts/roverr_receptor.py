@@ -12,6 +12,29 @@ BIND_HOST = '0.0.0.0'
 BIND_PORT = 8095
 MAX_SPEED_MBPS = 0  # 0 for unlimited, adjust to throttle copy
 
+# --- PATH MAPPING ---
+# Translate Linux/Docker paths from Home Assistant to Windows local paths
+# Example: If HA sends '/media/TorDownloads/movie.mkv', and it's on your 'D:\Downloads' drive
+# Add an entry: '/media/TorDownloads': 'D:\\Downloads' 
+# Important: Use double backslashes \\ or forward slashes / for Windows paths in Python
+PATH_MAPPING = {
+    '/media/TorDownloads': 'D:\\Downloads', 
+    '/media/Filmo9': 'E:\\Filmo9'
+}
+
+def apply_path_mapping(path):
+    if not path:
+        return path
+    # Normalize slashes just in case
+    path_formatted = path.replace('\\', '/')
+    for ha_path, win_path in PATH_MAPPING.items():
+        if path_formatted.startswith(ha_path):
+            # Replace the HA part with the Windows part, and fix slashes
+            mapped = path_formatted.replace(ha_path, win_path, 1)
+            return os.path.normpath(mapped) # converts to correct Windows slashes
+    return os.path.normpath(path)
+
+
 # Logging setup
 logging.basicConfig(
     level=logging.INFO,
@@ -233,6 +256,12 @@ class ReceptorServer(BaseHTTPRequestHandler):
             if not all([task_id, source_path, dest_dir]):
                 self._send_json(400, {'error': 'Missing required fields: task_id, source(source_path), destination(dest_dir)'})
                 return
+                
+            # Apply Path Mapping
+            source_path = apply_path_mapping(source_path)
+            dest_dir = apply_path_mapping(dest_dir)
+            
+            logger.info(f"Received copy request mapped to locally: {source_path} -> {dest_dir}")
                 
             # Prevent double-starting
             with TASKS_LOCK:
