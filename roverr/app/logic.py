@@ -883,7 +883,7 @@ def sync_movies(torrents, api_key):
                              else:
                                  movie.status = 'moved' if history.status == 'success' else 'moved_manually'
                                  
-                         elif history.status == 'error': movie.status = 'error'
+                         elif history.status in ['error', 'receptor_offline']: movie.status = 'error'
                          elif history.status == 'skipped': movie.status = 'skipped'
                     else:
                         # 3. No history and not downloading -> Pending or Error
@@ -1861,7 +1861,7 @@ def get_movie_details(torrent_hash, api_key):
                             logger.warning(f"DEBUG PATH CHECK - ✗ Path NOT FOUND: '{dest_path}' - Setting status to 'missing'")
                             status = 'missing'
                     elif history.status == 'skipped': status = 'skipped'
-                    elif history.status == 'error': status = 'error'
+                    elif history.status in ['error', 'receptor_offline']: status = 'error'
                 else:
                     # 3. No history and not downloading -> Pending or Error
                     if state in ['uploading', 'pausedUP', 'queuedUP', 'stalledUP', 'completed', 'checkingUP', 'checkingDL']:
@@ -2540,8 +2540,6 @@ def process_single_torrent(qb, torrent, settings):
     logger.info(f"Destination directory: {dest_dir}")
     
     try:
-        os.makedirs(dest_dir, exist_ok=True)
-        
         limit = settings.get('copy_speed_limit', 10)
         logger.info("=" * 80)
         logger.info(f"📁 [COPY] COPY STARTED")
@@ -2627,6 +2625,7 @@ def process_single_torrent(qb, torrent, settings):
                 return
         
         # === LOCAL COPY LOGIC (Fallback / Default) ===
+        os.makedirs(dest_dir, exist_ok=True)
         # If it's a file
         if os.path.isfile(source_path):
             logger.info(f"Source is a file: {source_path}")
