@@ -199,16 +199,18 @@
                                         Emby, Kodi, Plex, etc.).</small>
                                 </div>
                             </div>
-                            
+
                             <div class="settings-section">
                                 <h3><i class="fa-solid fa-server"></i> Remote Copy Receptor (Windows Only)</h3>
-                                <p class="section-desc">Offload the file copy process to a background script running natively on the destination PC to eliminate network bottleneck.</p>
-                                
+                                <p class="section-desc">Offload the file copy process to a background script running
+                                    natively on the destination PC to eliminate network bottleneck.</p>
+
                                 <div class="checkbox-row" style="margin-bottom: 1rem;">
                                     <input type="checkbox" id="setting-receptor-enabled">
-                                    <label for="setting-receptor-enabled" style="font-weight: 600;">Enable Remote Copy Receptor</label>
+                                    <label for="setting-receptor-enabled" style="font-weight: 600;">Enable Remote Copy
+                                        Receptor</label>
                                 </div>
-                                
+
                                 <div class="grid-2">
                                     <div class="input-group">
                                         <label>Receptor IP / Host</label>
@@ -218,9 +220,18 @@
                                         <label>Receptor Port</label>
                                         <input type="number" id="setting-receptor-port" placeholder="8095">
                                     </div>
+                                    <div class="input-group" style="grid-column: 1 / -1; margin-top: 0.5rem;">
+                                        <label>Path Mapping (Linux to Windows)</label>
+                                        <textarea id="setting-receptor-path-mapping" rows="3"
+                                            placeholder="/media/TorDownloads=D:\Downloads&#10;/media/Filmo9=E:\Filmo9"
+                                            style="font-family: monospace;"></textarea>
+                                        <small>Translate HA paths to Windows local paths. One per line. Format:
+                                            LinuxPath=WindowsPath</small>
+                                    </div>
                                 </div>
                                 <div class="actions-row mt-3" style="margin-top: 1rem;">
-                                    <button id="test-receptor-btn" class="btn warning"><i class="fa-solid fa-plug"></i> Test Receptor Connection</button>
+                                    <button id="test-receptor-btn" class="btn warning"><i class="fa-solid fa-plug"></i>
+                                        Test Receptor Connection</button>
                                 </div>
                             </div>
                         </div>

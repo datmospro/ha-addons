@@ -2560,12 +2560,32 @@ def process_single_torrent(qb, torrent, settings):
                 
             logger.info(f"Receptor is ENABLED. Offloading copy to {host}:{port}")
             try:
+                # Apply path mapping if configured
+                mapping_str = settings.get('receptor_path_mapping', '')
+                receptor_source = source_path
+                receptor_dest = dest_dir
+                
+                if mapping_str:
+                    for line in mapping_str.split('\n'):
+                        line = line.strip()
+                        if '=' in line:
+                            linux_path, win_path = line.split('=', 1)
+                            linux_path = linux_path.strip()
+                            win_path = win_path.strip()
+                            if receptor_source.startswith(linux_path):
+                                receptor_source = receptor_source.replace(linux_path, win_path, 1).replace('/', '\\')
+                            if receptor_dest.startswith(linux_path):
+                                receptor_dest = receptor_dest.replace(linux_path, win_path, 1).replace('/', '\\')
+                
+                logger.info(f"Receptor mapped path: Src: {receptor_source}")
+                logger.info(f"Receptor mapped path: Dst: {receptor_dest}")
+                
                 # 1. Inform the Receptor to start copying
                 payload = {
                     "task_id": torrent.hash,
-                    "source": source_path,
-                    "destination": dest_dir,
-                    "is_directory": os.path.isdir(source_path)
+                    "source": receptor_source,
+                    "destination": receptor_dest,
+                    "folder_name": folder_name
                 }
                 
                 resp = requests.post(f"http://{host}:{port}/copy", json=payload, timeout=5)

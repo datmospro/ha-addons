@@ -136,6 +136,7 @@ function renderSettings() {
     document.getElementById('setting-receptor-enabled').checked = settings.receptor_enabled || false;
     document.getElementById('setting-receptor-host').value = settings.receptor_host || '';
     document.getElementById('setting-receptor-port').value = settings.receptor_port || 8095;
+    document.getElementById('setting-receptor-path-mapping').value = settings.receptor_path_mapping || '';
 
     // Advanced
     document.getElementById('setting-auto-copy-manual').checked = settings.auto_copy_manual_search || false;
@@ -499,6 +500,7 @@ async function handleSaveSettings() {
         receptor_enabled: document.getElementById('setting-receptor-enabled').checked,
         receptor_host: document.getElementById('setting-receptor-host').value,
         receptor_port: parseInt(document.getElementById('setting-receptor-port').value) || 8095,
+        receptor_path_mapping: document.getElementById('setting-receptor-path-mapping').value,
         auto_copy_manual_search: document.getElementById('setting-auto-copy-manual').checked,
         copy_speed_limit: parseInt(document.getElementById('setting-speed-limit').value),
         tmdb_api_key: document.getElementById('setting-tmdb-key').value,
