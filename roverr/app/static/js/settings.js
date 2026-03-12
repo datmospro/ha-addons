@@ -1,4 +1,4 @@
-﻿/**
+/**
  * MÃ³dulo Settings para Roverr
  * Gestiona toda la configuraciÃ³n de la aplicaciÃ³n
  * ExtraÃ­do de app.js - lÃ­neas 631-986, 1840-2009
@@ -140,7 +140,7 @@ function renderSettings() {
 
     // Advanced
     document.getElementById('setting-auto-copy-manual').checked = settings.auto_copy_manual_search || false;
-    document.getElementById('setting-speed-limit').value = settings.copy_speed_limit || 10;
+
     document.getElementById('setting-tmdb-key').value = settings.tmdb_api_key || '';
     document.getElementById('setting-language').value = settings.language || 'es-ES';
 
@@ -502,8 +502,6 @@ async function handleSaveSettings() {
         receptor_port: parseInt(document.getElementById('setting-receptor-port').value) || 8095,
         receptor_path_mapping: document.getElementById('setting-receptor-path-mapping').value,
         auto_copy_manual_search: document.getElementById('setting-auto-copy-manual').checked,
-        copy_speed_limit: parseInt(document.getElementById('setting-speed-limit').value),
-        tmdb_api_key: document.getElementById('setting-tmdb-key').value,
         language: document.getElementById('setting-language').value,
         telegram_bot_token: document.getElementById('setting-telegram-token').value,
         telegram_chat_id: document.getElementById('setting-telegram-chat-id').value,
