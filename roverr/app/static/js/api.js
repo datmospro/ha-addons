@@ -261,6 +261,23 @@ export async function testTelegram(token, chatId) {
 }
 
 /**
+ * Prueba la conexion al Receptor localmente a través del backend python
+ */
+export async function testReceptor(host, port) {
+    try {
+        const res = await fetch(`${API_BASE}/test_receptor`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ host, port })
+        });
+        return await res.json();
+    } catch (e) {
+        console.error("Error testing Receptor:", e);
+        return { success: false, message: 'Failed to reach Receptor script.' };
+    }
+}
+
+/**
  * Búsqueda en TMDB
  * Líneas 360-377 de app.js
  */

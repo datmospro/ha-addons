@@ -480,6 +480,20 @@ def test_telegram(payload: dict):
     success, message = test_telegram_connection(token, chat_id)
     return {"success": success, "message": message}
 
+@app.post("/api/test_receptor")
+def test_receptor(payload: dict):
+    """Test remote copy receptor connectivity"""
+    from logic import test_receptor_connection
+    
+    host = payload.get('host')
+    port = payload.get('port', 8095)
+    
+    if not host:
+        return {"success": False, "message": "Missing Receptor Host"}
+        
+    success, message = test_receptor_connection(host, port)
+    return {"success": success, "message": message}
+
 @app.get("/api/search_tmdb")
 def search_tmdb(q: str):
     """Search TMDB for movies"""

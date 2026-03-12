@@ -967,6 +967,32 @@ def sync_movies(torrents, api_key):
                         logger.info(f"DEBUG: No auto-copy match found (RSS or manual search)")
                 
                 logger.info(f"DEBUG: Auto-copy check completed for '{movie.title}'")
+                
+            # AUTO-RETRY RECEPTOR: Check if a movie was stuck because the receptor was offline
+            if old_status == 'receptor_offline' and movie.status in ['pending', 'uploading', 'completed', 'queuedUP', 'stalledUP']:
+                # The torrent is still in the correct state, we should check if the receptor is back online
+                logger.info(f"Movie '{movie.title}' is stuck waiting for Receptor. Checking Receptor status...")
+                settings = load_settings()
+                receptor_enabled = settings.get('receptor_enabled', False)
+                if receptor_enabled:
+                    host = settings.get('receptor_host')
+                    port = settings.get('receptor_port', 8095)
+                    if host:
+                        try:
+                            resp = requests.get(f"http://{host}:{port}/", timeout=3)
+                            if resp.status_code == 200:
+                                logger.info(f"Receptor appears to be back online. Retrying copy for '{movie.title}'")
+                                # Send silent notification or let the next move log it
+                                try:
+                                    # Trigger copy process
+                                    manual_move(t['hash'])
+                                except Exception as e:
+                                    logger.error(f"Failed to retry Receptor copy for '{movie.title}': {e}")
+                            else:
+                                 logger.debug(f"Receptor check returned HTTP {resp.status_code}. Still offline.")
+                        except requests.exceptions.RequestException:
+                             logger.debug("Receptor check failed. Still offline.")
+
         else:
             # Check if it's a series
             if is_series(t['name']):
@@ -2521,6 +2547,58 @@ def process_single_torrent(qb, torrent, settings):
         
         logger.info(f"Using copy speed limit: {limit} MB/s")
         
+        # === RECEPTOR LOGIC (Offloaded Copy) ===
+        receptor_enabled = settings.get('receptor_enabled', False)
+        if receptor_enabled:
+            host = settings.get('receptor_host')
+            port = settings.get('receptor_port', 8095)
+            
+            if not host:
+                logger.error("Receptor is enabled but no host is configured.")
+                MoveHistory.create(torrent_name=torrent.name, status='error', message="Receptor host missing", source_path=source_path, dest_path=dest_dir)
+                return
+                
+            logger.info(f"Receptor is ENABLED. Offloading copy to {host}:{port}")
+            try:
+                # 1. Inform the Receptor to start copying
+                payload = {
+                    "task_id": torrent.hash,
+                    "source": source_path,
+                    "destination": dest_dir,
+                    "is_directory": os.path.isdir(source_path)
+                }
+                
+                resp = requests.post(f"http://{host}:{port}/copy", json=payload, timeout=5)
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("status") == "started" or data.get("status") == "already_running":
+                        logger.info(f"Receptor accepted copy task for {torrent.hash}")
+                        # Update progress tracking so UI shows "copying"
+                        COPY_PROGRESS[torrent.hash] = {
+                            'percent': 0,
+                            'speed': 0,
+                            'status': 'copying',
+                            'is_receptor': True
+                        }
+                        # Start background thread to poll Receptor status
+                        threading.Thread(target=_poll_receptor_status, args=(torrent, host, port, source_path, dest_dir, settings, title, year)).start()
+                        return
+                    else:
+                        error_msg = data.get("message", "Unknown Receptor Error")
+                        logger.error(f"Receptor returned error: {error_msg}")
+                        MoveHistory.create(torrent_name=torrent.name, status='error', message=f"Receptor: {error_msg}", source_path=source_path, dest_path=dest_dir)
+                        return
+                else:
+                    logger.error(f"Receptor HTTP error: {resp.status_code}")
+                    MoveHistory.create(torrent_name=torrent.name, status='receptor_offline', message=f"Receptor HTTP {resp.status_code}", source_path=source_path, dest_path=dest_dir)
+                    return
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Receptor is unreachable ({e}). Marking as waiting for automatic retry.")
+                MoveHistory.create(torrent_name=torrent.name, status='receptor_offline', message="Receptor unreachable, waiting...", source_path=source_path, dest_path=dest_dir)
+                return
+        
+        # === LOCAL COPY LOGIC (Fallback / Default) ===
         # If it's a file
         if os.path.isfile(source_path):
             logger.info(f"Source is a file: {source_path}")
@@ -2650,6 +2728,113 @@ def process_single_torrent(qb, torrent, settings):
     except Exception as e:
         logger.error(f"Error moving {torrent.name}: {e}")
         MoveHistory.create(torrent_name=torrent.name, status='error', message=str(e), source_path="", dest_path="")
+
+def _poll_receptor_status(torrent, host, port, source_path, dest_dir, settings, title, year):
+    """
+    Background thread to poll the receptor for copy progress and handle completion.
+    """
+    global COPY_PROGRESS, STOP_FLAGS
+    
+    url = f"http://{host}:{port}/status/{torrent.hash}"
+    stop_url = f"http://{host}:{port}/stop/{torrent.hash}"
+    
+    logger.info(f"Started polling Receptor for {torrent.hash}")
+    
+    while True:
+        try:
+            # Check for stop signal from Roverr UI
+            if torrent.hash in STOP_FLAGS:
+                logger.info(f"Sending stop signal to Receptor for {torrent.hash}")
+                requests.post(stop_url, timeout=5)
+                STOP_FLAGS.remove(torrent.hash)
+                if torrent.hash in COPY_PROGRESS:
+                    del COPY_PROGRESS[torrent.hash]
+                break
+                
+            resp = requests.get(url, timeout=3)
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                status = data.get("status")
+                
+                if status == "copying":
+                    COPY_PROGRESS[torrent.hash] = {
+                        'percent': data.get("percent", 0),
+                        'speed': data.get("speed", 0),
+                        'status': 'copying',
+                        'is_receptor': True
+                    }
+                elif status == "done":
+                    # Receptor finished copying
+                    logger.info(f"Receptor finished copying {torrent.hash}")
+                    COPY_PROGRESS[torrent.hash] = {
+                        'percent': 100,
+                        'speed': 0,
+                        'status': 'done',
+                        'is_receptor': True
+                    }
+                    MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_dir, status='success')
+                    
+                    # Notify Telegram
+                    if settings.get('telegram_notify_on_move', True):
+                        send_telegram_notification(f"🚀 <b>Movie Moved via Receptor</b>\n\n🎬 {title} ({year})\n📂 {dest_dir}")
+                        
+                    # Clear Watchlist
+                    try:
+                        movie = Movie.get_or_none(Movie.torrent_hash == torrent.hash)
+                        if movie and movie.watchlist:
+                            movie.watchlist = False
+                            movie.watchlist_expiry = None
+                            movie.save()
+                    except Exception as wl_err:
+                        logger.error(f"Error clearing watchlist for {title}: {wl_err}")
+                        
+                    time.sleep(2)
+                    if torrent.hash in COPY_PROGRESS:
+                        del COPY_PROGRESS[torrent.hash]
+                    break
+                    
+                elif status == "error":
+                    # Receptor encountered an error
+                    error_msg = data.get("error", "Unknown receptor error")
+                    logger.error(f"Receptor copy error for {torrent.hash}: {error_msg}")
+                    MoveHistory.create(torrent_name=torrent.name, status='error', message=f"Receptor Error: {error_msg}", source_path=source_path, dest_path=dest_dir)
+                    if torrent.hash in COPY_PROGRESS:
+                        del COPY_PROGRESS[torrent.hash]
+                    break
+                    
+                elif status == "not_found":
+                     # Task was likely cancelled or cleaned up
+                     logger.warning(f"Receptor task not found (cancelled?) for {torrent.hash}")
+                     if torrent.hash in COPY_PROGRESS:
+                         del COPY_PROGRESS[torrent.hash]
+                     break
+                
+            else:
+                 logger.warning(f"Receptor status returned {resp.status_code} for {torrent.hash}")
+                 
+        except Exception as e:
+            logger.error(f"Error polling receptor for {torrent.hash}: {e}")
+            
+        time.sleep(1) # Poll every 1 second
+
+def test_receptor_connection(host, port):
+    """
+    Tests connection to the Remote Copy Receptor.
+    """
+    try:
+        url = f"http://{host}:{port}/"
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("service") == "Roverr Receptor":
+                return True, "Successfully connected to Roverr Receptor."
+            else:
+                return False, "Connected to port, but the service is not Roverr Receptor."
+        return False, f"Receptor returned HTTP {resp.status_code}"
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Receptor connection test failed: {e}")
+        return False, f"Failed to connect to {host}:{port}. Is the script running?"
 
 def test_indexer_connection(url, api_key):
     """

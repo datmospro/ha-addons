@@ -29,6 +29,7 @@ export function initSettings() {
     document.getElementById('test-telegram-btn')?.addEventListener('click', handleTestTelegram);
     document.getElementById('reset-ignored-btn')?.addEventListener('click', handleResetIgnored);
     document.getElementById('view-ignored-btn')?.addEventListener('click', openIgnoredMoviesModal);
+    document.getElementById('test-receptor-btn')?.addEventListener('click', handleTestReceptor);
 
     // Setup ignored movies modal listeners
     document.getElementById('ignored-movies-close-btn')?.addEventListener('click', () => closeModal('ignored-movies-modal'));
@@ -130,6 +131,11 @@ function renderSettings() {
     // Paths
     document.getElementById('setting-local-source').value = settings.local_source_path || '';
     document.getElementById('setting-local-dest').value = settings.local_dest_path || '';
+
+    // Receptor
+    document.getElementById('setting-receptor-enabled').checked = settings.receptor_enabled || false;
+    document.getElementById('setting-receptor-host').value = settings.receptor_host || '';
+    document.getElementById('setting-receptor-port').value = settings.receptor_port || 8095;
 
     // Advanced
     document.getElementById('setting-auto-copy-manual').checked = settings.auto_copy_manual_search || false;
@@ -364,6 +370,37 @@ async function handleTestTelegram() {
 }
 
 /**
+ * Prueba la conexion del Receptor
+ */
+async function handleTestReceptor() {
+    const host = document.getElementById('setting-receptor-host').value.trim();
+    const port = parseInt(document.getElementById('setting-receptor-port').value) || 8095;
+
+    if (!host) {
+        showToast('Please enter the receptor IP or host', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('test-receptor-btn');
+    setButtonLoading(btn, true, 'Testing...');
+
+    try {
+        const { testReceptor } = await import('./api.js');
+        const data = await testReceptor(host, port);
+
+        if (data.success) {
+            showToast(data.message, 'success');
+        } else {
+            showToast(data.message, 'error');
+        }
+    } catch (e) {
+        showToast('Error testing receptor connection locally', 'error');
+    }
+
+    setButtonLoading(btn, false);
+}
+
+/**
  * AÃ±ade un RSS feed
  * LÃ­neas 869-913 de app.js
  */
@@ -459,6 +496,9 @@ async function handleSaveSettings() {
         qb_pass: document.getElementById('setting-qb-pass').value,
         local_source_path: document.getElementById('setting-local-source').value,
         local_dest_path: document.getElementById('setting-local-dest').value,
+        receptor_enabled: document.getElementById('setting-receptor-enabled').checked,
+        receptor_host: document.getElementById('setting-receptor-host').value,
+        receptor_port: parseInt(document.getElementById('setting-receptor-port').value) || 8095,
         auto_copy_manual_search: document.getElementById('setting-auto-copy-manual').checked,
         copy_speed_limit: parseInt(document.getElementById('setting-speed-limit').value),
         tmdb_api_key: document.getElementById('setting-tmdb-key').value,

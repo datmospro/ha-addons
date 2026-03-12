@@ -212,7 +212,7 @@ function updateMovieCard(card, movie, posterSrc, statusClass, statusIcon, status
     meta.innerHTML = `<span>${movie.year || 'N/A'}</span>${movie.size > 0 ? `<span>${formatBytes(movie.size)}</span>` : ''}`;
 
     const progressBar = card.querySelector('.progress-bar');
-    if (movie.status === 'moved' || movie.status === 'skipped' || movie.status === 'error') {
+    if (movie.status === 'moved' || movie.status === 'skipped' || movie.status === 'error' || movie.status === 'receptor_offline') {
         progressBar.style.display = 'none';
     } else {
         progressBar.style.display = 'block';
@@ -256,7 +256,7 @@ function createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel)
             </div>
         </div>
         </div>
-        <div class="progress-bar" style="display: ${['moved', 'skipped', 'error'].includes(movie.status) ? 'none' : 'block'}">
+        <div class="progress-bar" style="display: ${['moved', 'skipped', 'error', 'receptor_offline'].includes(movie.status) ? 'none' : 'block'}">
             <div class="fill ${movie.status === 'copying' ? 'copying' : getProgressClass(movie.state)}" 
                  style="width: ${(movie.status === 'copying' && movie.copy_progress) ? movie.copy_progress.percent : movie.progress * 100}%"></div>
         </div>
@@ -343,11 +343,11 @@ function renderMovieDetails(container, movie, hash) {
                 <button class="btn secondary back-to-dashboard"><i class="fa-solid fa-arrow-left"></i> Back</button>
             </div>
             <div class="movie-action-bar">
-                ${movie.status !== 'moved' && movie.status !== 'copying' ?
+                ${movie.status !== 'moved' && movie.status !== 'copying' && movie.status !== 'receptor_offline' ?
             `<button class="btn primary move-now-btn" data-hash="${movie.torrent_hash}"><i class="fa-solid fa-play"></i> Move Now</button>` : ''}
                 ${movie.status === 'copying' ?
             `<button class="btn danger stop-copy-btn" data-hash="${movie.torrent_hash}"><i class="fa-solid fa-stop"></i> Stop Copy</button>` : ''}
-                ${movie.status === 'missing' ?
+                ${movie.status === 'missing' || movie.status === 'receptor_offline' ?
             `<button class="btn warning retry-move-btn" data-hash="${hash}"><i class="fa-solid fa-rotate-right"></i> Retry Move</button>` : ''}
                 <button class="btn secondary identify-btn" data-hash="${hash}"><i class="fa-solid fa-magnifying-glass"></i> Identify Manually</button>
                 <button class="btn secondary manual-search-btn" data-hash="${hash}"><i class="fa-solid fa-globe"></i> Manual Search</button>
@@ -573,7 +573,7 @@ function startDetailsPolling(hash, initialStatus) {
             renderMovieDetails(container, movie, hash);
 
             // If status changed to a final state, stop polling (no more changes expected)
-            const finalStates = ['moved', 'moved_manually', 'skipped', 'error', 'orphaned', 'missing'];
+            const finalStates = ['moved', 'moved_manually', 'skipped', 'error', 'orphaned', 'missing', 'receptor_offline'];
             if (finalStates.includes(movie.status)) {
                 console.log('Movie reached final state, stopping polling');
                 stopDetailsPolling();
