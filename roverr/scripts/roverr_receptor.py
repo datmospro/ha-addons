@@ -187,8 +187,12 @@ class ReceptorServer(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         
         # Healthcheck endpoint (Roverr logic ping)
-        if parsed.path == '/ping':
-            self._send_json(200, {'status': 'ok', 'message': 'Roverr Receptor is online.'})
+        if parsed.path == '/' or parsed.path == '/ping':
+            self._send_json(200, {
+                'service': 'Roverr Receptor', 
+                'status': 'ok', 
+                'message': 'Roverr Receptor is online.'
+            })
             return
 
         # Status endpoint: /status/<task_id>
@@ -222,12 +226,12 @@ class ReceptorServer(BaseHTTPRequestHandler):
                 return
                 
             task_id = data.get('task_id')
-            source_path = data.get('source_path')
-            dest_dir = data.get('dest_dir')
+            source_path = data.get('source_path') or data.get('source')
+            dest_dir = data.get('dest_dir') or data.get('destination')
             folder_name = data.get('folder_name', '') # Explicit name format 'Title (Year)'
             
             if not all([task_id, source_path, dest_dir]):
-                self._send_json(400, {'error': 'Missing required fields: task_id, source_path, dest_dir'})
+                self._send_json(400, {'error': 'Missing required fields: task_id, source(source_path), destination(dest_dir)'})
                 return
                 
             # Prevent double-starting
