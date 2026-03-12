@@ -2600,7 +2600,7 @@ def process_single_torrent(qb, torrent, settings):
                 
                 if resp.status_code in [200, 202]:
                     data = resp.json()
-                    if data.get("status") == "started" or data.get("status") == "already_running":
+                    if data.get("status") in ["started", "already_running", "accepted"]:
                         logger.info(f"Receptor accepted copy task for {torrent.hash}")
                         # Update progress tracking so UI shows "copying"
                         COPY_PROGRESS[torrent.hash] = {
