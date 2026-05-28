@@ -6,31 +6,38 @@
 /* ========== Movie Grid ========== */
 .movies-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 1rem;
-    padding: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1.25rem;
+    padding: 1.5rem;
 }
 
 .movie-card {
     position: relative;
-    border-radius: 8px;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--border);
     overflow: hidden;
-    transition: transform 0.2s, outline 0.2s;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.15);
     cursor: pointer;
     aspect-ratio: 2/3;
-    background: #2a2a2a;
+    background: #0d121f;
 }
 
 .movie-card:hover {
-    transform: scale(1.05);
+    transform: scale(1.05) translateY(-4px);
     z-index: 10;
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+    border-color: var(--accent);
+    box-shadow: 0 12px 30px -5px rgba(29, 78, 216, 0.35), 0 0 15px rgba(29, 78, 216, 0.2);
 }
 
 .movie-card img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transition: transform 0.6s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.movie-card:hover img {
+    transform: scale(1.03);
 }
 
 .movie-info {
@@ -318,16 +325,19 @@
 /* ========== Movie Backdrop ========== */
 .movie-backdrop {
     position: fixed;
-    top: 10rem;
+    top: 0;
     left: 0;
     right: 0;
     bottom: 0;
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    opacity: 0.15;
+    opacity: 0.18;
+    filter: blur(100px) saturate(140%);
+    -webkit-filter: blur(100px) saturate(140%);
     z-index: -1;
     pointer-events: none;
+    transition: background-image 1.2s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.8s ease;
 }
 
 /* ========== Series Badge ========== */

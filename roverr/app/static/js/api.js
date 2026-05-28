@@ -295,7 +295,7 @@ export async function searchTMDB(query) {
  * Búsqueda en indexers
  * Líneas 429-461 de app.js
  */
-export async function searchIndexers(query, tmdbId = null) {
+export async function searchIndexers(query, tmdbId = null, signal = null) {
     try {
         let url = `${API_BASE}/search?q=${encodeURIComponent(query)}`;
 
@@ -304,9 +304,18 @@ export async function searchIndexers(query, tmdbId = null) {
             url += `&tmdb_id=${tmdbId}`;
         }
 
-        const res = await fetch(url);
+        const options = {};
+        if (signal) {
+            options.signal = signal;
+        }
+
+        const res = await fetch(url, options);
         return await res.json();
     } catch (e) {
+        if (e.name === 'AbortError') {
+            console.log('Search aborted successfully');
+            return { success: false, aborted: true, message: 'Search cancelled by user' };
+        }
         console.error('Indexer search error:', e);
         return { success: false, message: 'Error searching indexers' };
     }

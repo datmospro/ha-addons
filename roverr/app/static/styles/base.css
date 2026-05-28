@@ -1,13 +1,10 @@
-/* ===================================
-   BASE STYLES
-   Variables, Resets, Global Styles
-   =================================== */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
 :root {
     /* Colors */
-    --bg-color: #0f172a;
-    --sidebar-bg: #1e293b;
-    --card-bg: #1e293b;
+    --bg-color: #0a0d14;
+    --sidebar-bg: rgba(15, 23, 42, 0.45);
+    --card-bg: rgba(30, 41, 59, 0.4);
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
     --accent: #1d4ed8;
@@ -15,10 +12,13 @@
     --success: #22c55e;
     --warning: #eab308;
     --error: #ef4444;
-    --border: #334155;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-hover: rgba(255, 255, 255, 0.18);
 
     /* Layout */
     --sidebar-width: 250px;
+    --radius-premium: 16px;
+    --radius-card: 12px;
 
     /* Status Colors */
     --status-moved-text: #22c55e;
@@ -39,7 +39,7 @@
 
 /* Body */
 body {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Outfit', sans-serif;
     background-color: var(--bg-color);
     color: var(--text-primary);
     line-height: 1.5;

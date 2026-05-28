@@ -191,6 +191,7 @@ function updateMovieCard(card, movie, posterSrc, statusClass, statusIcon, status
         title: movie.title,
         status: movie.status
     });
+    card.dataset.backdrop = movie.backdrop_url || '';
 
     const img = card.querySelector('img');
     if (img.getAttribute('src') !== posterSrc) img.src = posterSrc;
@@ -234,6 +235,7 @@ function createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel)
     const card = document.createElement('div');
     card.className = 'movie-card';
     card.dataset.hash = movie.torrent_hash;
+    card.dataset.backdrop = movie.backdrop_url || '';
     card.dataset.movie = JSON.stringify({
         torrent_hash: movie.torrent_hash,
         title: movie.title,
@@ -277,6 +279,28 @@ function createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel)
             title: movie.title,
             status: movie.status
         }, e);
+    });
+
+    // Dashboard hover reactivity
+    card.addEventListener('mouseenter', () => {
+        const globalBackdrop = document.getElementById('global-backdrop');
+        const backdropUrl = card.dataset.backdrop;
+        if (globalBackdrop && backdropUrl && document.getElementById('view-dashboard').classList.contains('active')) {
+            globalBackdrop.style.backgroundImage = `url('${backdropUrl}')`;
+            globalBackdrop.style.opacity = '0.08'; // Very subtle ambient glow for dashboard
+        }
+    });
+
+    card.addEventListener('mouseleave', () => {
+        const globalBackdrop = document.getElementById('global-backdrop');
+        if (globalBackdrop && document.getElementById('view-dashboard').classList.contains('active')) {
+            globalBackdrop.style.opacity = '0';
+            setTimeout(() => {
+                if (globalBackdrop.style.opacity === '0') {
+                    globalBackdrop.style.backgroundImage = 'none';
+                }
+            }, 800);
+        }
     });
 
     return card;
@@ -333,10 +357,20 @@ function renderMovieDetails(container, movie, hash) {
         </div>
     `).join('') : '<p>No crew information available.</p>';
 
+    // Update global cinematic backdrop
+    const globalBackdrop = document.getElementById('global-backdrop');
+    if (globalBackdrop) {
+        if (movie.backdrop_url) {
+            globalBackdrop.style.backgroundImage = `url('${movie.backdrop_url}')`;
+            globalBackdrop.style.opacity = '0.18';
+        } else {
+            globalBackdrop.style.backgroundImage = 'none';
+            globalBackdrop.style.opacity = '0';
+        }
+    }
+
     // Este es el mismo HTML que en app.js líneas 1312-1428
     container.innerHTML = `
-        ${movie.backdrop_url ? `<div class="movie-backdrop" style="background-image: url('${movie.backdrop_url}');"></div>` : ''}
-        
         <div class="movie-sticky-header">
             <div class="header-top">
                 <h2>Movie Details</h2>
@@ -459,7 +493,18 @@ function setupMovieDetailsListeners(hash) {
 
     const backBtn = container.querySelector('.back-to-dashboard');
     if (backBtn) {
-        backBtn.addEventListener('click', () => switchView('dashboard'));
+        backBtn.addEventListener('click', () => {
+            const globalBackdrop = document.getElementById('global-backdrop');
+            if (globalBackdrop) {
+                globalBackdrop.style.opacity = '0';
+                setTimeout(() => {
+                    if (globalBackdrop.style.opacity === '0') {
+                        globalBackdrop.style.backgroundImage = 'none';
+                    }
+                }, 800);
+            }
+            switchView('dashboard');
+        });
     }
 
     const moveBtn = container.querySelector('.move-now-btn');
