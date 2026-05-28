@@ -8,7 +8,8 @@ const MODAL_FILES = [
     'edit-indexer-modal.html',
     'edit-rss-modal.html',
     'manual-search-modal.html',
-    'ignored-movies-modal.html'
+    'ignored-movies-modal.html',
+    'identify-modal.html'
 ];
 
 /**

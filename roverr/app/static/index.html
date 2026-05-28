@@ -120,6 +120,7 @@
                     <!-- Search Bar -->
                     <div style="max-width: 700px; margin: 0 auto 3rem auto;">
                         <div style="position: relative; display: flex; gap: 0.75rem; align-items: stretch;">
+                            <label for="search-input" class="sr-only">Search for a movie</label>
                             <input type="text" id="search-input" placeholder="Search for a movie..."
                                 style="flex: 1; padding: 1rem 1.5rem; font-size: 1.1rem; border: 2px solid var(--border); border-radius: 12px; background: var(--bg-secondary); color: var(--text); transition: all 0.3s ease;">
                             <button id="search-btn" class="btn primary"
@@ -187,13 +188,13 @@
                                 <p class="section-desc">Configure where your media is downloaded and stored.</p>
 
                                 <div class="input-group">
-                                    <label>Source Path <span class="badge">Downloads</span></label>
+                                    <label for="setting-local-source">Source Path <span class="badge">Downloads</span></label>
                                     <input type="text" id="setting-local-source" placeholder="/path/to/source">
                                     <small>Directory where your torrent client downloads files (e.g., qBittorrent,
                                         Transmission, Deluge).</small>
                                 </div>
                                 <div class="input-group">
-                                    <label>Destination Path <span class="badge">Library</span></label>
+                                    <label for="setting-local-dest">Destination Path <span class="badge">Library</span></label>
                                     <input type="text" id="setting-local-dest" placeholder="/path/to/destination">
                                     <small>Directory where movies will be moved to (your media server library: Jellyfin,
                                         Emby, Kodi, Plex, etc.).</small>
@@ -212,21 +213,21 @@
 
                                 <div class="grid-2">
                                     <div class="input-group">
-                                        <label>Host</label>
+                                        <label for="setting-qb-host">Host</label>
                                         <input type="text" id="setting-qb-host" placeholder="localhost">
                                     </div>
                                     <div class="input-group">
-                                        <label>Port</label>
+                                        <label for="setting-qb-port">Port</label>
                                         <input type="number" id="setting-qb-port" placeholder="8080">
                                     </div>
                                 </div>
                                 <div class="grid-2">
                                     <div class="input-group">
-                                        <label>Username</label>
+                                        <label for="setting-qb-user">Username</label>
                                         <input type="text" id="setting-qb-user" placeholder="admin">
                                     </div>
                                     <div class="input-group">
-                                        <label>Password</label>
+                                        <label for="setting-qb-pass">Password</label>
                                         <input type="password" id="setting-qb-pass" placeholder="adminpass">
                                     </div>
                                 </div>
@@ -261,15 +262,15 @@
 
                                 <div class="grid-2">
                                     <div class="input-group">
-                                        <label>Receptor IP / Host</label>
+                                        <label for="setting-receptor-host">Receptor IP / Host</label>
                                         <input type="text" id="setting-receptor-host" placeholder="192.168.1.100">
                                     </div>
                                     <div class="input-group">
-                                        <label>Receptor Port</label>
+                                        <label for="setting-receptor-port">Receptor Port</label>
                                         <input type="number" id="setting-receptor-port" placeholder="8095">
                                     </div>
                                     <div class="input-group" style="grid-column: 1 / -1; margin-top: 0.5rem;">
-                                        <label>Path Mapping (Linux to Windows)</label>
+                                        <label for="setting-receptor-path-mapping">Path Mapping (Linux to Windows)</label>
                                         <textarea id="setting-receptor-path-mapping" rows="3"
                                             placeholder="/media/TorDownloads=D:\Downloads&#10;/media/Filmo9=E:\Filmo9"
                                             style="font-family: monospace;"></textarea>
@@ -295,15 +296,26 @@
                                 <p class="section-desc">Manage your Prowlarr or Jackett indexers.</p>
 
                                 <div class="input-group card-like">
-                                    <label>Add New Indexer</label>
+                                    <h4 style="margin-bottom: 0.75rem; font-weight: 600; color: var(--text-primary);">Add New Indexer</h4>
                                     <div class="grid-2">
-                                        <input type="text" id="indexer-name" placeholder="Name (e.g. MyIndexer)">
-                                        <input type="text" id="indexer-url"
-                                            placeholder="URL (e.g. https://indexer.com)">
+                                        <div class="input-group">
+                                            <label for="indexer-name">Indexer Name</label>
+                                            <input type="text" id="indexer-name" placeholder="Name (e.g. MyIndexer)">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="indexer-url">Indexer URL</label>
+                                            <input type="text" id="indexer-url" placeholder="URL (e.g. https://indexer.com)">
+                                        </div>
                                     </div>
                                     <div class="grid-2">
-                                        <input type="password" id="indexer-key" placeholder="API Key">
-                                        <input type="text" id="indexer-cats" placeholder="Categories (e.g. 2000,2010)">
+                                        <div class="input-group">
+                                            <label for="indexer-key">API Key</label>
+                                            <input type="password" id="indexer-key" placeholder="API Key">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="indexer-cats">Categories</label>
+                                            <input type="text" id="indexer-cats" placeholder="Categories (e.g. 2000,2010)">
+                                        </div>
                                     </div>
                                     <div class="actions-row">
                                         <button id="test-indexer-btn" class="btn warning"><i
@@ -331,15 +343,27 @@
                                 <p class="section-desc">Automate downloads with RSS feeds.</p>
 
                                 <div class="input-group card-like">
-                                    <label>Add New RSS Feed</label>
+                                    <h4 style="margin-bottom: 0.75rem; font-weight: 600; color: var(--text-primary);">Add New RSS Feed</h4>
                                     <div class="grid-2">
-                                        <input type="text" id="rss-name" placeholder="Name (e.g. New Releases)">
-                                        <input type="text" id="rss-label" placeholder="Label (e.g. action)">
+                                        <div class="input-group">
+                                            <label for="rss-name">Feed Name</label>
+                                            <input type="text" id="rss-name" placeholder="Name (e.g. New Releases)">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="rss-label">Label (qBittorrent Tag)</label>
+                                            <input type="text" id="rss-label" placeholder="Label (e.g. action)">
+                                        </div>
                                     </div>
                                     <div class="grid-2">
-                                        <input type="url" id="rss-url" placeholder="RSS URL">
-                                        <input type="number" id="rss-refresh-interval" placeholder="Interval (sec)"
-                                            min="60" value="300">
+                                        <div class="input-group">
+                                            <label for="rss-url">RSS URL</label>
+                                            <input type="url" id="rss-url" placeholder="RSS URL">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="rss-refresh-interval">Refresh Interval (seconds)</label>
+                                            <input type="number" id="rss-refresh-interval" placeholder="Interval (sec)"
+                                                min="60" value="300">
+                                        </div>
                                     </div>
 
                                     <div class="options-grid">
@@ -361,11 +385,11 @@
                                     <!-- Size fields container (shown when Auto-download is checked) -->
                                     <div id="rss-size-fields" class="grid-2" style="display: none; margin-top: 1rem;">
                                         <div class="input-group">
-                                            <label>Preferred Size (MB)</label>
+                                            <label for="rss-preferred-size">Preferred Size (MB)</label>
                                             <input type="number" id="rss-preferred-size" placeholder="5000" min="0">
                                         </div>
                                         <div class="input-group">
-                                            <label>Max Size (MB)</label>
+                                            <label for="rss-max-size">Max Size (MB)</label>
                                             <input type="number" id="rss-max-size" placeholder="12000" min="0">
                                         </div>
                                     </div>
@@ -400,12 +424,12 @@
 
                                 <div class="grid-2">
                                     <div class="input-group">
-                                        <label>Bot Token</label>
+                                        <label for="setting-telegram-token">Bot Token</label>
                                         <input type="password" id="setting-telegram-token"
                                             placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
                                     </div>
                                     <div class="input-group">
-                                        <label>Chat ID</label>
+                                        <label for="setting-telegram-chat-id">Chat ID</label>
                                         <input type="text" id="setting-telegram-chat-id" placeholder="123456789">
                                     </div>
                                 </div>
@@ -438,13 +462,13 @@
                             <div class="settings-section">
                                 <h3><i class="fa-solid fa-film"></i> Metadata</h3>
                                 <div class="input-group">
-                                    <label>TMDB API Key</label>
+                                    <label for="setting-tmdb-key">TMDB API Key</label>
                                     <input type="password" id="setting-tmdb-key" placeholder="TMDB API Key">
                                     <small>Required for fetching movie details and artwork.</small>
                                 </div>
 
                                 <div class="input-group">
-                                    <label>Language / Idioma</label>
+                                    <label for="setting-language">Language / Idioma</label>
                                     <select id="setting-language">
                                         <option value="en-US">English (US)</option>
                                         <option value="es-ES" selected>Español (España)</option>

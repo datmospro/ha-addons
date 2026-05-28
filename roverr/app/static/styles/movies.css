@@ -332,7 +332,7 @@
 
 /* ========== Series Badge ========== */
 .series-badge {
-    background-color: #3b82f6;
+    background-color: var(--accent);
     color: white;
     padding: 0.5rem 1rem;
     border-radius: 20px;
@@ -348,7 +348,7 @@
 
 .series-badge:hover {
     transform: translateY(-1px);
-    background-color: #2563eb;
+    background-color: var(--accent-hover);
 }
 
 /* ========== Ratings Section ========== */
@@ -454,6 +454,7 @@
     width: 100%;
     pointer-events: auto;
     -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
 }
 
 .cast-carousel::-webkit-scrollbar {
@@ -477,6 +478,7 @@
 .cast-card {
     flex: 0 0 150px;
     text-align: center;
+    scroll-snap-align: start;
 }
 
 .cast-card img {

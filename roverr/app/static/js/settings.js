@@ -218,7 +218,12 @@ async function handleTestIndexer() {
     const btn = document.getElementById('test-indexer-btn');
     setButtonLoading(btn, true, 'Testing...');
 
+    const startTime = Date.now();
     const data = await testIndexer(url, key);
+    const duration = Date.now() - startTime;
+    if (duration < 500) {
+        await new Promise(resolve => setTimeout(resolve, 500 - duration));
+    }
 
     if (data.success) {
         showToast(data.message, 'success');
@@ -359,7 +364,12 @@ async function handleTestTelegram() {
     const btn = document.getElementById('test-telegram-btn');
     setButtonLoading(btn, true, 'Testing...');
 
+    const startTime = Date.now();
     const data = await testTelegram(token, chatId);
+    const duration = Date.now() - startTime;
+    if (duration < 500) {
+        await new Promise(resolve => setTimeout(resolve, 500 - duration));
+    }
 
     if (data.success) {
         showToast(data.message, 'success');
@@ -387,7 +397,12 @@ async function handleTestReceptor() {
 
     try {
         const { testReceptor } = await import('./api.js');
+        const startTime = Date.now();
         const data = await testReceptor(host, port);
+        const duration = Date.now() - startTime;
+        if (duration < 500) {
+            await new Promise(resolve => setTimeout(resolve, 500 - duration));
+        }
 
         if (data.success) {
             showToast(data.message, 'success');
@@ -487,6 +502,19 @@ function removeRSSFeed(index) {
  * LÃ­neas 951-986 de app.js
  */
 async function handleSaveSettings() {
+    const sourcePathInput = document.getElementById('setting-local-source');
+    const destPathInput = document.getElementById('setting-local-dest');
+    
+    const sourcePath = sourcePathInput.value.trim();
+    const destPath = destPathInput.value.trim();
+    
+    if (!sourcePath || !destPath) {
+        showToast('Source Path and Destination Path are required and cannot be empty', 'error');
+        if (!sourcePath) sourcePathInput.focus();
+        else destPathInput.focus();
+        return;
+    }
+
     const settings = state.getSettings();
 
     const newSettings = {
@@ -495,8 +523,8 @@ async function handleSaveSettings() {
         qb_port: parseInt(document.getElementById('setting-qb-port').value),
         qb_user: document.getElementById('setting-qb-user').value,
         qb_pass: document.getElementById('setting-qb-pass').value,
-        local_source_path: document.getElementById('setting-local-source').value,
-        local_dest_path: document.getElementById('setting-local-dest').value,
+        local_source_path: sourcePath,
+        local_dest_path: destPath,
         receptor_enabled: document.getElementById('setting-receptor-enabled').checked,
         receptor_host: document.getElementById('setting-receptor-host').value,
         receptor_port: parseInt(document.getElementById('setting-receptor-port').value) || 8095,
@@ -709,7 +737,12 @@ async function testEditedIndexer() {
     const btn = document.getElementById('edit-indexer-test-btn');
     setButtonLoading(btn, true, 'Testing...');
 
+    const startTime = Date.now();
     const data = await testIndexer(url, key);
+    const duration = Date.now() - startTime;
+    if (duration < 500) {
+        await new Promise(resolve => setTimeout(resolve, 500 - duration));
+    }
 
     if (data.success) {
         showToast(data.message, 'success');
@@ -800,7 +833,12 @@ async function testEditedRSS() {
     const btn = document.getElementById('edit-rss-test-btn');
     setButtonLoading(btn, true, 'Testing...');
 
+    const startTime = Date.now();
     const data = await testRSSFeed(url);
+    const duration = Date.now() - startTime;
+    if (duration < 500) {
+        await new Promise(resolve => setTimeout(resolve, 500 - duration));
+    }
 
     if (data.success) {
         const info = data.feed_info || {};

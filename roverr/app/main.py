@@ -147,6 +147,11 @@ def get_settings():
 
 @app.post("/api/settings")
 def update_settings(settings: dict):
+    from fastapi import HTTPException
+    source_path = settings.get('local_source_path', '').strip()
+    dest_path = settings.get('local_dest_path', '').strip()
+    if not source_path or not dest_path:
+        raise HTTPException(status_code=400, detail="Source Path and Destination Path are required and cannot be empty")
     save_settings(settings)
     return {"success": True, "message": "Settings saved"}
 

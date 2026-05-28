@@ -10,8 +10,8 @@
     --card-bg: #1e293b;
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
-    --accent: #3b82f6;
-    --accent-hover: #2563eb;
+    --accent: #1d4ed8;
+    --accent-hover: #1e40af;
     --success: #22c55e;
     --warning: #eab308;
     --error: #ef4444;
@@ -59,4 +59,17 @@ body {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* Accessibility */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Módulo de Películas para Roverr
  * Gestiona la vista de detalles de películas y multi-selección
  * Extraído de app.js - líneas 1056-1237, 1239-1567, 1587-1838
@@ -10,7 +10,7 @@ import {
     batchCopyMovies, batchDeleteMovies, stopCopy as apiStopCopy,
     searchIndexers, addTorrent
 } from './api.js';
-import { showToast, formatBytes, getProgressClass, escapeHtml } from './ui.js';
+import { showToast, formatBytes, getProgressClass, escapeHtml, openModal, closeModal } from './ui.js';
 import { getStatusClass, getStatusIconAndLabel } from './templates.js';
 import { switchView, getCurrentView } from './navigation.js';
 
@@ -366,13 +366,9 @@ function renderMovieDetails(container, movie, hash) {
                 <div class="meta-row">
                     <span class="badge status ${statusClass}"${movie.status === 'new' && movie.status_reason ? ` title="${escapeHtml(movie.status_reason)}"` : ''}>${statusIcon} ${statusLabel}</span>
                     <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
-                    <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${(() => {
-            const showNA = movie.status === 'new';
-            console.log('[SIZE DEBUG]', movie.title, '- status:', movie.status, '- showNA:', showNA, '- will return:', showNA ? 'N/A' : formatBytes(movie.size));
-            return showNA ? 'N/A' : formatBytes(movie.size);
-        })()}</span>
+                    <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${movie.size > 0 ? formatBytes(movie.size) : 'N/A'}</span>
                     ${movie.country_code ? `<span class="badge country" title="${escapeHtml(getCountryName(movie.country_code))}"><span class="flag-emoji">${countryCodeToFlag(movie.country_code)}</span></span>` : ''}
-                    <button class="badge trailer-badge" data-hash="${hash}" title="Trailer"><i class="fa-brands fa-youtube"></i></button>
+                    <button class="badge trailer-badge" data-hash="${hash}" title="Trailer" aria-label="Play YouTube trailer"><i class="fa-brands fa-youtube"></i></button>
                 </div>
                 
                 ${movie.status === 'copying' && movie.copy_progress ? `
@@ -417,11 +413,11 @@ function renderMovieDetails(container, movie, hash) {
                 <div class="paths-box">
                     <div class="path-item">
                         <label>Current Location:</label>
-                        <code>${movie.source_path}</code>
+                        ${movie.source_path && movie.source_path !== 'N/A' ? `<code>${escapeHtml(movie.source_path)}</code>` : '<span class="badge secondary" style="background: var(--bg-tertiary); color: var(--text-muted); border: 1px solid var(--border); font-size: 0.85rem; padding: 0.25rem 0.6rem; border-radius: 6px;">Not available</span>'}
                     </div>
                     <div class="path-item">
                         <label>Destination:</label>
-                        <code>${movie.dest_path}</code>
+                        ${movie.dest_path && movie.dest_path !== 'N/A' ? `<code>${escapeHtml(movie.dest_path)}</code>` : '<span class="badge secondary" style="background: var(--bg-tertiary); color: var(--text-muted); border: 1px solid var(--border); font-size: 0.85rem; padding: 0.25rem 0.6rem; border-radius: 6px;">Not available</span>'}
                     </div>
                 </div>
                 
@@ -433,18 +429,18 @@ function renderMovieDetails(container, movie, hash) {
                 <div class="cast-section">
                     <h3>Reparto</h3>
                     <div class="carousel-wrapper">
-                        <button class="carousel-nav carousel-prev" data-carousel="cast"><i class="fa-solid fa-chevron-left"></i></button>
+                        <button class="carousel-nav carousel-prev" data-carousel="cast" aria-label="Previous actors"><i class="fa-solid fa-chevron-left"></i></button>
                         <div class="cast-carousel">${castHTML}</div>
-                        <button class="carousel-nav carousel-next" data-carousel="cast"><i class="fa-solid fa-chevron-right"></i></button>
+                        <button class="carousel-nav carousel-next" data-carousel="cast" aria-label="Next actors"><i class="fa-solid fa-chevron-right"></i></button>
                     </div>
                 </div>
                 
                 <div class="crew-section">
                     <h3>Equipo</h3>
                     <div class="carousel-wrapper">
-                        <button class="carousel-nav carousel-prev" data-carousel="crew"><i class="fa-solid fa-chevron-left"></i></button>
+                        <button class="carousel-nav carousel-prev" data-carousel="crew" aria-label="Previous crew members"><i class="fa-solid fa-chevron-left"></i></button>
                         <div class="cast-carousel">${crewHTML}</div>
-                        <button class="carousel-nav carousel-next" data-carousel="crew"><i class="fa-solid fa-chevron-right"></i></button>
+                        <button class="carousel-nav carousel-next" data-carousel="crew" aria-label="Next crew members"><i class="fa-solid fa-chevron-right"></i></button>
                     </div>
                 </div>
             </div>
@@ -620,18 +616,141 @@ function updateProgressUI(progress, type) {
     }
 }
 
+let currentIdentifyHash = null;
+
 async function identifyMovie(hash) {
-    const tmdbId = prompt("Enter the TMDB ID for this movie (e.g., 550 for Fight Club):");
-    if (!tmdbId) return;
+    currentIdentifyHash = hash;
+    const movie = await getMovieDetails(hash);
+    if (movie.error) {
+        showToast('Error loading movie details', 'error');
+        return;
+    }
 
-    showToast('Identifying movie...', 'info');
-    const data = await apiIdentifyMovie(hash, tmdbId);
+    const modal = document.getElementById('identify-modal');
+    if (!modal) {
+        showToast('Identification modal not loaded', 'error');
+        return;
+    }
 
-    if (data.success) {
-        showToast('Movie identified successfully!', 'success');
-        showMovieDetails(hash);
-    } else {
-        showToast(data.message, 'error');
+    const searchInput = document.getElementById('identify-search-input');
+    const searchBtn = document.getElementById('identify-search-btn');
+    const cancelBtn = document.getElementById('identify-modal-cancel-btn');
+    const closeBtn = document.getElementById('identify-modal-close-btn');
+    const resultsEl = document.getElementById('identify-search-results');
+    const loadingEl = document.getElementById('identify-search-loading');
+
+    // Setup input value
+    searchInput.value = movie.title || '';
+    resultsEl.innerHTML = '<p class="empty-state" style="text-align: center; color: var(--text-muted); font-style: italic; padding: 2rem 0;">Click Search to find matches.</p>';
+    loadingEl.style.display = 'none';
+
+    // Show modal
+    openModal('identify-modal');
+
+    // Attach search event
+    const newSearchBtn = searchBtn.cloneNode(true);
+    searchBtn.parentNode.replaceChild(newSearchBtn, searchBtn);
+    newSearchBtn.addEventListener('click', () => performIdentifySearch(searchInput.value.trim()));
+
+    searchInput.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            performIdentifySearch(searchInput.value.trim());
+        }
+    };
+
+    // Attach cancel/close events
+    cancelBtn.onclick = () => closeModal('identify-modal');
+    closeBtn.onclick = () => closeModal('identify-modal');
+}
+
+async function performIdentifySearch(query) {
+    if (!query) {
+        showToast('Please enter a movie title', 'warning');
+        return;
+    }
+
+    const resultsEl = document.getElementById('identify-search-results');
+    const loadingEl = document.getElementById('identify-search-loading');
+
+    resultsEl.innerHTML = '';
+    loadingEl.style.display = 'block';
+
+    try {
+        const { searchTMDB } = await import('./api.js');
+        const data = await searchTMDB(query);
+        loadingEl.style.display = 'none';
+
+        if (!data.success) {
+            resultsEl.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 2rem;">Error: ${data.message}</div>`;
+            return;
+        }
+
+        if (!data.results || data.results.length === 0) {
+            resultsEl.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 2rem;">No matches found on TMDB.</div>`;
+            return;
+        }
+
+        renderIdentifySearchResults(resultsEl, data.results);
+    } catch (e) {
+        console.error(e);
+        loadingEl.style.display = 'none';
+        resultsEl.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 2rem;">Error performing search</div>`;
+    }
+}
+
+function renderIdentifySearchResults(container, results) {
+    container.innerHTML = results.map(movie => `
+        <div class="identify-movie-result-item" 
+             style="display: flex; gap: 1rem; padding: 0.75rem; border-bottom: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: background 0.2s;"
+             onclick="window.executeIdentifyMovie('${movie.tmdb_id}', '${escapeHtml(movie.title)}')">
+            <img src="${movie.poster || 'https://via.placeholder.com/60x90?text=No+Cover'}" 
+                 alt="${escapeHtml(movie.title)}" 
+                 style="width: 50px; height: 75px; object-fit: cover; border-radius: 4px; flex-shrink: 0; background: var(--bg-tertiary);">
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center;">
+                <div style="font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem;">
+                    ${escapeHtml(movie.title)} ${movie.year ? `<span style="font-weight: 400; color: var(--text-muted); font-size: 0.9rem;">(${movie.year})</span>` : ''}
+                </div>
+                ${movie.original_title && movie.original_title !== movie.title ? `
+                    <div style="font-size: 0.85rem; color: var(--text-muted); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        Título original: ${escapeHtml(movie.original_title)}
+                    </div>
+                ` : ''}
+                <div style="font-size: 0.85rem; color: var(--text-secondary); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 0.25rem; line-height: 1.4;">
+                    ${escapeHtml(movie.overview) || 'Sin descripción disponible.'}
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    // Hover effect dynamically
+    container.querySelectorAll('.identify-movie-result-item').forEach(item => {
+        item.addEventListener('mouseenter', () => item.style.backgroundColor = 'var(--bg-tertiary)');
+        item.addEventListener('mouseleave', () => item.style.backgroundColor = 'transparent');
+    });
+}
+
+window.executeIdentifyMovie = async function (tmdbId, title) {
+    if (!currentIdentifyHash) return;
+    
+    closeModal('identify-modal');
+    showToast(`Identifying torrent as "${title}"...`, 'info');
+    
+    try {
+        const data = await apiIdentifyMovie(currentIdentifyHash, tmdbId);
+        if (data.success) {
+            showToast('Movie identified successfully!', 'success');
+            showMovieDetails(currentIdentifyHash);
+            
+            // Also refresh dashboard to update titles/poster
+            const { fetchMovies } = await import('./movies.js');
+            await fetchMovies();
+        } else {
+            showToast(data.message || 'Error identifying movie', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('Error identifying movie', 'error');
     }
 }
 

@@ -115,13 +115,36 @@ function renderTMDBResults(results) {
  * Busca en indexers para una película específica
  * Líneas 429-461 de app.js
  */
+let currentSearchController = null;
+
 window.searchIndexersForMovie = async function (title, originalTitle, year, tmdbId) {
+    // Abort any existing search
+    if (currentSearchController) {
+        currentSearchController.abort();
+    }
+    
+    currentSearchController = new AbortController();
+    const { signal } = currentSearchController;
+
     searchResults.innerHTML = `
         <div style="grid-column: 1 / -1; max-width: 1200px; margin: 0 auto; width: 100%; text-align: center; padding: 4rem 2rem;">
-            <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary); margin-bottom: 1rem;"></i>
-            <p style="font-size: 1.1rem; color: var(--text);">Searching indexers for "${title}"...</p>
+            <i class="fa-solid fa-spinner fa-spin" style="font-size: 2.5rem; color: var(--primary); margin-bottom: 1.5rem;"></i>
+            <p style="font-size: 1.25rem; color: var(--text); margin-bottom: 1.5rem;">Searching indexers for "${title}"...</p>
+            <button id="cancel-indexer-search-btn" class="btn danger" style="padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 600;">
+                <i class="fa-solid fa-circle-xmark"></i> Cancel Search
+            </button>
         </div>
     `;
+
+    // Attach listener for the Cancel button
+    document.getElementById('cancel-indexer-search-btn')?.addEventListener('click', () => {
+        if (currentSearchController) {
+            currentSearchController.abort();
+            currentSearchController = null;
+            showToast('Search cancelled', 'info');
+            location.reload(); // Returns cleanly to TMDB search view
+        }
+    });
 
     try {
         const queries = [];
@@ -131,16 +154,46 @@ window.searchIndexersForMovie = async function (title, originalTitle, year, tmdb
         }
 
         const query = queries.join(' | ');
-        const data = await searchIndexers(query);
+        const data = await searchIndexers(query, tmdbId, signal);
+
+        if (data.aborted) {
+            return;
+        }
+
+        currentSearchController = null;
 
         if (data.success && data.results) {
             renderIndexerResults(data.results, title, year);
         } else {
-            searchResults.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--error);">${data.message || 'No torrents found'}</div>`;
+            searchResults.innerHTML = `
+                <div style="grid-column: 1 / -1; max-width: 1200px; margin: 0 auto; width: 100%;">
+                    <button class="btn secondary" onclick="location.reload()" style="margin-bottom: 2rem;">
+                        <i class="fa-solid fa-arrow-left"></i> Back to Search
+                    </button>
+                    <div style="text-align: center; padding: 4rem 2rem; color: var(--error);">
+                        <i class="fa-solid fa-circle-exclamation" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                        <p style="font-size: 1.1rem;">${data.message || 'No torrents found'}</p>
+                    </div>
+                </div>
+            `;
         }
     } catch (e) {
+        if (e.name === 'AbortError') {
+            return;
+        }
+        currentSearchController = null;
         console.error('Indexer search error:', e);
-        searchResults.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--error);">Error searching indexers</div>';
+        searchResults.innerHTML = `
+            <div style="grid-column: 1 / -1; max-width: 1200px; margin: 0 auto; width: 100%;">
+                <button class="btn secondary" onclick="location.reload()" style="margin-bottom: 2rem;">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Search
+                </button>
+                <div style="text-align: center; padding: 4rem 2rem; color: var(--error);">
+                    <i class="fa-solid fa-circle-exclamation" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                    <p style="font-size: 1.1rem;">Error searching indexers</p>
+                </div>
+            </div>
+        `;
     }
 };
 
