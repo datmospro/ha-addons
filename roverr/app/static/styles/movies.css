@@ -369,9 +369,9 @@
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    opacity: 0.08;
-    filter: blur(80px) saturate(130%);
-    -webkit-filter: blur(80px) saturate(130%);
+    opacity: 0.18;
+    filter: blur(35px) saturate(120%);
+    -webkit-filter: blur(35px) saturate(120%);
     z-index: -1;
     pointer-events: none;
     transition: background-image 1.2s var(--ease-out), opacity 0.8s ease;

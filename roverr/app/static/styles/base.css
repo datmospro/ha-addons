@@ -7,12 +7,12 @@
 
 :root {
     /* ── Background Surfaces ── */
-    --bg-primary: #09090b;
-    --bg-secondary: #18181b;
-    --bg-tertiary: #27272a;
-    --bg-elevated: #1c1c1f;
-    --sidebar-bg: rgba(9, 9, 11, 0.88);
-    --card-bg: #18181b;
+    --bg-primary: #121214;
+    --bg-secondary: #1a1a1e;
+    --bg-tertiary: #232329;
+    --bg-elevated: #1e1e24;
+    --sidebar-bg: rgba(18, 18, 20, 0.85);
+    --card-bg: #1a1a1e;
 
     /* ── Accent (Blue) ── */
     --accent: #3b82f6;
