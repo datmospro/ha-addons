@@ -1,60 +1,75 @@
 /* ===================================
    META BADGES
    Status, Runtime, Size, Country badges
-   Similar styling to rating badges
    =================================== */
 
 /* Container for all meta badges */
 .meta-row {
     display: flex;
-    gap: 1rem;
+    gap: 0.75rem;
     flex-wrap: wrap;
     margin: 1.5rem 0;
 }
 
 /* Base badge styling - card-like design */
 .badge {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 0.625rem 1rem;
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.9rem;
-    transition: transform 0.2s, border-color 0.2s;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    transition: all var(--duration-fast) var(--ease-out);
     min-width: fit-content;
+    box-shadow: var(--shadow-sm);
 }
 
 .badge:hover {
     transform: translateY(-2px);
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-md);
 }
 
 /* Runtime badge */
 .badge.runtime {
-    border-color: var(--accent);
-    color: var(--text-primary);
+    border-color: rgba(59, 130, 246, 0.2);
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.02) 0%, transparent 100%), var(--bg-secondary);
 }
 
 .badge.runtime i {
     color: var(--accent);
 }
 
+.badge.runtime:hover {
+    border-color: rgba(59, 130, 246, 0.4);
+}
+
 /* Size badge */
 .badge.size {
-    border-color: #10b981;
-    color: var(--text-primary);
+    border-color: rgba(16, 185, 129, 0.2);
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.02) 0%, transparent 100%), var(--bg-secondary);
 }
 
 .badge.size i {
     color: #10b981;
 }
 
+.badge.size:hover {
+    border-color: rgba(16, 185, 129, 0.4);
+}
+
 /* Country badge */
 .badge.country {
-    border-color: #f59e0b;
-    color: var(--text-primary);
-    padding: 0.65rem 0.9rem;
+    border-color: rgba(245, 158, 11, 0.2);
+    background: linear-gradient(180deg, rgba(245, 158, 11, 0.02) 0%, transparent 100%), var(--bg-secondary);
+}
+
+.badge.country:hover {
+    border-color: rgba(245, 158, 11, 0.4);
 }
 
 .badge.country .flag-emoji {
@@ -66,29 +81,33 @@
     object-fit: contain;
 }
 
-/* Status badges - keep existing colors from status.css */
+/* Status badges */
 .badge.status {
     font-weight: 600;
 }
 
 /* Trailer badge */
 .badge.trailer-badge {
-    border-color: #ff0000;
+    border-color: rgba(239, 68, 68, 0.2);
     color: var(--text-primary);
-    background: var(--card-bg);
+    background: linear-gradient(180deg, rgba(239, 68, 68, 0.02) 0%, transparent 100%), var(--bg-secondary);
     cursor: pointer;
-    padding: 0.75rem 0.85rem;
 }
 
 .badge.trailer-badge i {
-    color: #ff0000;
-    font-size: 1.4rem;
+    color: #ef4444;
+    font-size: 1.1rem;
+    transition: color var(--duration-fast) var(--ease-out);
 }
 
 .badge.trailer-badge:hover {
-    background: rgba(255, 0, 0, 0.15);
-    transform: translateY(-2px);
-    border-color: #ff3333;
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.5);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
+.badge.trailer-badge:hover i {
+    color: #f87171;
 }
 
 .badge.trailer-badge:active {
@@ -97,11 +116,11 @@
 
 @media (max-width: 768px) {
     .meta-row {
-        gap: 0.75rem;
+        gap: 0.5rem;
     }
 
     .badge {
-        padding: 0.6rem 0.85rem;
-        font-size: 0.85rem;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
     }
 }

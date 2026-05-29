@@ -1,22 +1,23 @@
 /* ===================================
    COMPONENTS
-   Buttons, Cards, Tables, Forms
+   Buttons, Cards, Tables, Forms, Lists
    =================================== */
 
 /* ========== Buttons ========== */
 .btn {
     padding: 0.625rem 1.25rem;
-    border-radius: 10px;
+    border-radius: var(--radius-md);
     border: 1px solid transparent;
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    transition: all var(--duration-normal) var(--ease-out);
     font-family: inherit;
-    font-size: 0.9rem;
+    font-size: 0.875rem;
+    user-select: none;
 }
 
 .btn:active {
@@ -24,14 +25,14 @@
 }
 
 .btn.primary {
-    background: linear-gradient(135deg, var(--accent), #1e40af);
-    color: white;
-    box-shadow: 0 4px 14px rgba(29, 78, 216, 0.3);
+    background-color: var(--accent);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
 }
 
 .btn.primary:hover {
-    background: linear-gradient(135deg, var(--accent-hover), #173793);
-    box-shadow: 0 6px 20px rgba(29, 78, 216, 0.45);
+    background-color: var(--accent-hover);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.35);
 }
 
 .btn.secondary {
@@ -45,32 +46,56 @@
     border-color: var(--border-hover);
 }
 
+.btn.danger {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.btn.danger:hover {
+    background-color: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+.btn.warning {
+    background-color: rgba(234, 179, 8, 0.1);
+    color: #eab308;
+    border: 1px solid rgba(234, 179, 8, 0.2);
+}
+
+.btn.warning:hover {
+    background-color: rgba(234, 179, 8, 0.2);
+    border-color: rgba(234, 179, 8, 0.4);
+}
+
 .btn.sm {
     padding: 0.375rem 0.75rem;
-    font-size: 0.8rem;
-    border-radius: 6px;
+    font-size: 0.75rem;
+    border-radius: var(--radius-sm);
 }
 
 /* ========== Cards ========== */
 .content-card {
     background-color: var(--card-bg);
-    border-radius: var(--radius-premium);
+    border-radius: var(--radius-lg);
     border: 1px solid var(--border);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    padding: 1.75rem;
-    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-md);
+    transition: border-color var(--duration-normal) var(--ease-out),
+                box-shadow var(--duration-normal) var(--ease-out);
 }
 
 .content-card:hover {
     border-color: var(--border-hover);
-    box-shadow: 0 15px 35px -10px rgba(0, 0, 0, 0.65);
+    box-shadow: var(--shadow-lg);
 }
 
 /* ========== Tables ========== */
 .table-container {
     overflow-x: auto;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background-color: var(--bg-secondary);
 }
 
 table {
@@ -80,21 +105,31 @@ table {
 
 th,
 td {
-    padding: 1rem;
+    padding: 1rem 1.25rem;
     text-align: left;
     border-bottom: 1px solid var(--border);
+    font-size: 0.875rem;
 }
 
 th {
     color: var(--text-secondary);
     font-weight: 600;
-    font-size: 0.875rem;
+    background-color: rgba(0, 0, 0, 0.15);
     cursor: pointer;
     user-select: none;
+    transition: color var(--duration-fast) var(--ease-out);
 }
 
 th:hover {
     color: var(--text-primary);
+}
+
+tr {
+    transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+tr:hover td {
+    background-color: rgba(255, 255, 255, 0.015);
 }
 
 tr:last-child td {
@@ -105,7 +140,7 @@ tr:last-child td {
 .progress-bar {
     width: 100px;
     height: 6px;
-    background-color: var(--border);
+    background-color: rgba(255, 255, 255, 0.08);
     border-radius: 3px;
     overflow: hidden;
 }
@@ -113,18 +148,22 @@ tr:last-child td {
 .progress-bar.large {
     width: 100%;
     max-width: 500px;
-    height: 10px;
+    height: 8px;
+    border-radius: 4px;
 }
 
 .progress-fill {
     height: 100%;
     background-color: var(--accent);
+    border-radius: 3px;
+    transition: width var(--duration-slow) var(--ease-out);
 }
 
 /* ========== Forms & Inputs ========== */
 .description {
     color: var(--text-secondary);
     margin-bottom: 1.5rem;
+    font-size: 0.875rem;
 }
 
 .input-group {
@@ -133,36 +172,61 @@ tr:last-child td {
     margin-bottom: 1.5rem;
 }
 
-input[type="text"] {
+input[type="text"],
+input[type="password"],
+input[type="number"],
+select,
+textarea {
     flex: 1;
-    padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
+    padding: 0.625rem 1rem;
+    border-radius: var(--radius-md);
     border: 1px solid var(--border);
-    background-color: var(--bg-color);
+    background-color: var(--bg-primary);
     color: var(--text-primary);
     font-family: inherit;
+    font-size: 0.875rem;
+    transition: all var(--duration-normal) var(--ease-out);
 }
 
-input[type="text"]:focus {
+input[type="text"]:hover,
+input[type="password"]:hover,
+input[type="number"]:hover,
+select:hover,
+textarea:hover {
+    border-color: var(--border-hover);
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+select:focus,
+textarea:focus {
     outline: none;
     border-color: var(--accent);
+    background-color: var(--bg-secondary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 /* ========== Settings List ========== */
 .settings-list {
     list-style: none;
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     overflow: hidden;
+    background-color: var(--bg-secondary);
 }
 
 .settings-list li {
-    padding: 0.75rem 1rem;
+    padding: 0.875rem 1.25rem;
     border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background-color: rgba(0, 0, 0, 0.1);
+    transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.settings-list li:hover {
+    background-color: rgba(255, 255, 255, 0.015);
 }
 
 .settings-list li:last-child {
@@ -174,11 +238,16 @@ input[type="text"]:focus {
     border: none;
     color: var(--error);
     cursor: pointer;
-    padding: 0.25rem;
-    opacity: 0.7;
-    transition: opacity 0.2s;
+    padding: 0.375rem;
+    opacity: 0.6;
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--duration-fast) var(--ease-out);
 }
 
 .delete-btn:hover {
     opacity: 1;
+    background-color: rgba(239, 68, 68, 0.1);
 }

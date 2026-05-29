@@ -5,20 +5,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Roverr - Media Manager</title> <!-- Modular CSS Architecture -->
-    <link rel="stylesheet" href="styles/base.css?v=4">
-    <link rel="stylesheet" href="styles/layout.css?v=4">
-    <link rel="stylesheet" href="styles/components.css?v=4">
-    <link rel="stylesheet" href="styles/movies.css?v=4">
-    <link rel="stylesheet" href="styles/badges.css?v=4">
-    <link rel="stylesheet" href="styles/status.css?v=4">
-    <link rel="stylesheet" href="styles/modal.css?v=4">
-    <link rel="stylesheet" href="styles/settings.css?v=4">
+    <link rel="stylesheet" href="styles/base.css?v=5">
+    <link rel="stylesheet" href="styles/layout.css?v=5">
+    <link rel="stylesheet" href="styles/components.css?v=5">
+    <link rel="stylesheet" href="styles/movies.css?v=5">
+    <link rel="stylesheet" href="styles/badges.css?v=5">
+    <link rel="stylesheet" href="styles/status.css?v=5">
+    <link rel="stylesheet" href="styles/modal.css?v=5">
+    <link rel="stylesheet" href="styles/settings.css?v=5">
     <!-- Critical fix for text wrapping -->
-    <link rel="stylesheet" href="styles/fix-text-wrap.css?v=4">
-    <link rel="stylesheet" href="styles/movie-checkbox.css?v=4">
-
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-
+    <link rel="stylesheet" href="styles/fix-text-wrap.css?v=5">
+    <link rel="stylesheet" href="styles/movie-checkbox.css?v=5">
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Icons -->
@@ -46,7 +43,7 @@
                 </button>
             </nav>
             <div class="sidebar-footer">
-                <span id="version-info">v3.1.1</span>
+                <span id="version-info">v4.4.78</span>
             </div>
         </aside>
 
@@ -57,9 +54,8 @@
                 <div class="movie-sticky-header">
                     <div class="header-top">
                         <h2>Dashboard<span id="selection-counter" class="selection-counter"></span></h2>
-                        <div style="display: flex; align-items: center; gap: 1.5rem;">
-                            <div id="rss-countdown"
-                                style="color: var(--text-muted); font-size: 0.85rem; display: none;">
+                        <div class="header-top-right">
+                            <div id="rss-countdown" class="rss-countdown">
                                 <!-- RSS countdown will be injected here -->
                             </div>
                             <div id="series-notification" style="display: none;"></div>
@@ -90,7 +86,7 @@
                 </div>
 
                 <div class="dashboard-content">
-                    <section class="content-card" id="movies-section" style="margin-bottom: 2rem;">
+                    <section class="content-card" id="movies-section">
                         <h3>Movies</h3>
                         <div id="movies-grid" class="movies-grid">
                             <!-- Movies injected here -->
@@ -117,15 +113,13 @@
                     </div>
                 </div>
 
-                <div style="max-width: 1600px; margin: 0 auto; padding: 2rem;">
+                <div class="search-container">
                     <!-- Search Bar -->
-                    <div style="max-width: 700px; margin: 0 auto 3rem auto;">
-                        <div style="position: relative; display: flex; gap: 0.75rem; align-items: stretch;">
+                    <div class="search-bar-wrapper">
+                        <div class="search-input-group">
                             <label for="search-input" class="sr-only">Search for a movie</label>
-                            <input type="text" id="search-input" placeholder="Search for a movie..."
-                                style="flex: 1; padding: 1rem 1.5rem; font-size: 1.1rem; border: 2px solid var(--border); border-radius: 12px; background: var(--bg-secondary); color: var(--text); transition: all 0.3s ease;">
-                            <button id="search-btn" class="btn primary"
-                                style="padding: 1rem 2rem; font-size: 1.1rem; border-radius: 12px; display: flex; align-items: center; gap: 0.5rem; white-space: nowrap;">
+                            <input type="text" id="search-input" placeholder="Search for a movie...">
+                            <button id="search-btn" class="btn primary">
                                 <i class="fa-solid fa-magnifying-glass"></i>
                                 <span>Search</span>
                             </button>
@@ -133,8 +127,7 @@
                     </div>
 
                     <!-- Results Container -->
-                    <div id="search-results"
-                        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;">
+                    <div id="search-results">
                         <!-- Search results here -->
                     </div>
                 </div>
@@ -239,25 +232,25 @@
                                 <p class="section-desc">Offload the file copy process to a background script running
                                     natively on the destination PC to eliminate network bottleneck.</p>
 
-                                <details style="margin-bottom: 1.5rem; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; transition: all 0.2s ease;">
-                                    <summary style="cursor: pointer; font-weight: 500; color: var(--info); display: flex; align-items: center; gap: 0.5rem; outline: none; user-select: none;">
+                                <details class="setup-guide-details">
+                                    <summary class="setup-guide-summary">
                                         <i class="fa-solid fa-circle-info"></i> Windows Setup Mini-Guide
                                     </summary>
-                                    <div style="margin-top: 1rem; font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; padding-left: 1.5rem;">
-                                        <p style="margin-bottom: 0.5rem;"><strong>1. The Script:</strong> Place <code>roverr_receptor.py</code> on your Windows destination PC.</p>
-                                        <p style="margin-bottom: 0.5rem;"><strong>2. Open Task Scheduler:</strong> Click <em>Create Task</em> (not basic).</p>
-                                        <p style="margin-bottom: 0.5rem;"><strong>3. General Tab:</strong> Check <em>"Run whether user is logged on or not"</em> (this secretly hides the console window) and <em>"Run with highest privileges"</em>.</p>
-                                        <p style="margin-bottom: 0.5rem;"><strong>4. Triggers Tab:</strong> New ➔ <em>At startup</em>.</p>
-                                        <p style="margin-bottom: 0;"><strong>5. Actions Tab:</strong> Start a program.<br>
+                                    <div class="setup-guide-content">
+                                        <p><strong>1. The Script:</strong> Place <code>roverr_receptor.py</code> on your Windows destination PC.</p>
+                                        <p><strong>2. Open Task Scheduler:</strong> Click <em>Create Task</em> (not basic).</p>
+                                        <p><strong>3. General Tab:</strong> Check <em>"Run whether user is logged on or not"</em> (this secretly hides the console window) and <em>"Run with highest privileges"</em>.</p>
+                                        <p><strong>4. Triggers Tab:</strong> New ➔ <em>At startup</em>.</p>
+                                        <p><strong>5. Actions Tab:</strong> Start a program.<br>
                                         &nbsp;&nbsp;• <em>Program:</em> Put the path to your normal <code>python.exe</code> (NOT pythonw.exe).<br>
                                         &nbsp;&nbsp;• <em>Arguments:</em> <code>"roverr_receptor.py"</code><br>
                                         &nbsp;&nbsp;• <em>Start in:</em> The folder where the script is located.</p>
                                     </div>
                                 </details>
 
-                                <div class="checkbox-row" style="margin-bottom: 1rem;">
+                                <div class="checkbox-row mb-1">
                                     <input type="checkbox" id="setting-receptor-enabled">
-                                    <label for="setting-receptor-enabled" style="font-weight: 600;">Enable Remote Copy
+                                    <label for="setting-receptor-enabled">Enable Remote Copy
                                         Receptor</label>
                                 </div>
 
@@ -270,7 +263,7 @@
                                         <label for="setting-receptor-port">Receptor Port</label>
                                         <input type="number" id="setting-receptor-port" placeholder="8095">
                                     </div>
-                                    <div class="input-group" style="grid-column: 1 / -1; margin-top: 0.5rem;">
+                                    <div class="input-group full-width mt-sm">
                                         <label for="setting-receptor-path-mapping">Path Mapping (Linux to Windows)</label>
                                         <textarea id="setting-receptor-path-mapping" rows="3"
                                             placeholder="/media/TorDownloads=D:\Downloads&#10;/media/Filmo9=E:\Filmo9"
@@ -279,11 +272,11 @@
                                             LinuxPath=WindowsPath</small>
                                     </div>
                                 </div>
-                                <div class="checkbox-row mt-2" style="margin-top: 1rem;">
+                                <div class="checkbox-row mt-1">
                                     <input type="checkbox" id="setting-auto-copy-manual">
                                     <label for="setting-auto-copy-manual">Auto-copy manual search movies</label>
                                 </div>
-                                <div class="actions-row mt-3" style="margin-top: 1rem;">
+                                <div class="actions-row mt-1">
                                     <button id="test-receptor-btn" class="btn warning"><i class="fa-solid fa-plug"></i>
                                         Test Receptor Connection</button>
                                 </div>
@@ -297,7 +290,7 @@
                                 <p class="section-desc">Manage your Prowlarr or Jackett indexers.</p>
 
                                 <div class="input-group card-like">
-                                    <h4 style="margin-bottom: 0.75rem; font-weight: 600; color: var(--text-primary);">Add New Indexer</h4>
+                                    <h4>Add New Indexer</h4>
                                     <div class="grid-2">
                                         <div class="input-group">
                                             <label for="indexer-name">Indexer Name</label>
@@ -344,7 +337,7 @@
                                 <p class="section-desc">Automate downloads with RSS feeds.</p>
 
                                 <div class="input-group card-like">
-                                    <h4 style="margin-bottom: 0.75rem; font-weight: 600; color: var(--text-primary);">Add New RSS Feed</h4>
+                                    <h4>Add New RSS Feed</h4>
                                     <div class="grid-2">
                                         <div class="input-group">
                                             <label for="rss-name">Feed Name</label>
@@ -384,7 +377,7 @@
                                     </div>
 
                                     <!-- Size fields container (shown when Auto-download is checked) -->
-                                    <div id="rss-size-fields" class="grid-2" style="display: none; margin-top: 1rem;">
+                                    <div id="rss-size-fields" class="grid-2 mt-1" style="display: none;">
                                         <div class="input-group">
                                             <label for="rss-preferred-size">Preferred Size (MB)</label>
                                             <input type="number" id="rss-preferred-size" placeholder="5000" min="0">
@@ -394,8 +387,8 @@
                                             <input type="number" id="rss-max-size" placeholder="12000" min="0">
                                         </div>
                                     </div>
-                                    <small id="rss-size-hint"
-                                        style="display: none; color: var(--text-muted); margin-top: 0.5rem;">Will
+                                    <small id="rss-size-hint" class="rss-size-hint"
+                                        style="display: none;">Will
                                         download torrent closest to Preferred Size, up to Max Size.</small>
 
                                     <div class="actions-row">
@@ -435,7 +428,7 @@
                                     </div>
                                 </div>
 
-                                <div class="options-grid" style="margin-top: 1rem;">
+                                <div class="options-grid mt-1">
                                     <div class="checkbox-row">
                                         <input type="checkbox" id="setting-notify-new">
                                         <label for="setting-notify-new">Notify on New Movie Found</label>
@@ -484,7 +477,7 @@
                                 <h3><i class="fa-solid fa-ban"></i> Ignored Items</h3>
                                 <div class="flex-between">
                                     <div>
-                                        <label style="margin:0; display:block;">Ignored Movies List</label>
+                                        <label class="d-block m-0">Ignored Movies List</label>
                                         <small>Manage movies you've hidden from the dashboard.</small>
                                     </div>
                                     <div class="flex-gap">
@@ -503,7 +496,7 @@
                                 <h3><i class="fa-solid fa-eye"></i> Watchlist Items</h3>
                                 <div class="flex-between">
                                     <div>
-                                        <label style="margin:0; display:block;">Watchlist Movies</label>
+                                        <label class="d-block m-0">Watchlist Movies</label>
                                         <small>Movies monitoring for correct file size from RSS feeds.</small>
                                     </div>
                                     <div class="flex-gap">
@@ -524,22 +517,21 @@
     </div>
 
     <!-- Main JavaScript - Version parameter forces cache refresh on updates -->
-    <script type="module" src="js/main.js?v=4.4.76"></script>
+    <script type="module" src="js/main.js?v=4.4.78"></script>
 
 </body>
 
 </html><!-- Trailer Modal -->
 <div id="trailer-modal" class="modal-backdrop">
-    <div class="modal-dialog" style="max-width: 900px;">
+    <div class="modal-dialog">
         <div class="modal-header">
             <h3 class="modal-title" id="trailer-modal-title">Tráiler</h3>
             <button class="modal-close-btn" id="trailer-modal-close-btn" aria-label="Close">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
-        <div class="modal-body" style="padding: 0;">
-            <div id="trailer-container"
-                style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;">
+        <div class="modal-body">
+            <div id="trailer-container">
                 <!-- YouTube iframe will be injected here -->
             </div>
         </div>
@@ -548,16 +540,15 @@
 
 <!-- Watchlist Movies Modal -->
 <div id="watchlist-movies-modal" class="modal-backdrop">
-    <div class="modal-dialog" style="max-width: 800px;">
+    <div class="modal-dialog">
         <div class="modal-header">
             <h3 class="modal-title">Watchlist Movies</h3>
         </div>
         <div class="modal-body">
-            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+            <p class="text-muted mb-1">
                 These movies are being monitored for correct file size from RSS feeds.
             </p>
-            <div id="watchlist-movies-container"
-                style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 60vh; overflow-y: auto;">
+            <div id="watchlist-movies-container">
                 <!-- Populated by JavaScript -->
             </div>
         </div>
