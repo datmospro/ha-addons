@@ -362,7 +362,7 @@ function renderMovieDetails(container, movie, hash) {
     if (globalBackdrop) {
         if (movie.backdrop_url) {
             globalBackdrop.style.backgroundImage = `url('${movie.backdrop_url}')`;
-            globalBackdrop.style.opacity = '0.18';
+            globalBackdrop.style.opacity = ''; // Let CSS stylesheet/custom property handle it
         } else {
             globalBackdrop.style.backgroundImage = 'none';
             globalBackdrop.style.opacity = '0';

@@ -144,6 +144,16 @@ function renderSettings() {
     document.getElementById('setting-tmdb-key').value = settings.tmdb_api_key || '';
     document.getElementById('setting-language').value = settings.language || 'es-ES';
 
+    // Backdrop Options
+    const blurVal = settings.backdrop_blur !== undefined ? settings.backdrop_blur : 35;
+    const opacityVal = settings.backdrop_opacity !== undefined ? settings.backdrop_opacity : 18;
+    document.getElementById('setting-backdrop-blur').value = blurVal;
+    document.getElementById('setting-backdrop-opacity').value = opacityVal;
+
+    // Apply backdrop CSS variables dynamically
+    document.documentElement.style.setProperty('--backdrop-blur', `${blurVal}px`);
+    document.documentElement.style.setProperty('--backdrop-opacity', opacityVal / 100);
+
     // Telegram
     document.getElementById('setting-telegram-token').value = settings.telegram_bot_token || '';
     document.getElementById('setting-telegram-chat-id').value = settings.telegram_chat_id || '';
@@ -531,6 +541,8 @@ async function handleSaveSettings() {
         receptor_path_mapping: document.getElementById('setting-receptor-path-mapping').value,
         auto_copy_manual_search: document.getElementById('setting-auto-copy-manual').checked,
         language: document.getElementById('setting-language').value,
+        backdrop_blur: isNaN(parseInt(document.getElementById('setting-backdrop-blur').value)) ? 35 : parseInt(document.getElementById('setting-backdrop-blur').value),
+        backdrop_opacity: isNaN(parseInt(document.getElementById('setting-backdrop-opacity').value)) ? 18 : parseInt(document.getElementById('setting-backdrop-opacity').value),
         telegram_bot_token: document.getElementById('setting-telegram-token').value,
         telegram_chat_id: document.getElementById('setting-telegram-chat-id').value,
         telegram_notify_on_new_movie: document.getElementById('setting-notify-new').checked,
@@ -544,6 +556,9 @@ async function handleSaveSettings() {
 
     if (result.success) {
         state.setSettings(newSettings);
+        // Apply backdrop CSS variables immediately for a responsive live update
+        document.documentElement.style.setProperty('--backdrop-blur', `${newSettings.backdrop_blur}px`);
+        document.documentElement.style.setProperty('--backdrop-opacity', newSettings.backdrop_opacity / 100);
     }
 }
 

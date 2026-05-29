@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('✓ Auto-refresh started');
 
         console.log('✅ Roverr initialized successfully!');
-        console.log('🔧 Version 4.4.79 - Dark Premium UI/UX Redesign - JavaScript is UPDATED');
+        console.log('🔧 Version 4.4.80 - Dark Premium UI/UX Redesign - JavaScript is UPDATED');
 
     } catch (error) {
         console.error('❌ Error initializing Roverr:', error);

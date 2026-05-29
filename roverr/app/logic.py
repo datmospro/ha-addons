@@ -61,7 +61,9 @@ DEFAULT_SETTINGS = {
     "telegram_notify_on_new_movie": True,
     "telegram_notify_on_download_complete": True,
     "telegram_notify_on_move": True,
-    "language": "es-ES"  # Default to Spanish for backwards compatibility
+    "language": "es-ES",  # Default to Spanish for backwards compatibility
+    "backdrop_blur": 35,
+    "backdrop_opacity": 18
 }
 
 # Global State

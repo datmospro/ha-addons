@@ -67,6 +67,18 @@ export function switchView(viewName) {
             views[key].classList.remove('active');
         }
     });
+
+    // Fade out and clear cinematic backdrop if we are NOT in movie-details
+    const globalBackdrop = document.getElementById('global-backdrop');
+    if (globalBackdrop && viewName !== 'movie-details') {
+        globalBackdrop.style.opacity = '0';
+        setTimeout(() => {
+            // Only clear the background image if we haven't navigated back to movie-details in the meantime
+            if (globalBackdrop.style.opacity === '0' && state.getCurrentView() !== 'movie-details') {
+                globalBackdrop.style.backgroundImage = 'none';
+            }
+        }, 800);
+    }
 }
 
 /**
