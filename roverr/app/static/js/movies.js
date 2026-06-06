@@ -597,6 +597,8 @@ function startDetailsPolling(hash, initialStatus) {
     lastKnownStatus = initialStatus;
 
     detailsPollInterval = setInterval(async () => {
+        if (state.wsConnected) return;
+
         const container = document.getElementById('movie-details-content');
         if (getCurrentView() !== 'movie-details' || !container || container.getAttribute('data-hash') !== hash) {
             stopDetailsPolling();
@@ -642,7 +644,7 @@ function stopDetailsPolling() {
     }
 }
 
-function updateProgressUI(progress, type) {
+export function updateProgressUI(progress, type) {
     const container = document.querySelector('.details-progress-container');
     if (!container) return;
 

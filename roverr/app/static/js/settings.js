@@ -143,6 +143,7 @@ function renderSettings() {
 
     document.getElementById('setting-tmdb-key').value = settings.tmdb_api_key || '';
     document.getElementById('setting-language').value = settings.language || 'es-ES';
+    document.getElementById('setting-min-year').value = settings.min_year || '';
 
     // Backdrop Options
     const blurVal = settings.backdrop_blur !== undefined ? settings.backdrop_blur : 35;
@@ -541,6 +542,7 @@ async function handleSaveSettings() {
         receptor_path_mapping: document.getElementById('setting-receptor-path-mapping').value,
         auto_copy_manual_search: document.getElementById('setting-auto-copy-manual').checked,
         language: document.getElementById('setting-language').value,
+        min_year: document.getElementById('setting-min-year').value,
         backdrop_blur: isNaN(parseInt(document.getElementById('setting-backdrop-blur').value)) ? 35 : parseInt(document.getElementById('setting-backdrop-blur').value),
         backdrop_opacity: isNaN(parseInt(document.getElementById('setting-backdrop-opacity').value)) ? 18 : parseInt(document.getElementById('setting-backdrop-opacity').value),
         telegram_bot_token: document.getElementById('setting-telegram-token').value,

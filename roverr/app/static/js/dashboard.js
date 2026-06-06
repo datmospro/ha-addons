@@ -17,6 +17,7 @@ import {
 } from './api.js';
 import { showToast, formatBytes, formatDate, setButtonLoading } from './ui.js';
 import { getStatusClass } from './templates.js';
+import { connectWebSocket } from './websocket.js';
 
 // Referencias DOM
 
@@ -215,10 +216,18 @@ export function startDashboardAutoRefresh(interval = 2000) {
         clearInterval(state.refreshInterval);
     }
 
+    // Connect WebSocket
+    connectWebSocket();
+
     // Función de polling que se ejecuta en cada intervalo
     const pollFunction = async () => {
         // Solo hacer polling si la página está visible
         if (!isPageVisible) {
+            return;
+        }
+
+        // Skip HTTP poll if WebSocket is connected
+        if (state.wsConnected) {
             return;
         }
 
@@ -266,7 +275,7 @@ function adjustPollingInterval() {
         if (state.refreshInterval) {
             clearInterval(state.refreshInterval);
             state.refreshInterval = setInterval(async () => {
-                if (!isPageVisible) return;
+                if (!isPageVisible || state.wsConnected) return;
 
                 await fetchTorrents();
                 const { fetchMovies } = await import('./movies.js');
@@ -302,13 +311,18 @@ function setupPageVisibilityDetection() {
 
             if (isPageVisible) {
                 console.log('▶️ Page active & focused - resuming polling');
-                // Fetch inmediato al volver para datos frescos
-                (async () => {
-                    await fetchTorrents();
-                    const { fetchMovies } = await import('./movies.js');
-                    await fetchMovies(true);
-                    adjustPollingInterval();
-                })();
+                // Refresh WebSocket connection
+                connectWebSocket();
+                
+                // Fetch immediate data if WS is not active
+                if (!state.wsConnected) {
+                    (async () => {
+                        await fetchTorrents();
+                        const { fetchMovies } = await import('./movies.js');
+                        await fetchMovies(true);
+                        adjustPollingInterval();
+                    })();
+                }
             } else {
                 console.log('⏸️ Page inactive/background - pausing polling');
             }

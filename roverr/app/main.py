@@ -1,12 +1,78 @@
 import json
 import asyncio
 import logging
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 from database import init_db, MoveHistory
-from logic import process_torrents, get_active_torrents, manual_move, mark_as_moved, load_settings, save_settings, get_copy_progress, stop_copy, get_movie_data
+from logic import process_torrents, get_active_torrents, manual_move, mark_as_moved, load_settings, save_settings, get_copy_progress, stop_copy, get_movie_data, get_qb_client
+import logic
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        logger.info(f"WebSocket client connected. Total clients: {len(self.active_connections)}")
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+            logger.info(f"WebSocket client disconnected. Remaining clients: {len(self.active_connections)}")
+
+    async def broadcast(self, message: dict):
+        for connection in list(self.active_connections):
+            try:
+                await connection.send_json(message)
+            except Exception:
+                # If connection is broken, disconnect it
+                self.disconnect(connection)
+
+manager = ConnectionManager()
+
+async def broadcast_movies_update():
+    if not manager.active_connections:
+        return
+    try:
+        settings = load_settings()
+        api_key = settings.get('tmdb_api_key')
+        torrents = await asyncio.to_thread(get_active_torrents, None)
+        from logic import get_movie_data
+        data = await asyncio.to_thread(get_movie_data, torrents, api_key)
+        
+        # Inject copy progress
+        progress_data = get_copy_progress()
+        if data and 'movies' in data:
+            for movie in data['movies']:
+                t_hash = movie.get('torrent_hash')
+                if t_hash and t_hash in progress_data:
+                    prog = progress_data[t_hash]
+                    movie['copy_progress'] = prog
+                    if prog['status'] == 'copying':
+                        movie['status'] = 'copying'
+                        
+        await manager.broadcast({
+            "type": "movies",
+            "movies": data.get("movies", []) if data else [],
+            "ignored_series": data.get("ignored_series", []) if data else []
+        })
+    except Exception as e:
+        logger.error(f"Error broadcasting movies update: {e}")
+
+def trigger_movies_broadcast():
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(broadcast_movies_update())
+    except RuntimeError:
+        # No running event loop in this thread
+        pass
+
+# Register logic callback
+logic.register_movies_update_callback(trigger_movies_broadcast)
+
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -16,7 +82,7 @@ logger = logging.getLogger("Roverr")
 logger.info("=" * 80)
 logger.info("🚀 ROVERR - MEDIA MANAGER")
 logger.info("=" * 80)
-logger.info(f"📦 Version: 4.4.82")
+logger.info(f"📦 Version: 4.4.83")
 logger.info(f"🔧 Log Level: {logging.getLevelName(logger.getEffectiveLevel())}")
 logger.info("=" * 80)
 
@@ -85,6 +151,67 @@ async def backup_scheduler():
         await asyncio.sleep(3600)
 
 
+async def ws_progress_broadcast_task():
+    logger.info("WebSocket progress broadcaster task started")
+    last_sent_progress = None
+    while True:
+        try:
+            if manager.active_connections:
+                # Get active copy progress
+                progress_data = get_copy_progress() # {hash: {percent, speed, status}}
+                
+                # Get active downloading torrents progress
+                settings = load_settings()
+                
+                # Use to_thread to avoid blocking event loop
+                qb = await asyncio.to_thread(get_qb_client, settings)
+                await asyncio.to_thread(qb.auth_log_in)
+                torrents = await asyncio.to_thread(qb.torrents_info)
+                
+                active_progress = {}
+                # 1. Add downloading torrents
+                for t in torrents:
+                    if t.state in ['downloading', 'metaDL', 'allocating', 'queuedDL', 'checkingDL']:
+                        active_progress[t.hash] = {
+                            "type": "downloading",
+                            "progress": t.progress,
+                            "speed": round(t.dlspeed / 1024 / 1024, 2),
+                            "eta": t.eta,
+                            "state": t.state
+                        }
+                
+                # 2. Add copying progress
+                for t_hash, prog in progress_data.items():
+                    active_progress[t_hash] = {
+                        "type": "copying",
+                        "progress": prog.get('percent', 0) / 100.0, # Normalise to 0-1
+                        "speed": prog.get('speed', 0),
+                        "state": prog.get('status', 'copying')
+                    }
+                
+                # Detect completion
+                if last_sent_progress:
+                    completed_hashes = []
+                    for h in last_sent_progress.keys():
+                        if h not in active_progress:
+                            completed_hashes.append(h)
+                    
+                    if completed_hashes:
+                        logger.info(f"Detected copy/download completion for hashes: {completed_hashes}. Syncing DB.")
+                        await asyncio.to_thread(process_torrents, None)
+                        await broadcast_movies_update()
+                
+                if active_progress or last_sent_progress:
+                    await manager.broadcast({
+                        "type": "progress",
+                        "progress": active_progress
+                    })
+                    last_sent_progress = active_progress if active_progress else None
+        except Exception as e:
+            logger.debug(f"Error in ws_progress_broadcast_task: {e}")
+            
+        await asyncio.sleep(1)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -98,8 +225,12 @@ async def lifespan(app: FastAPI):
     # Start database backup scheduler (daily at 3 AM)
     asyncio.create_task(backup_scheduler())
     
+    # Start WebSocket progress broadcast task
+    asyncio.create_task(ws_progress_broadcast_task())
+    
     yield
     # Shutdown
+
 
 app = FastAPI(lifespan=lifespan)
 
@@ -676,7 +807,7 @@ def get_ignored_movies():
     from database import Movie
     
     try:
-        ignored_movies = Movie.select().where(Movie.ignored == True)
+        ignored_movies = Movie.select().where(Movie.ignored == True).order_by(Movie.ignored_at.desc(), Movie.added_at.desc())
         movies_list = []
         for movie in ignored_movies:
             movies_list.append({
@@ -841,6 +972,44 @@ def get_database_info():
     except Exception as e:
         logger.error(f"Error getting database info: {e}")
         return {"success": False, "message": str(e)}
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        # Send initial movies and ignored list immediately
+        settings = load_settings()
+        api_key = settings.get('tmdb_api_key')
+        torrents = await asyncio.to_thread(get_active_torrents, None)
+        from logic import get_movie_data
+        data = await asyncio.to_thread(get_movie_data, torrents, api_key)
+        
+        # Inject copy progress
+        progress_data = get_copy_progress()
+        if data and 'movies' in data:
+            for movie in data['movies']:
+                t_hash = movie.get('torrent_hash')
+                if t_hash and t_hash in progress_data:
+                    prog = progress_data[t_hash]
+                    movie['copy_progress'] = prog
+                    if prog['status'] == 'copying':
+                        movie['status'] = 'copying'
+                        
+        await websocket.send_json({
+            "type": "initial",
+            "movies": data.get("movies", []) if data else [],
+            "ignored_series": data.get("ignored_series", []) if data else []
+        })
+        
+        while True:
+            # Maintain connection
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception as e:
+        logger.error(f"WebSocket connection error: {e}")
+        manager.disconnect(websocket)
 
 
 # Serve Frontend

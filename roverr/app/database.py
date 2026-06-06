@@ -54,6 +54,7 @@ class Movie(BaseModel):
     watchlist = BooleanField(default=False) # If True, movie is in watchlist monitoring
     watchlist_expiry = DateTimeField(null=True) # Expiration date for watchlist
     status_reason = CharField(null=True) # Reason for current status (e.g., why stuck in 'new')
+    ignored_at = DateTimeField(null=True) # Timestamp of when the movie was ignored
 
 def migrate_db():
     """
@@ -79,7 +80,8 @@ def migrate_db():
         ('torrent_name', 'TEXT'),
         ('watchlist', 'BOOLEAN'),
         ('watchlist_expiry', 'DATETIME'),
-        ('status_reason', 'TEXT')
+        ('status_reason', 'TEXT'),
+        ('ignored_at', 'DATETIME')
     ]
     
     try:

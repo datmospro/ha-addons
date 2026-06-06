@@ -41,6 +41,32 @@ logging.basicConfig(
 )
 logger = logging.getLogger("Roverr")
 
+# Callback for notifying main app when movies change
+ON_MOVIES_UPDATE_CALLBACK = None
+
+def register_movies_update_callback(callback):
+    global ON_MOVIES_UPDATE_CALLBACK
+    ON_MOVIES_UPDATE_CALLBACK = callback
+    logger.info("Registered movies update callback")
+
+def trigger_movies_update_callback():
+    global ON_MOVIES_UPDATE_CALLBACK
+    if ON_MOVIES_UPDATE_CALLBACK:
+        try:
+            import asyncio
+            if asyncio.iscoroutinefunction(ON_MOVIES_UPDATE_CALLBACK):
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(ON_MOVIES_UPDATE_CALLBACK())
+                except RuntimeError:
+                    # Run it in a new thread if no event loop is running in this thread
+                    asyncio.run(ON_MOVIES_UPDATE_CALLBACK())
+            else:
+                ON_MOVIES_UPDATE_CALLBACK()
+        except Exception as e:
+            logger.error(f"Error executing movies update callback: {e}")
+
+
 # Constants
 MANUAL_SEARCH_TAG = "manual-search-autocopy"
 SETTINGS_FILE = "/data/settings.json"
@@ -63,7 +89,8 @@ DEFAULT_SETTINGS = {
     "telegram_notify_on_move": True,
     "language": "es-ES",  # Default to Spanish for backwards compatibility
     "backdrop_blur": 35,
-    "backdrop_opacity": 18
+    "backdrop_opacity": 18,
+    "min_year": ""
 }
 
 # Global State
@@ -1116,6 +1143,9 @@ def sync_movies(torrents, api_key):
                 movie.state = 'orphaned'
                 movie.save()
 
+    trigger_movies_update_callback()
+
+
 def get_movie_data(torrents, api_key):
     """
     Returns list of movies from the Database AND list of ignored series.
@@ -1288,6 +1318,7 @@ def identify_movie(torrent_hash, tmdb_id, api_key):
             movie.backdrop_path = download_image(backdrop_url, f"{torrent_hash}_backdrop.jpg", force=True)
             
         movie.save()
+        trigger_movies_update_callback()
         return True, "Movie identified successfully"
         
     except Exception as e:
@@ -1335,12 +1366,15 @@ def delete_movie(torrent_hash, ignore_movie=True):
     if ignore_movie:
         # Mark as ignored (do NOT delete) to prevent sync_movies from re-adding it
         movie.ignored = True
+        movie.ignored_at = datetime.now()
         movie.save()
         logger.info(f"Successfully removed movie from dashboard (ignored): {movie_title}")
+        trigger_movies_update_callback()
     else:
         # Hard delete from database
         movie.delete_instance()
         logger.info(f"Successfully deleted movie from database: {movie_title}")
+        trigger_movies_update_callback()
         
     return True
 
@@ -2673,6 +2707,7 @@ def process_single_torrent(qb, torrent, settings):
                     logger.info(f"Copying {source_path} to {dest_file}")
                     copy_with_progress(source_path, dest_file, torrent.hash, limit)
                     MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_file, status='success')
+                    trigger_movies_update_callback()
                     
                     # Notify Telegram: Moved
                     if settings.get('telegram_notify_on_move', True):
@@ -2696,6 +2731,7 @@ def process_single_torrent(qb, torrent, settings):
             else:
                 logger.info(f"File already exists: {dest_file}")
                 MoveHistory.create(torrent_name=torrent.name, status='skipped', message="Destination exists", source_path=source_path, dest_path=dest_file)
+                trigger_movies_update_callback()
                 
         # If it's a directory
         elif os.path.isdir(source_path):
@@ -2744,6 +2780,7 @@ def process_single_torrent(qb, torrent, settings):
                             
                 if copied:
                     MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_dir, status='success')
+                    trigger_movies_update_callback()
                     
                     # Notify Telegram: Moved
                     if settings.get('telegram_notify_on_move', True):
@@ -2763,6 +2800,7 @@ def process_single_torrent(qb, torrent, settings):
                 else:
                     logger.warning(f"No video files found in {source_path}")
                     MoveHistory.create(torrent_name=torrent.name, status='skipped', message="No video file found in folder", source_path=source_path, dest_path=dest_dir)
+                    trigger_movies_update_callback()
                     
             finally:
                 # ALWAYS release reservation, even if copy fails
@@ -2770,6 +2808,7 @@ def process_single_torrent(qb, torrent, settings):
         else:
              logger.error(f"Source path is valid but neither file nor dir? {source_path}")
              MoveHistory.create(torrent_name=torrent.name, status='error', message="Invalid source type", source_path=source_path, dest_path="")
+             trigger_movies_update_callback()
 
     except InterruptedError:
         logger.info(f"Copy cancelled for {torrent.name}")
@@ -2777,6 +2816,7 @@ def process_single_torrent(qb, torrent, settings):
     except Exception as e:
         logger.error(f"Error moving {torrent.name}: {e}")
         MoveHistory.create(torrent_name=torrent.name, status='error', message=str(e), source_path="", dest_path="")
+        trigger_movies_update_callback()
 
 def _poll_receptor_status(torrent, host, port, source_path, dest_dir, settings, title, year):
     """
@@ -2823,6 +2863,7 @@ def _poll_receptor_status(torrent, host, port, source_path, dest_dir, settings, 
                         'is_receptor': True
                     }
                     MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_dir, status='success')
+                    trigger_movies_update_callback()
                     
                     # Notify Telegram
                     if settings.get('telegram_notify_on_move', True):
@@ -2848,6 +2889,7 @@ def _poll_receptor_status(torrent, host, port, source_path, dest_dir, settings, 
                     error_msg = data.get("error", "Unknown receptor error")
                     logger.error(f"Receptor copy error for {torrent.hash}: {error_msg}")
                     MoveHistory.create(torrent_name=torrent.name, status='error', message=f"Receptor Error: {error_msg}", source_path=source_path, dest_path=dest_dir)
+                    trigger_movies_update_callback()
                     if torrent.hash in COPY_PROGRESS:
                         del COPY_PROGRESS[torrent.hash]
                     break
@@ -3967,6 +4009,29 @@ def fetch_rss_movies(limit=30):
             if Movie.select().where(Movie.torrent_hash == pseudo_hash).exists():
                 logger.info(f"RSS movie '{title}' ({year}) already exists with exact hash {pseudo_hash[:8]}..., skipping")
                 continue
+
+            # Year filtering check (only for RSS entry)
+            min_year = settings.get('min_year')
+            if min_year:
+                try:
+                    min_year_val = int(min_year)
+                    if year and int(year) < min_year_val:
+                        logger.info(f"Skipping RSS movie '{title}' ({year}) as it is older than minimum year filter {min_year_val}. Auto-ignoring in DB.")
+                        # Save in DB as ignored to avoid duplicate checks in future
+                        Movie.create(
+                            torrent_hash=pseudo_hash,
+                            title=title,
+                            year=year,
+                            ignored=True,
+                            ignored_at=datetime.now(),
+                            state='rss',
+                            status='new',
+                            torrent_name=entry['title'],
+                            overview=f"Auto-ignored: released before {min_year_val}"
+                        )
+                        continue
+                except ValueError:
+                    pass
             
             # First check if movie is ignored (skip completely - no RSS entry, no auto-download)
             if is_movie_ignored(title, year, entry.get('tmdb_id'), ignored_movies):
@@ -4285,6 +4350,9 @@ def fetch_rss_movies(limit=30):
             
         except Exception as e:
             logger.error(f"Error adding RSS movie {entry['title']}: {e}")
+            
+    if added_count > 0:
+        trigger_movies_update_callback()
             
     return {
         "success": True, 
