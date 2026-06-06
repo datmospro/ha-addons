@@ -369,6 +369,7 @@ export async function batchDeleteMovies(torrentHashes, options) {
             body: JSON.stringify({
                 torrent_hashes: torrentHashes,
                 delete_from_db: options.deleteFromDB,
+                delete_torrent: options.deleteTorrent || false,
                 delete_from_destination: options.deleteFromDestination,
                 ignore_movie: options.ignoreMovie,
                 watchlist_movie: options.watchlistMovie || false,

@@ -1244,6 +1244,7 @@ async function copySelectedMovies() {
 
 async function confirmDeleteSelectedMovies() {
     const deleteFromDB = document.getElementById('delete-from-db').checked;
+    const deleteTorrent = document.getElementById('delete-torrent')?.checked || false;
     const deleteFromDestination = document.getElementById('delete-from-destination').checked;
     const ignoreMovie = document.getElementById('ignore-movie').checked;
     const watchlistMovie = document.getElementById('watchlist-movie')?.checked || false;
@@ -1258,7 +1259,7 @@ async function confirmDeleteSelectedMovies() {
         }
     } else {
         // Normal delete mode
-        if (!deleteFromDB && !deleteFromDestination) {
+        if (!deleteFromDB && !deleteFromDestination && !deleteTorrent) {
             showToast('Please select at least one option', 'warning');
             return;
         }
@@ -1270,6 +1271,7 @@ async function confirmDeleteSelectedMovies() {
 
     const data = await batchDeleteMovies(hashes, {
         deleteFromDB,
+        deleteTorrent,
         deleteFromDestination,
         ignoreMovie,
         watchlistMovie,
