@@ -304,7 +304,6 @@ def batch_delete_movies(payload: dict):
     
     torrent_hashes = payload.get('torrent_hashes', [])
     delete_from_db = payload.get('delete_from_db', False)
-    delete_torrent = payload.get('delete_torrent', False)
     delete_from_destination = payload.get('delete_from_destination', False)
     ignore_movie = payload.get('ignore_movie', True)
     watchlist_movie = payload.get('watchlist_movie', False)
@@ -340,22 +339,17 @@ def batch_delete_movies(payload: dict):
     settings = load_settings()
     dest_path = settings.get('local_dest_path', '')
     
-    # Pre-fetch active torrents to map hash -> name (to find history) and delete if requested
+    # Pre-fetch active torrents to map hash -> name (to find history)
     hash_to_name = {}
-    if delete_from_destination or delete_torrent:
+    if delete_from_destination:
         try:
             qb = get_qb_client(settings)
             qb.auth_log_in()
             torrents = qb.torrents_info(torrent_hashes=torrent_hashes)
             for t in torrents:
                 hash_to_name[t.hash.lower()] = t.name
-            
-            if delete_torrent:
-                qb.torrents_delete(delete_files=True, torrent_hashes=torrent_hashes)
-                logger.info(f"Deleted torrents {torrent_hashes} from qBittorrent (including files)")
         except Exception as e:
-            logger.error(f"Error handling qBittorrent deletion/mapping: {e}")
-            errors.append(f"qBittorrent: {str(e)}")
+            logger.error(f"Error fetching torrents for delete mapping: {e}")
 
     for hash in torrent_hashes:
         try:

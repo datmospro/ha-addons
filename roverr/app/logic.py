@@ -3756,6 +3756,84 @@ def auto_download_movie(title, year, preferred_size_gb, max_size_gb, label=None,
         logger.error(f"Error adding torrent to download client: {e}")
         return None, None, f"Download client error: {str(e)}"
 
+def is_movie_ignored(title, year, tmdb_id, ignored_movies):
+    def normalize(t):
+        if not t: return ""
+        return "".join(re.sub(r'[^\w\s]', '', t.lower()).split())
+        
+    norm_title = normalize(title)
+    
+    for m in ignored_movies:
+        if tmdb_id and m.tmdb_id:
+            if int(tmdb_id) == int(m.tmdb_id):
+                return True
+                
+        norm_db_title = normalize(m.title)
+        norm_db_torrent = normalize(m.torrent_name)
+        
+        title_matches = (norm_title == norm_db_title or (norm_db_torrent and norm_title == norm_db_torrent))
+        
+        year_matches = True
+        if year and m.year:
+            year_matches = str(year) == str(m.year)
+            
+        if title_matches and year_matches:
+            return True
+            
+    return False
+
+def get_watchlist_movie(title, year, tmdb_id, watchlist_movies):
+    def normalize(t):
+        if not t: return ""
+        return "".join(re.sub(r'[^\w\s]', '', t.lower()).split())
+        
+    norm_title = normalize(title)
+    
+    for m in watchlist_movies:
+        if tmdb_id and m.tmdb_id:
+            if int(tmdb_id) == int(m.tmdb_id):
+                return m
+                
+        norm_db_title = normalize(m.title)
+        norm_db_torrent = normalize(m.torrent_name)
+        
+        title_matches = (norm_title == norm_db_title or (norm_db_torrent and norm_title == norm_db_torrent))
+        
+        year_matches = True
+        if year and m.year:
+            year_matches = str(year) == str(m.year)
+            
+        if title_matches and year_matches:
+            return m
+            
+    return None
+
+def is_duplicate_movie(title, year, tmdb_id, existing_movies):
+    def normalize(t):
+        if not t: return ""
+        return "".join(re.sub(r'[^\w\s]', '', t.lower()).split())
+        
+    norm_title = normalize(title)
+    
+    for m in existing_movies:
+        if tmdb_id and m.tmdb_id:
+            if int(tmdb_id) == int(m.tmdb_id):
+                return True
+                
+        norm_db_title = normalize(m.title)
+        norm_db_torrent = normalize(m.torrent_name)
+        
+        title_matches = (norm_title == norm_db_title or (norm_db_torrent and norm_title == norm_db_torrent))
+        
+        year_matches = True
+        if year and m.year:
+            year_matches = str(year) == str(m.year)
+            
+        if title_matches and year_matches:
+            return True
+            
+    return False
+
 def fetch_rss_movies(limit=30):
     """
     Fetch movies from all RSS feeds and add them to the database
@@ -3767,6 +3845,13 @@ def fetch_rss_movies(limit=30):
     settings = load_settings()
     feeds = settings.get('rss_feeds', [])
     api_key = settings.get('tmdb_api_key')
+    
+    ignored_movies = list(Movie.select().where(Movie.ignored == True))
+    watchlist_movies = list(Movie.select().where(Movie.watchlist == True))
+    existing_movies = list(Movie.select().where(
+        (Movie.ignored == False) & 
+        ((Movie.watchlist == False) | (Movie.watchlist.is_null()))
+    ))
     
     if not feeds:
         logger.warning("⚠️  [RSS] No RSS feeds configured")
@@ -3884,20 +3969,12 @@ def fetch_rss_movies(limit=30):
                 continue
             
             # First check if movie is ignored (skip completely - no RSS entry, no auto-download)
-            ignored_query = Movie.select().where(Movie.title == title, Movie.ignored == True)
-            if year:
-                ignored_query = ignored_query.where(Movie.year == year)
-            
-            if ignored_query.exists():
-                logger.info(f"Movie '{title}' ({year}) is in ignored list. Skipping RSS entry and auto-download.")
+            if is_movie_ignored(title, year, entry.get('tmdb_id'), ignored_movies):
+                logger.info(f"Movie '{title}' ({year}) is in ignored list. Skipping RSS entry.")
                 continue
             
             # CHECK IF MOVIE IS IN WATCHLIST
-            watchlist_query = Movie.select().where(Movie.title == title, Movie.watchlist == True)
-            if year:
-                watchlist_query = watchlist_query.where(Movie.year == year)
-            
-            watchlist_movie = watchlist_query.first()
+            watchlist_movie = get_watchlist_movie(title, year, entry.get('tmdb_id'), watchlist_movies)
             if watchlist_movie:
                 # Movie is in watchlist - check expiration and size
                 if watchlist_movie.watchlist_expiry and datetime.now() > watchlist_movie.watchlist_expiry:
@@ -3938,17 +4015,8 @@ def fetch_rss_movies(limit=30):
                 
             # CRITICAL FIX: Check if movie already exists in dashboard by title+year (not ignored, not watchlist)
             # This prevents duplicate entries for the same movie in different qualities/formats
-            existing_query = Movie.select().where(
-                Movie.title == title, 
-                Movie.ignored == False,
-                (Movie.watchlist == False) | (Movie.watchlist.is_null())
-            )
-            if year:
-                existing_query = existing_query.where(Movie.year == year)
-            
-            existing_movie = existing_query.first()
-            if existing_movie:
-                logger.info(f"Movie '{title}' ({year}) already exists in dashboard with hash {existing_movie.torrent_hash[:8]}... Skipping duplicate RSS entry.")
+            if is_duplicate_movie(title, year, entry.get('tmdb_id'), existing_movies):
+                logger.info(f"Movie '{title}' ({year}) already exists in dashboard. Skipping duplicate RSS entry.")
                 continue
             
             # CHECK FOR AUTO-DOWNLOAD (only for new, non-ignored movies)
