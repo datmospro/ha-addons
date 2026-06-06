@@ -16,7 +16,7 @@ logger = logging.getLogger("Roverr")
 logger.info("=" * 80)
 logger.info("🚀 ROVERR - MEDIA MANAGER")
 logger.info("=" * 80)
-logger.info(f"📦 Version: 4.4.81")
+logger.info(f"📦 Version: 4.4.82")
 logger.info(f"🔧 Log Level: {logging.getLevelName(logger.getEffectiveLevel())}")
 logger.info("=" * 80)
 
