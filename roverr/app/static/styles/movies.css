@@ -299,7 +299,7 @@
     left: var(--sidebar-width);
     width: calc(100vw - var(--sidebar-width));
     z-index: 100;
-    background: rgba(9, 9, 11, 0.75);
+    background: rgba(34, 37, 43, 0.75);
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     border-bottom: 1px solid var(--border);
