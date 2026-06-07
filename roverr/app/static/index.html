@@ -45,7 +45,7 @@
                 </button>
             </nav>
             <div class="sidebar-footer">
-                <span id="version-info">v4.4.83</span>
+                <span id="version-info">v4.4.84</span>
             </div>
         </aside>
 
@@ -379,7 +379,7 @@
                                     </div>
 
                                     <!-- Size fields container (shown when Auto-download is checked) -->
-                                    <div id="rss-size-fields" class="grid-2 mt-1" style="display: none;">
+                                    <div id="rss-size-fields" class="grid-3 mt-1" style="display: none;">
                                         <div class="input-group">
                                             <label for="rss-preferred-size">Preferred Size (MB)</label>
                                             <input type="number" id="rss-preferred-size" placeholder="5000" min="0">
@@ -387,6 +387,10 @@
                                         <div class="input-group">
                                             <label for="rss-max-size">Max Size (MB)</label>
                                             <input type="number" id="rss-max-size" placeholder="12000" min="0">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="rss-min-year">Min Release Year</label>
+                                            <input type="number" id="rss-min-year" placeholder="e.g. 2002" min="1800">
                                         </div>
                                     </div>
                                     <small id="rss-size-hint" class="rss-size-hint"
@@ -491,15 +495,6 @@
                                 </div>
                             </div>
 
-                            <div class="settings-section">
-                                <h3><i class="fa-solid fa-filter"></i> Filters / Filtros</h3>
-                                <p class="section-desc">Filter content before it reaches your dashboard.</p>
-                                <div class="input-group">
-                                    <label for="setting-min-year">Minimum Release Year / Año Mínimo de Lanzamiento</label>
-                                    <input type="number" id="setting-min-year" min="1800" max="2100" placeholder="e.g. 2002">
-                                    <small>Movies released before this year entering through RSS feeds will be automatically ignored and hidden.</small>
-                                </div>
-                            </div>
 
 
 
@@ -547,7 +542,7 @@
     </div>
 
     <!-- Main JavaScript - Version parameter forces cache refresh on updates -->
-    <script type="module" src="js/main.js?v=4.4.83"></script>
+    <script type="module" src="js/main.js?v=4.4.84"></script>
 
 </body>
 

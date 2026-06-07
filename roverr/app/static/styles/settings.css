@@ -198,6 +198,12 @@
     gap: 1.25rem;
 }
 
+.grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1.25rem;
+}
+
 /* Card-like Input Groups */
 .card-like {
     background: rgba(0, 0, 0, 0.15);

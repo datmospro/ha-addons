@@ -143,7 +143,6 @@ function renderSettings() {
 
     document.getElementById('setting-tmdb-key').value = settings.tmdb_api_key || '';
     document.getElementById('setting-language').value = settings.language || 'es-ES';
-    document.getElementById('setting-min-year').value = settings.min_year || '';
 
     // Backdrop Options
     const blurVal = settings.backdrop_blur !== undefined ? settings.backdrop_blur : 35;
@@ -314,7 +313,7 @@ function renderRSSFeedsList() {
                     ${feed.enabled ? '<span style="color: var(--success); font-size: 0.75rem;"><i class="fa-solid fa-circle" style="font-size: 0.5rem;"></i> Enabled</span>' : '<span style="color: var(--text-muted); font-size: 0.75rem;"><i class="fa-regular fa-circle" style="font-size: 0.5rem;"></i> Disabled</span>'}
                 </div>
                 <span style="font-size: 0.8rem; color: var(--text-secondary); text-overflow: ellipsis; overflow: hidden;">${feed.url}</span>
-                <span style="font-size: 0.75rem; color: var(--text-muted);">Refresh: ${feed.refresh_interval}s ${feed.label ? `&bull; Label: ${feed.label}` : ''}</span>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Refresh: ${feed.refresh_interval}s ${feed.label ? `&bull; Label: ${feed.label}` : ''} ${feed.min_year ? `&bull; Min Year: ${feed.min_year}` : ''}</span>
             </div>
             <div style="display: flex; gap: 0.5rem;">
                 <button class="btn secondary sm edit-rss-btn" data-index="${index}"><i class="fa-solid fa-pencil"></i></button>
@@ -441,6 +440,7 @@ function addRSSFeed() {
     const urlInput = document.getElementById('rss-url');
     const preferredSizeInput = document.getElementById('rss-preferred-size');
     const maxSizeInput = document.getElementById('rss-max-size');
+    const minYearInput = document.getElementById('rss-min-year');
 
     const name = nameInput.value.trim();
     const enabled = enabledInput.checked;
@@ -451,6 +451,7 @@ function addRSSFeed() {
     const url = urlInput.value.trim();
     const preferredSize = parseInt(preferredSizeInput.value) || 0;
     const maxSize = parseInt(maxSizeInput.value) || 0;
+    const minYear = minYearInput && minYearInput.value.trim() !== '' ? (parseInt(minYearInput.value) || '') : '';
 
     if (!name || !url) {
         showToast('Please fill in Name and RSS URL', 'error');
@@ -473,7 +474,8 @@ function addRSSFeed() {
         refresh_interval: refreshInterval,
         url,
         preferred_size: preferredSize,
-        max_size: maxSize
+        max_size: maxSize,
+        min_year: minYear
     });
 
     nameInput.value = '';
@@ -485,6 +487,7 @@ function addRSSFeed() {
     urlInput.value = '';
     preferredSizeInput.value = '';
     maxSizeInput.value = '';
+    if (minYearInput) minYearInput.value = '';
 
     // Reset visibility
     toggleAutoDownloadSettings('rss-auto-add', 'rss-size-fields');
@@ -542,7 +545,6 @@ async function handleSaveSettings() {
         receptor_path_mapping: document.getElementById('setting-receptor-path-mapping').value,
         auto_copy_manual_search: document.getElementById('setting-auto-copy-manual').checked,
         language: document.getElementById('setting-language').value,
-        min_year: document.getElementById('setting-min-year').value,
         backdrop_blur: isNaN(parseInt(document.getElementById('setting-backdrop-blur').value)) ? 35 : parseInt(document.getElementById('setting-backdrop-blur').value),
         backdrop_opacity: isNaN(parseInt(document.getElementById('setting-backdrop-opacity').value)) ? 18 : parseInt(document.getElementById('setting-backdrop-opacity').value),
         telegram_bot_token: document.getElementById('setting-telegram-token').value,
@@ -786,6 +788,7 @@ function openEditRSSModal(index) {
     document.getElementById('edit-rss-url').value = feed.url || '';
     document.getElementById('edit-rss-preferred-size').value = feed.preferred_size || '';
     document.getElementById('edit-rss-max-size').value = feed.max_size || '';
+    document.getElementById('edit-rss-min-year').value = feed.min_year || '';
 
     toggleAutoDownloadSettings('edit-rss-auto-add', 'edit-rss-auto-download-settings');
 
@@ -809,6 +812,8 @@ async function saveEditedRSS() {
     const url = document.getElementById('edit-rss-url').value.trim();
     const preferredSize = parseInt(document.getElementById('edit-rss-preferred-size').value) || 0;
     const maxSize = parseInt(document.getElementById('edit-rss-max-size').value) || 0;
+    const minYearVal = document.getElementById('edit-rss-min-year').value.trim();
+    const minYear = minYearVal !== '' ? (parseInt(minYearVal) || '') : '';
 
     if (!name || !url) {
         showToast('Please fill in Name and RSS URL', 'error');
@@ -830,7 +835,8 @@ async function saveEditedRSS() {
         refresh_interval: refreshInterval,
         url,
         preferred_size: preferredSize,
-        max_size: maxSize
+        max_size: maxSize,
+        min_year: minYear
     };
 
     state.setSettings(settings);

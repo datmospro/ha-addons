@@ -4011,7 +4011,8 @@ def fetch_rss_movies(limit=30):
                 continue
 
             # Year filtering check (only for RSS entry)
-            min_year = settings.get('min_year')
+            feed_config = feed_map.get(entry['feed_name'])
+            min_year = feed_config.get('min_year') if feed_config else None
             if min_year:
                 try:
                     min_year_val = int(min_year)

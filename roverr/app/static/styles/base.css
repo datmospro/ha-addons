@@ -7,12 +7,12 @@
 
 :root {
     /* ── Background Surfaces ── */
-    --bg-primary: #121214;
-    --bg-secondary: #1a1a1e;
-    --bg-tertiary: #232329;
-    --bg-elevated: #1e1e24;
-    --sidebar-bg: rgba(18, 18, 20, 0.85);
-    --card-bg: #1a1a1e;
+    --bg-primary: #22252b;
+    --bg-secondary: #2c3039;
+    --bg-tertiary: #383d49;
+    --bg-elevated: #323742;
+    --sidebar-bg: rgba(34, 37, 43, 0.85);
+    --card-bg: #2c3039;
 
     /* ── Accent (Blue) ── */
     --accent: #3b82f6;
@@ -23,13 +23,13 @@
 
     /* ── Text ── */
     --text-primary: #fafafa;
-    --text-secondary: #a1a1aa;
-    --text-muted: #71717a;
+    --text-secondary: #d4d4d8;
+    --text-muted: #94949e;
 
     /* ── Borders ── */
-    --border: rgba(255, 255, 255, 0.06);
-    --border-hover: rgba(255, 255, 255, 0.12);
-    --border-active: rgba(59, 130, 246, 0.4);
+    --border: rgba(255, 255, 255, 0.14);
+    --border-hover: rgba(255, 255, 255, 0.22);
+    --border-active: rgba(59, 130, 246, 0.45);
 
     /* ── Status Colors ── */
     --success: #22c55e;
