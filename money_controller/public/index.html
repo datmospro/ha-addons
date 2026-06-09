@@ -268,9 +268,72 @@
           </button>
         </div>
 
+        <!-- Recurring Rules Controls -->
+        <div class="recurring-controls-bar glass" style="margin-bottom: 20px; padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <div class="search-box">
+            <i data-lucide="search"></i>
+            <input type="text" id="rec-search" placeholder="Buscar gasto fijo...">
+          </div>
+          
+          <div class="filter-group">
+            <select id="rec-filter-type" class="form-select">
+              <option value="">Todos los Tipos</option>
+              <option value="income">Ingresos Fijos</option>
+              <option value="expense">Gastos Fijos</option>
+            </select>
+
+            <select id="rec-filter-category" class="form-select">
+              <option value="">Todas las Categorías</option>
+              <!-- Dynamically populated -->
+            </select>
+
+            <select id="rec-sort" class="form-select">
+              <option value="day">Ordenar por Día de cobro</option>
+              <option value="amount-desc">Importe (mayor a menor)</option>
+              <option value="amount-asc">Importe (menor a mayor)</option>
+              <option value="name">Nombre (A-Z)</option>
+            </select>
+            
+            <div class="view-toggle-buttons" style="display: flex; gap: 6px;">
+              <button class="btn-icon active" id="btn-rec-view-grid" title="Vista de Tarjetas">
+                <i data-lucide="layout-grid"></i>
+              </button>
+              <button class="btn-icon" id="btn-rec-view-list" title="Vista de Lista Compacta">
+                <i data-lucide="list"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Recurring Rules Grid -->
         <div class="recurring-grid" id="recurring-rules-container">
           <!-- Dynamically populated -->
+        </div>
+
+        <!-- Recurring Rules Table (List View) -->
+        <div class="table-wrapper hidden" id="recurring-list-container">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Descripción</th>
+                <th>Tipo</th>
+                <th>Categoría</th>
+                <th>Frecuencia</th>
+                <th>Cobro / Pago</th>
+                <th>Fecha Inicio</th>
+                <th class="text-right">Importe</th>
+                <th class="text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="recurring-list-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="table-empty-state hidden" id="rec-empty-state">
+          <i data-lucide="calendar-x"></i>
+          <p>No se encontraron movimientos fijos con los filtros aplicados.</p>
         </div>
       </section>
 

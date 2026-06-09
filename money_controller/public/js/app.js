@@ -13,6 +13,13 @@ let selectedCalendarDay = null;
 // What-If scenarios (stored in memory)
 let simulatedScenarios = [];
 
+// Recurring Rules tab controls state
+let recSearch = '';
+let recFilterType = '';
+let recFilterCategory = '';
+let recSort = 'day';
+let recViewMode = 'grid';
+
 // Chart instances
 let forecastChart = null;
 let categoryChart = null;
@@ -78,10 +85,12 @@ function populateCategorySelects() {
   const txCatSelect = document.getElementById('tx-category');
   const recCatSelect = document.getElementById('rec-category');
   const filterCatSelect = document.getElementById('tx-filter-category');
+  const recFilterCatSelect = document.getElementById('rec-filter-category');
   
   txCatSelect.innerHTML = '<option value="" disabled selected>Selecciona categoría...</option>';
   recCatSelect.innerHTML = '<option value="" disabled selected>Selecciona categoría...</option>';
   filterCatSelect.innerHTML = '<option value="">Todas las Categorías</option>';
+  if (recFilterCatSelect) recFilterCatSelect.innerHTML = '<option value="">Todas las Categorías</option>';
   
   categories.forEach(cat => {
     const optionHTML = `<option value="${cat.id}">${cat.type === 'income' ? '📥' : '📤'} ${cat.name}</option>`;
@@ -91,6 +100,7 @@ function populateCategorySelects() {
     // For filters
     const filterOptionHTML = `<option value="${cat.id}">${cat.name}</option>`;
     filterCatSelect.insertAdjacentHTML('beforeend', filterOptionHTML);
+    if (recFilterCatSelect) recFilterCatSelect.insertAdjacentHTML('beforeend', filterOptionHTML);
   });
 }
 
@@ -577,15 +587,23 @@ async function renderTransactionsTab() {
 // Render Recurring Rules Tab
 async function renderRecurringTab() {
   const container = document.getElementById('recurring-rules-container');
+  const listContainer = document.getElementById('recurring-list-container');
+  const listBody = document.getElementById('recurring-list-body');
+  const emptyState = document.getElementById('rec-empty-state');
+  
   container.innerHTML = '';
+  if (listBody) listBody.innerHTML = '';
 
   try {
     const res = await fetch('/api/recurring');
     recurringRules = await res.json();
 
     if (recurringRules.length === 0) {
+      container.classList.remove('hidden');
+      listContainer.classList.add('hidden');
+      emptyState.classList.add('hidden');
       container.innerHTML = `
-        <div class="grid-item col-3 glass text-center" style="padding: 40px; display: flex; flex-direction: column; align-items: center; gap: 12px;">
+        <div class="grid-item col-3 glass text-center" style="padding: 40px; display: flex; flex-direction: column; align-items: center; gap: 12px; grid-column: 1/-1;">
           <i data-lucide="calendar-range" style="width: 48px; height: 48px; color: var(--text-muted)"></i>
           <h3>No has registrado gastos ni ingresos fijos</h3>
           <p class="text-muted" style="max-width: 400px; margin: 0 auto 12px;">Introduce tus recibos de agua, luz, hipoteca, seguros anuales, préstamos y nóminas periódicas para proyectar tu flujo de caja.</p>
@@ -596,59 +614,141 @@ async function renderRecurringTab() {
       return;
     }
 
-    recurringRules.forEach(rule => {
-      const freqMap = {
-        weekly: 'Semanal',
-        monthly: 'Mensual',
-        bimonthly: 'Bimestral',
-        quarterly: 'Trimestral',
-        semiannually: 'Semestral',
-        annually: 'Anual'
-      };
+    // Apply filters in memory
+    let filteredRules = recurringRules.filter(rule => {
+      const matchesSearch = rule.description.toLowerCase().includes(recSearch.toLowerCase()) || 
+                            (rule.notes && rule.notes.toLowerCase().includes(recSearch.toLowerCase()));
+      const matchesType = recFilterType === '' || rule.type === recFilterType;
+      const matchesCategory = recFilterCategory === '' || String(rule.category_id) === recFilterCategory;
+      return matchesSearch && matchesType && matchesCategory;
+    });
 
-      const dateDetail = rule.frequency === 'annually' && rule.specific_date
-        ? `el día ${rule.specific_date.split('-')[1]} de ${new Date(2026, parseInt(rule.specific_date.split('-')[0]) - 1, 1).toLocaleString('es-ES', { month: 'long' })}`
-        : `el día ${rule.day_of_month || rule.start_date.split('-')[2]}`;
+    // Apply sorting in memory
+    filteredRules.sort((a, b) => {
+      if (recSort === 'amount-desc') {
+        return b.amount - a.amount;
+      } else if (recSort === 'amount-asc') {
+        return a.amount - b.amount;
+      } else if (recSort === 'name') {
+        return a.description.localeCompare(b.description);
+      } else {
+        // default: 'day' sorting
+        const dayA = a.day_of_month || parseInt(a.start_date.split('-')[2]) || 1;
+        const dayB = b.day_of_month || parseInt(b.start_date.split('-')[2]) || 1;
+        return dayA - dayB;
+      }
+    });
 
-      const card = document.createElement('div');
-      card.className = 'recurring-rule-card glass';
-      card.innerHTML = `
-        <div>
-          <div class="recurring-card-header">
-            <div class="recurring-title-box">
-              <h4>${escapeHtml(rule.description)}</h4>
-              <span class="recurring-category" style="color: ${rule.category_color || '#9ca3af'}">
-                ● ${escapeHtml(rule.category_name || 'Fijo')}
+    if (filteredRules.length === 0) {
+      container.classList.add('hidden');
+      listContainer.classList.add('hidden');
+      emptyState.classList.remove('hidden');
+      lucide.createIcons();
+      return;
+    }
+    emptyState.classList.add('hidden');
+
+    const freqMap = {
+      weekly: 'Semanal',
+      monthly: 'Mensual',
+      bimonthly: 'Bimestral',
+      quarterly: 'Trimestral',
+      semiannually: 'Semestral',
+      annually: 'Anual'
+    };
+
+    if (recViewMode === 'grid') {
+      container.classList.remove('hidden');
+      listContainer.classList.add('hidden');
+      
+      filteredRules.forEach(rule => {
+        const dateDetail = rule.frequency === 'annually' && rule.specific_date
+          ? `el día ${rule.specific_date.split('-')[1]} de ${new Date(2026, parseInt(rule.specific_date.split('-')[0]) - 1, 1).toLocaleString('es-ES', { month: 'long' })}`
+          : `el día ${rule.day_of_month || rule.start_date.split('-')[2]}`;
+
+        const card = document.createElement('div');
+        card.className = 'recurring-rule-card glass';
+        card.innerHTML = `
+          <div>
+            <div class="recurring-card-header">
+              <div class="recurring-title-box">
+                <h4>${escapeHtml(rule.description)}</h4>
+                <span class="recurring-category" style="color: ${rule.category_color || '#9ca3af'}">
+                  ● ${escapeHtml(rule.category_name || 'Fijo')}
+                </span>
+              </div>
+              <span class="badge ${rule.type === 'income' ? 'badge-income' : 'badge-expense'}">
+                ${rule.type === 'income' ? 'Ingreso' : 'Gasto'}
               </span>
             </div>
+            <div class="recurring-amount ${rule.type}">
+              ${rule.type === 'income' ? '+' : '-'}${formatCurrency(rule.amount)}
+            </div>
+          </div>
+
+          <div class="recurring-details">
+            <span><i data-lucide="refresh-cw"></i> Frecuencia: ${freqMap[rule.frequency] || rule.frequency}</span>
+            <span><i data-lucide="calendar"></i> Cobro: ${dateDetail}</span>
+            <span><i data-lucide="calendar-days"></i> Inicio: ${formatDisplayDate(rule.start_date)}</span>
+            ${rule.end_date ? `<span><i data-lucide="calendar-off"></i> Fin: ${formatDisplayDate(rule.end_date)}</span>` : ''}
+            ${rule.notes ? `<span class="notes-txt" style="margin-top: 4px; font-style: italic;"><i data-lucide="file-text"></i> ${escapeHtml(rule.notes)}</span>` : ''}
+          </div>
+
+          <div class="recurring-card-actions">
+            <button class="btn-table-action" onclick="openEditRecurring(${rule.id})" title="Editar">
+              <i data-lucide="edit-3" style="width: 16px;"></i>
+            </button>
+            <button class="btn-table-action delete" onclick="deleteRecurringRule(${rule.id})" title="Eliminar">
+              <i data-lucide="trash-2" style="width: 16px;"></i>
+            </button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    } else {
+      // List view
+      container.classList.add('hidden');
+      listContainer.classList.remove('hidden');
+
+      filteredRules.forEach(rule => {
+        const dateDetail = rule.frequency === 'annually' && rule.specific_date
+          ? `${rule.specific_date.split('-')[1]} de ${new Date(2026, parseInt(rule.specific_date.split('-')[0]) - 1, 1).toLocaleString('es-ES', { month: 'short' })}`
+          : `Día ${rule.day_of_month || rule.start_date.split('-')[2]}`;
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><strong>${escapeHtml(rule.description)}</strong></td>
+          <td>
             <span class="badge ${rule.type === 'income' ? 'badge-income' : 'badge-expense'}">
               ${rule.type === 'income' ? 'Ingreso' : 'Gasto'}
             </span>
-          </div>
-          <div class="recurring-amount ${rule.type}">
+          </td>
+          <td>
+            <span class="category-tag">
+              <span class="category-dot" style="background-color: ${rule.category_color || '#6b7280'}"></span>
+              ${escapeHtml(rule.category_name || 'Sin Categoría')}
+            </span>
+          </td>
+          <td>${freqMap[rule.frequency] || rule.frequency}</td>
+          <td>${dateDetail}</td>
+          <td>${formatDisplayDate(rule.start_date)}</td>
+          <td class="text-right tx-amount ${rule.type}">
             ${rule.type === 'income' ? '+' : '-'}${formatCurrency(rule.amount)}
-          </div>
-        </div>
-
-        <div class="recurring-details">
-          <span><i data-lucide="refresh-cw"></i> Frecuencia: ${freqMap[rule.frequency] || rule.frequency}</span>
-          <span><i data-lucide="calendar"></i> Cobro: ${dateDetail}</span>
-          <span><i data-lucide="calendar-days"></i> Inicio: ${formatDisplayDate(rule.start_date)}</span>
-          ${rule.end_date ? `<span><i data-lucide="calendar-off"></i> Fin: ${formatDisplayDate(rule.end_date)}</span>` : ''}
-          ${rule.notes ? `<span class="notes-txt" style="margin-top: 4px; font-style: italic;"><i data-lucide="file-text"></i> ${escapeHtml(rule.notes)}</span>` : ''}
-        </div>
-
-        <div class="recurring-card-actions">
-          <button class="btn-table-action" onclick="openEditRecurring(${rule.id})" title="Editar">
-            <i data-lucide="edit-3" style="width: 16px;"></i>
-          </button>
-          <button class="btn-table-action delete" onclick="deleteRecurringRule(${rule.id})" title="Eliminar">
-            <i data-lucide="trash-2" style="width: 16px;"></i>
-          </button>
-        </div>
-      `;
-      container.appendChild(card);
-    });
+          </td>
+          <td class="text-center">
+            <div class="action-buttons">
+              <button class="btn-table-action" onclick="openEditRecurring(${rule.id})" title="Editar">
+                <i data-lucide="edit-3"></i>
+              </button>
+              <button class="btn-table-action delete" onclick="deleteRecurringRule(${rule.id})" title="Eliminar">
+                <i data-lucide="trash-2"></i>
+              </button>
+            </div>
+          </td>
+        `;
+        listBody.appendChild(row);
+      });
+    }
 
     lucide.createIcons();
 
@@ -934,6 +1034,41 @@ function setupEventListeners() {
 
   document.getElementById('btn-add-transaction').addEventListener('click', () => {
     openAddTransactionModal();
+  });
+
+  // Recurring Rules Filter & Sorting & View Toggle Event Listeners
+  document.getElementById('rec-search').addEventListener('input', debounce((e) => {
+    recSearch = e.target.value;
+    renderRecurringTab();
+  }, 300));
+  
+  document.getElementById('rec-filter-type').addEventListener('change', (e) => {
+    recFilterType = e.target.value;
+    renderRecurringTab();
+  });
+  
+  document.getElementById('rec-filter-category').addEventListener('change', (e) => {
+    recFilterCategory = e.target.value;
+    renderRecurringTab();
+  });
+  
+  document.getElementById('rec-sort').addEventListener('change', (e) => {
+    recSort = e.target.value;
+    renderRecurringTab();
+  });
+
+  document.getElementById('btn-rec-view-grid').addEventListener('click', () => {
+    recViewMode = 'grid';
+    document.getElementById('btn-rec-view-grid').classList.add('active');
+    document.getElementById('btn-rec-view-list').classList.remove('active');
+    renderRecurringTab();
+  });
+
+  document.getElementById('btn-rec-view-list').addEventListener('click', () => {
+    recViewMode = 'list';
+    document.getElementById('btn-rec-view-grid').classList.remove('active');
+    document.getElementById('btn-rec-view-list').classList.add('active');
+    renderRecurringTab();
   });
 
   // Modals close button handlers

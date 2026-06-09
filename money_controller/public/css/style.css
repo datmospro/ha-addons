@@ -926,6 +926,27 @@ body {
 }
 
 /* Recurring Rules View */
+.recurring-controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.view-toggle-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.view-toggle-buttons .btn-icon.active {
+  background: linear-gradient(135deg, var(--primary), var(--indigo)) !important;
+  color: white !important;
+  box-shadow: 0 0 12px var(--primary-glow) !important;
+}
+
 .recurring-intro-card {
   padding: 24px;
   display: flex;
