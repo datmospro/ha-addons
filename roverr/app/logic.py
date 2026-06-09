@@ -906,7 +906,11 @@ def sync_movies(torrents, api_key):
                                      if os.path.exists(dest_path):
                                          movie.status = 'moved' if history.status == 'success' else 'moved_manually'
                                      else:
-                                         movie.status = 'missing'
+                                         receptor_enabled = settings.get('receptor_enabled', False)
+                                         if not receptor_enabled or os.path.exists(local_dest):
+                                             movie.status = 'missing'
+                                         else:
+                                             movie.status = 'moved' if history.status == 'success' else 'moved_manually'
                                  else:
                                      movie.status = 'moved' if history.status == 'success' else 'moved_manually'
                              else:
@@ -1894,8 +1898,12 @@ def get_movie_details(torrent_hash, api_key):
                             logger.info(f"DEBUG PATH CHECK - ✓ Path EXISTS: '{dest_path}'")
                             pass # Status remains moved
                         else:
-                            logger.warning(f"DEBUG PATH CHECK - ✗ Path NOT FOUND: '{dest_path}' - Setting status to 'missing'")
-                            status = 'missing'
+                            receptor_enabled = settings.get('receptor_enabled', False)
+                            if not receptor_enabled or (local_dest and os.path.exists(local_dest)):
+                                logger.warning(f"DEBUG PATH CHECK - ✗ Path NOT FOUND: '{dest_path}' - Setting status to 'missing'")
+                                status = 'missing'
+                            else:
+                                logger.info(f"DEBUG PATH CHECK - ✗ Path NOT FOUND: '{dest_path}', but local base dest '{local_dest}' does not exist (unmounted) and Receptor is enabled. Keeping moved/moved_manually status.")
                     elif history.status == 'skipped': status = 'skipped'
                     elif history.status in ['error', 'receptor_offline']: status = 'error'
                 else:
@@ -2432,7 +2440,9 @@ def get_active_torrents(config_ignored=None):
                              dest_path = os.path.join(local_dest, folder_name)
                              
                              if not os.path.exists(dest_path):
-                                 status = 'missing'
+                                 receptor_enabled = settings.get('receptor_enabled', False)
+                                 if not receptor_enabled or os.path.exists(local_dest):
+                                     status = 'missing'
                          # If match fails, we assume moved (fallback)
                 elif history.status == 'skipped':
                     status = 'skipped'
