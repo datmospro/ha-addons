@@ -707,7 +707,8 @@ body {
   min-width: 200px;
 }
 
-.search-box i {
+.search-box i,
+.search-box svg {
   position: absolute;
   left: 12px;
   top: 50%;
@@ -715,6 +716,7 @@ body {
   width: 18px;
   height: 18px;
   color: var(--text-muted);
+  pointer-events: none;
 }
 
 .search-box input {

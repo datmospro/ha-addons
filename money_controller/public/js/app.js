@@ -584,6 +584,150 @@ async function renderTransactionsTab() {
   }
 }
 
+// Helper to normalize a Date object to YYYY-MM-DD local string
+function formatDate(date) {
+  if (!date) return null;
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+// Check if a recurring rule applies on a specific date (local implementation matching backend)
+function doesRuleApplyLocally(rule, dateObj) {
+  const d = new Date(dateObj);
+  d.setHours(0, 0, 0, 0);
+  
+  const start = new Date(rule.start_date + 'T00:00:00');
+  
+  if (d < start) return false;
+  if (rule.end_date && d > new Date(rule.end_date + 'T00:00:00')) return false;
+
+  const targetDay = d.getDate();
+  const targetMonth = d.getMonth() + 1;
+  const targetYear = d.getFullYear();
+
+  const startDay = start.getDate();
+  const startMonth = start.getMonth() + 1;
+  const startYear = start.getFullYear();
+
+  const monthDiff = (targetYear - startYear) * 12 + (targetMonth - startMonth);
+
+  const isLastDayOfMonth = (date) => {
+    const nextDay = new Date(date.getTime());
+    nextDay.setDate(nextDay.getDate() + 1);
+    return nextDay.getMonth() !== date.getMonth();
+  };
+
+  const matchesDayOfMonth = (targetDayNum) => {
+    if (targetDay === targetDayNum) return true;
+    if (targetDayNum > 28 && isLastDayOfMonth(d)) {
+      const daysInMonth = new Date(targetYear, targetMonth, 0).getDate();
+      if (targetDayNum >= daysInMonth) return true;
+    }
+    return false;
+  };
+
+  switch (rule.frequency) {
+    case 'weekly':
+      return d.getDay() === start.getDay();
+
+    case 'monthly':
+      return matchesDayOfMonth(rule.day_of_month || startDay);
+
+    case 'bimonthly':
+      return (monthDiff % 2 === 0) && matchesDayOfMonth(rule.day_of_month || startDay);
+
+    case 'quarterly':
+      return (monthDiff % 3 === 0) && matchesDayOfMonth(rule.day_of_month || startDay);
+
+    case 'semiannually':
+      return (monthDiff % 6 === 0) && matchesDayOfMonth(rule.day_of_month || startDay);
+
+    case 'annually':
+      if (rule.specific_date) {
+        const [specMonth, specDay] = rule.specific_date.split('-').map(Number);
+        if (targetMonth === specMonth) {
+          return matchesDayOfMonth(specDay);
+        }
+        return false;
+      }
+      return (monthDiff % 12 === 0) && matchesDayOfMonth(rule.day_of_month || startDay);
+
+    default:
+      return false;
+  }
+}
+
+// Calculate the last (before today) and next (>= today) occurrences for a recurring rule
+function getRecurringDates(rule) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const start = new Date(rule.start_date + 'T00:00:00');
+  
+  // If rule has not started yet
+  if (start > today) {
+    return {
+      last: null,
+      next: start
+    };
+  }
+
+  // If rule has an end date and the end date is before today
+  if (rule.end_date) {
+    const end = new Date(rule.end_date + 'T00:00:00');
+    if (end < today) {
+      let lastOccur = null;
+      let d = new Date(start);
+      while (d <= end) {
+        if (doesRuleApplyLocally(rule, d)) {
+          lastOccur = new Date(d);
+        }
+        d.setDate(d.getDate() + 1);
+      }
+      return {
+        last: lastOccur,
+        next: null
+      };
+    }
+  }
+
+  // Find next occurrence (>= today)
+  let nextOccur = null;
+  let d = new Date(today);
+  const maxFuture = new Date(today);
+  maxFuture.setFullYear(maxFuture.getFullYear() + 2); // Check up to 2 years in future
+  while (d <= maxFuture) {
+    if (doesRuleApplyLocally(rule, d)) {
+      if (!rule.end_date || d <= new Date(rule.end_date + 'T00:00:00')) {
+        nextOccur = new Date(d);
+        break;
+      } else {
+        break;
+      }
+    }
+    d.setDate(d.getDate() + 1);
+  }
+
+  // Find last occurrence (< today)
+  let lastOccur = null;
+  let d2 = new Date(today);
+  d2.setDate(d2.getDate() - 1); // Start yesterday
+  while (d2 >= start) {
+    if (doesRuleApplyLocally(rule, d2)) {
+      lastOccur = new Date(d2);
+      break;
+    }
+    d2.setDate(d2.getDate() - 1);
+  }
+
+  return {
+    last: lastOccur,
+    next: nextOccur
+  };
+}
+
 // Render Recurring Rules Tab
 async function renderRecurringTab() {
   const container = document.getElementById('recurring-rules-container');
@@ -596,7 +740,17 @@ async function renderRecurringTab() {
 
   try {
     const res = await fetch('/api/recurring');
-    recurringRules = await res.json();
+    const rawRules = await res.json();
+
+    // Map rules to include nextChargeDate and lastChargeDate
+    recurringRules = rawRules.map(rule => {
+      const dates = getRecurringDates(rule);
+      return {
+        ...rule,
+        nextChargeDate: dates.next,
+        lastChargeDate: dates.last
+      };
+    });
 
     if (recurringRules.length === 0) {
       container.classList.remove('hidden');
@@ -632,10 +786,10 @@ async function renderRecurringTab() {
       } else if (recSort === 'name') {
         return a.description.localeCompare(b.description);
       } else {
-        // default: 'day' sorting
-        const dayA = a.day_of_month || parseInt(a.start_date.split('-')[2]) || 1;
-        const dayB = b.day_of_month || parseInt(b.start_date.split('-')[2]) || 1;
-        return dayA - dayB;
+        // default: 'day' sorting (Ordenar por Próximo cobro)
+        if (!a.nextChargeDate) return 1;
+        if (!b.nextChargeDate) return -1;
+        return a.nextChargeDate - b.nextChargeDate;
       }
     });
 
@@ -688,7 +842,9 @@ async function renderRecurringTab() {
 
           <div class="recurring-details">
             <span><i data-lucide="refresh-cw"></i> Frecuencia: ${freqMap[rule.frequency] || rule.frequency}</span>
-            <span><i data-lucide="calendar"></i> Cobro: ${dateDetail}</span>
+            <span><i data-lucide="calendar"></i> Ajuste Cobro: ${dateDetail}</span>
+            <span><i data-lucide="calendar-check"></i> Último cobro: ${rule.lastChargeDate ? formatDisplayDate(formatDate(rule.lastChargeDate)) : 'Ninguno'}</span>
+            <span><i data-lucide="calendar-clock"></i> Próximo cobro: ${rule.nextChargeDate ? formatDisplayDate(formatDate(rule.nextChargeDate)) : 'Finalizado'}</span>
             <span><i data-lucide="calendar-days"></i> Inicio: ${formatDisplayDate(rule.start_date)}</span>
             ${rule.end_date ? `<span><i data-lucide="calendar-off"></i> Fin: ${formatDisplayDate(rule.end_date)}</span>` : ''}
             ${rule.notes ? `<span class="notes-txt" style="margin-top: 4px; font-style: italic;"><i data-lucide="file-text"></i> ${escapeHtml(rule.notes)}</span>` : ''}
@@ -731,7 +887,8 @@ async function renderRecurringTab() {
           </td>
           <td>${freqMap[rule.frequency] || rule.frequency}</td>
           <td>${dateDetail}</td>
-          <td>${formatDisplayDate(rule.start_date)}</td>
+          <td>${rule.lastChargeDate ? formatDisplayDate(formatDate(rule.lastChargeDate)) : 'N/A'}</td>
+          <td>${rule.nextChargeDate ? formatDisplayDate(formatDate(rule.nextChargeDate)) : 'Finalizado'}</td>
           <td class="text-right tx-amount ${rule.type}">
             ${rule.type === 'income' ? '+' : '-'}${formatCurrency(rule.amount)}
           </td>

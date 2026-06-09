@@ -13,7 +13,7 @@
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=1.0.3">
 </head>
 <body>
   <div class="app-container">
@@ -288,7 +288,7 @@
             </select>
 
             <select id="rec-sort" class="form-select">
-              <option value="day">Ordenar por Día de cobro</option>
+              <option value="day">Ordenar por Próximo cobro</option>
               <option value="amount-desc">Importe (mayor a menor)</option>
               <option value="amount-asc">Importe (menor a mayor)</option>
               <option value="name">Nombre (A-Z)</option>
@@ -320,7 +320,8 @@
                 <th>Categoría</th>
                 <th>Frecuencia</th>
                 <th>Cobro / Pago</th>
-                <th>Fecha Inicio</th>
+                <th>Último Cobro</th>
+                <th>Próximo Cobro</th>
                 <th class="text-right">Importe</th>
                 <th class="text-center">Acciones</th>
               </tr>
@@ -707,6 +708,6 @@
   </div>
 
   <!-- Custom script -->
-  <script src="js/app.js"></script>
+  <script src="js/app.js?v=1.0.3"></script>
 </body>
 </html>
