@@ -41,6 +41,32 @@ logging.basicConfig(
 )
 logger = logging.getLogger("Roverr")
 
+# Callback for notifying main app when movies change
+ON_MOVIES_UPDATE_CALLBACK = None
+
+def register_movies_update_callback(callback):
+    global ON_MOVIES_UPDATE_CALLBACK
+    ON_MOVIES_UPDATE_CALLBACK = callback
+    logger.info("Registered movies update callback")
+
+def trigger_movies_update_callback():
+    global ON_MOVIES_UPDATE_CALLBACK
+    if ON_MOVIES_UPDATE_CALLBACK:
+        try:
+            import asyncio
+            if asyncio.iscoroutinefunction(ON_MOVIES_UPDATE_CALLBACK):
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(ON_MOVIES_UPDATE_CALLBACK())
+                except RuntimeError:
+                    # Run it in a new thread if no event loop is running in this thread
+                    asyncio.run(ON_MOVIES_UPDATE_CALLBACK())
+            else:
+                ON_MOVIES_UPDATE_CALLBACK()
+        except Exception as e:
+            logger.error(f"Error executing movies update callback: {e}")
+
+
 # Constants
 MANUAL_SEARCH_TAG = "manual-search-autocopy"
 SETTINGS_FILE = "/data/settings.json"
@@ -61,7 +87,10 @@ DEFAULT_SETTINGS = {
     "telegram_notify_on_new_movie": True,
     "telegram_notify_on_download_complete": True,
     "telegram_notify_on_move": True,
-    "language": "es-ES"  # Default to Spanish for backwards compatibility
+    "language": "es-ES",  # Default to Spanish for backwards compatibility
+    "backdrop_blur": 35,
+    "backdrop_opacity": 18,
+    "min_year": ""
 }
 
 # Global State
@@ -70,6 +99,26 @@ STOP_FLAGS = set() # Set of hashes to stop
 RSS_LAST_FETCH = {} # {feed_url: timestamp} - Track last fetch time for each RSS feed
 RESERVED_SPACE = {} # {dest_path: reserved_bytes} - Track space reserved by active copies
 SPACE_LOCK = threading.Lock() # Thread-safe access to RESERVED_SPACE
+
+# ✅ PHASE 2: TMDB Search Cache
+_TMDB_SEARCH_CACHE = {}  # {cache_key: (timestamp, result)}
+TMDB_CACHE_TTL = 3600  # 1 hour cache TTL
+
+def get_cached_tmdb_result(title, year):
+    """Get cached TMDB search result if available and not expired."""
+    cache_key = f"{title.lower().strip()}_{year}"
+    if cache_key in _TMDB_SEARCH_CACHE:
+        timestamp, result = _TMDB_SEARCH_CACHE[cache_key]
+        if time.time() - timestamp < TMDB_CACHE_TTL:
+            logger.debug(f"🗄️ TMDB cache hit for '{title}' ({year})")
+            return result
+    return None
+
+def cache_tmdb_result(title, year, result):
+    """Cache a TMDB search result."""
+    cache_key = f"{title.lower().strip()}_{year}"
+    _TMDB_SEARCH_CACHE[cache_key] = (time.time(), result)
+    logger.debug(f"🗄️ TMDB result cached for '{title}' ({year})")
 
 def send_telegram_notification(message):
     """
@@ -413,12 +462,21 @@ def download_image(url, filename, force=False):
         # If file exists and not forcing, skip download (cache)
         if os.path.exists(save_path) and not force:
             return f"posters/{filename}"
-            
+        
+        # Log the download attempt
+        old_size = os.path.getsize(save_path) if os.path.exists(save_path) else 0
+        logger.info(f"🖼️ [DOWNLOAD] Downloading: {url}")
+        logger.info(f"🖼️ [DOWNLOAD] Saving to: {save_path} (force={force}, old_size={old_size})")
+        
         res = requests.get(url, stream=True, timeout=10)
         if res.status_code == 200:
             with open(save_path, 'wb') as f:
                 shutil.copyfileobj(res.raw, f)
+            new_size = os.path.getsize(save_path)
+            logger.info(f"🖼️ [DOWNLOAD] Success! New size: {new_size} bytes")
             return f"posters/{filename}"
+        else:
+            logger.error(f"🖼️ [DOWNLOAD] Failed! HTTP status: {res.status_code}")
     except Exception as e:
         logger.error(f"Error downloading image {url}: {e}")
     
@@ -488,7 +546,7 @@ def scrape_imdb_rating(imdb_id):
         logger.error(f"Error scraping IMDb for {imdb_id}: {e}")
     return None, None
 
-def fetch_complete_movie_metadata(title, year, api_key, images_only=False):
+def fetch_complete_movie_metadata(title, year, api_key, images_only=False, tmdb_id=None):
     """
     Fetches complete metadata for a movie from TMDB, including:
     - Basic details (title, year, runtime, overview, genres)
@@ -500,59 +558,138 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False):
     logger.info(f"🎬 [TMDB] METADATA FETCH STARTED - '{title}' ({year})")
     logger.info("=" * 80)
     try:
-        # 1. Search for movie with fallback variants
-        search_url = "https://api.themoviedb.org/3/search/movie"
-        original_lang = get_language()
-        
-        # Generate search variants (ordered from most to least specific)
-        variants = [
-            {"query": title, "year": year, "language": original_lang},  # Original with year
-            {"query": title, "language": original_lang},  # Without year
-        ]
-        
-        # Variant 3: Remove trailing numbers (e.g., "Köln 75" → "Köln")
-        import re
-        title_no_numbers = re.sub(r'\s+\d+$', '', title).strip()
-        if title_no_numbers != title:
-            variants.append({"query": title_no_numbers, "year": year, "language": original_lang})
-        
-        # Variant 4: Try in English
-        if original_lang != 'en-US':
-            variants.append({"query": title, "year": year, "language": "en-US"})
-        
-        # Variant 5: Normalize special characters (ö→o, á→a, etc.)
-        import unicodedata
-        normalized = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('utf-8')
-        if normalized != title and normalized:
-            variants.append({"query": normalized, "year": year, "language": original_lang})
-        
-        # Try each variant until we find results
         movie_id = None
-        for i, variant in enumerate(variants):
-            params = {"api_key": api_key, **variant}
-            logger.debug(f"🔧 [TMDB] Variant {i+1}/{len(variants)}: query='{variant['query']}', year={variant.get('year', 'None')}, lang={variant['language']}")
-            
-            res = requests.get(search_url, params=params, timeout=5)
-            search_data = res.json()
-            
-            if search_data.get('results'):
-                # Found results!
-                result = search_data['results'][0]
-                movie_id = result['id']
-                if i > 0:
-                    logger.info(f"✅ [TMDB] Found movie using variant #{i+1}: '{variant['query']}'")
+        matched_result = None
+        
+        # If TMDB ID is provided (e.g., from RSS), use it directly
+        if tmdb_id:
+            logger.info(f"🎯 [TMDB] Using exact TMDB ID: {tmdb_id} (from RSS)")
+            movie_id = int(tmdb_id)
+            # Fetch basic details to get the matched result
+            try:
+                details_url = f"https://api.themoviedb.org/3/movie/{movie_id}"
+                params = {"api_key": api_key, "language": get_language()}
+                res = requests.get(details_url, params=params, timeout=5)
+                if res.status_code == 200:
+                    matched_result = res.json()
+                    logger.info(f"✅ [TMDB] Exact match using ID: '{matched_result.get('title')}' ({matched_result.get('release_date', '')[:4] if matched_result.get('release_date') else 'Unknown'})")
                 else:
-                    logger.debug(f"TMDB found '{title}' ({year}) using exact search")
-                break
+                    logger.warning(f"⚠️ [TMDB] Failed to fetch movie with ID {tmdb_id}, falling back to search")
+                    movie_id = None
+            except Exception as e:
+                logger.warning(f"⚠️ [TMDB] Error fetching movie with ID {tmdb_id}: {e}, falling back to search")
+                movie_id = None
+        
+        # If no TMDB ID or direct fetch failed, search for movie
+        if not movie_id:
+            # ✅ PHASE 2: Check cache first
+            cached = get_cached_tmdb_result(title, year)
+            if cached:
+                movie_id = cached.get('id')
+                matched_result = cached
+                logger.info(f"✅ [TMDB] Using cached result: '{cached.get('title')}' ({cached.get('release_date', '')[:4] if cached.get('release_date') else 'Unknown'})")
+            else:
+                # 1. Search for movie with fallback variants
+                search_url = "https://api.themoviedb.org/3/search/movie"
+                original_lang = get_language()
+                
+                # Generate search variants (ordered from most to least specific)
+                variants = [
+                    {"query": title, "year": year, "language": original_lang},  # Original with year
+                    {"query": title, "language": original_lang},  # Without year
+                ]
+                
+                # Variant 3: Remove trailing numbers (e.g., "Köln 75" → "Köln")
+                import re
+                title_no_numbers = re.sub(r'\s+\d+$', '', title).strip()
+                if title_no_numbers != title:
+                    variants.append({"query": title_no_numbers, "year": year, "language": original_lang})
+                
+                # Variant 4: Try in English
+                if original_lang != 'en-US':
+                    variants.append({"query": title, "year": year, "language": "en-US"})
+                
+                # Variant 5: Normalize special characters (ö→o, á→a, etc.)
+                import unicodedata
+                normalized = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore').decode('utf-8')
+                if normalized != title and normalized:
+                    variants.append({"query": normalized, "year": year, "language": original_lang})
+                
+                # ✅ PHASE 2: Single loop with integrated fallback (was two separate loops)
+                fallback_result = None  # Store first result as fallback
+                
+                for i, variant in enumerate(variants):
+                    params = {"api_key": api_key, **variant}
+                    logger.debug(f"🔧 [TMDB] Variant {i+1}/{len(variants)}: query='{variant['query']}', year={variant.get('year', 'None')}, lang={variant['language']}")
+                    
+                    res = requests.get(search_url, params=params, timeout=10)  # Increased timeout
+                    search_data = res.json()
+                    
+                    if search_data.get('results'):
+                        for result in search_data['results']:
+                            result_year = result.get('release_date', '')[:4] if result.get('release_date') else None
+                            result_title = result.get('title', 'Unknown')
+                            
+                            # Store first result as fallback (in case no year match)
+                            if not fallback_result:
+                                fallback_result = result
+                            
+                            # If year was provided, validate it matches (tolerance ±1 year)
+                            if year:
+                                if result_year:
+                                    try:
+                                        year_diff = abs(int(result_year) - int(year))
+                                        if year_diff <= 1:
+                                            movie_id = result['id']
+                                            matched_result = result
+                                            logger.info(f"✅ [TMDB] Matched '{result_title}' ({result_year}) - Year validated (diff: {year_diff})")
+                                            break
+                                    except (ValueError, TypeError):
+                                        continue
+                            else:
+                                # No year provided, take first result
+                                movie_id = result['id']
+                                matched_result = result
+                                logger.warning(f"⚠️ [TMDB] No year provided, using first result: '{result_title}' ({result_year or 'Unknown'})")
+                                break
+                        
+                        # If we found a match, stop trying variants
+                        if movie_id:
+                            if i > 0:
+                                logger.info(f"✅ [TMDB] Found movie using variant #{i+1}: '{variant['query']}'")
+                            break
+                
+                # Use fallback if no exact year match found
+                if not movie_id and fallback_result:
+                    movie_id = fallback_result['id']
+                    matched_result = fallback_result
+                    result_year = fallback_result.get('release_date', '')[:4] if fallback_result.get('release_date') else 'Unknown'
+                    result_title = fallback_result.get('title', 'Unknown')
+                    logger.warning(f"⚠️ [TMDB] No exact year match for '{title}' ({year}). Using best guess: '{result_title}' ({result_year})")
+                
+                # ✅ PHASE 2: Cache the result
+                if matched_result:
+                    cache_tmdb_result(title, year, matched_result)
+
         
         if not movie_id:
-            logger.warning(f"⚠️  [TMDB] No results found for '{title}' ({year}) - tried {len(variants)} variants")
+            logger.warning(f"⚠️  [TMDB] No results found for '{title}' ({year})")
             return None
         
-        # 2. Get full details
+        # 2. Get full details (localized for metadata)
         details_url = f"https://api.themoviedb.org/3/movie/{movie_id}"
         details_res = requests.get(details_url, params={"api_key": api_key, "language": get_language()}, timeout=5)
         details = details_res.json()
+        
+        # ✅ FIX: Fetch without language to get original poster (not localized)
+        # Sometimes TMDB returns different poster for localized vs original
+        original_res = requests.get(details_url, params={"api_key": api_key}, timeout=5)
+        if original_res.status_code == 200:
+            original_details = original_res.json()
+            if original_details.get('poster_path'):
+                details['poster_path'] = original_details['poster_path']
+            if original_details.get('backdrop_path'):
+                details['backdrop_path'] = original_details['backdrop_path']
         
         # If we only need images, return early
         if images_only:
@@ -769,13 +906,17 @@ def sync_movies(torrents, api_key):
                                      if os.path.exists(dest_path):
                                          movie.status = 'moved' if history.status == 'success' else 'moved_manually'
                                      else:
-                                         movie.status = 'missing'
+                                         receptor_enabled = settings.get('receptor_enabled', False)
+                                         if not receptor_enabled or os.path.exists(local_dest):
+                                             movie.status = 'missing'
+                                         else:
+                                             movie.status = 'moved' if history.status == 'success' else 'moved_manually'
                                  else:
                                      movie.status = 'moved' if history.status == 'success' else 'moved_manually'
                              else:
                                  movie.status = 'moved' if history.status == 'success' else 'moved_manually'
                                  
-                         elif history.status == 'error': movie.status = 'error'
+                         elif history.status in ['error', 'receptor_offline']: movie.status = 'error'
                          elif history.status == 'skipped': movie.status = 'skipped'
                     else:
                         # 3. No history and not downloading -> Pending or Error
@@ -859,6 +1000,32 @@ def sync_movies(torrents, api_key):
                         logger.info(f"DEBUG: No auto-copy match found (RSS or manual search)")
                 
                 logger.info(f"DEBUG: Auto-copy check completed for '{movie.title}'")
+                
+            # AUTO-RETRY RECEPTOR: Check if a movie was stuck because the receptor was offline
+            if old_status == 'receptor_offline' and movie.status in ['pending', 'uploading', 'completed', 'queuedUP', 'stalledUP']:
+                # The torrent is still in the correct state, we should check if the receptor is back online
+                logger.info(f"Movie '{movie.title}' is stuck waiting for Receptor. Checking Receptor status...")
+                settings = load_settings()
+                receptor_enabled = settings.get('receptor_enabled', False)
+                if receptor_enabled:
+                    host = settings.get('receptor_host')
+                    port = settings.get('receptor_port', 8095)
+                    if host:
+                        try:
+                            resp = requests.get(f"http://{host}:{port}/", timeout=3)
+                            if resp.status_code == 200:
+                                logger.info(f"Receptor appears to be back online. Retrying copy for '{movie.title}'")
+                                # Send silent notification or let the next move log it
+                                try:
+                                    # Trigger copy process
+                                    manual_move(t['hash'])
+                                except Exception as e:
+                                    logger.error(f"Failed to retry Receptor copy for '{movie.title}': {e}")
+                            else:
+                                 logger.debug(f"Receptor check returned HTTP {resp.status_code}. Still offline.")
+                        except requests.exceptions.RequestException:
+                             logger.debug("Receptor check failed. Still offline.")
+
         else:
             # Check if it's a series
             if is_series(t['name']):
@@ -980,6 +1147,9 @@ def sync_movies(torrents, api_key):
                 movie.state = 'orphaned'
                 movie.save()
 
+    trigger_movies_update_callback()
+
+
 def get_movie_data(torrents, api_key):
     """
     Returns list of movies from the Database AND list of ignored series.
@@ -1027,8 +1197,11 @@ def get_movie_data(torrents, api_key):
             "overview": m.overview,
             "torrent_hash": m.torrent_hash,
             "status": m.status,
+            "status_reason": m.status_reason if hasattr(m, 'status_reason') else None,
             "progress": m.progress,
-            "state": m.state
+            "state": m.state,
+            "size": m.size,
+            "poster_updated": int(m.metadata_updated_at.timestamp()) if m.metadata_updated_at else 0
         })
         
     # Identify ignored series from active torrents
@@ -1050,7 +1223,7 @@ def identify_movie(torrent_hash, tmdb_id, api_key):
         return False, "Movie not found in dashboard"
         
     try:
-        # Fetch complete details from TMDB
+        # Fetch complete details from TMDB (localized for metadata)
         url = f"https://api.themoviedb.org/3/movie/{tmdb_id}"
         params = {"api_key": api_key, "language": get_language()}
         res = requests.get(url, params=params, timeout=5)
@@ -1059,6 +1232,19 @@ def identify_movie(torrent_hash, tmdb_id, api_key):
             return False, "TMDB ID not found"
             
         details = res.json()
+        
+        # ✅ FIX: Also fetch without language to get original poster (not localized)
+        # Sometimes TMDB returns different poster for localized vs original
+        original_params = {"api_key": api_key}  # No language = original poster
+        original_res = requests.get(url, params=original_params, timeout=5)
+        if original_res.status_code == 200:
+            original_details = original_res.json()
+            # Use original poster/backdrop since localized versions may differ
+            if original_details.get('poster_path'):
+                details['poster_path'] = original_details['poster_path']
+            if original_details.get('backdrop_path'):
+                details['backdrop_path'] = original_details['backdrop_path']
+            logger.info(f"🖼️ [IDENTIFY] Using original poster: {details.get('poster_path')}")
         
         # Get credits (cast & crew)
         credits_url = f"https://api.themoviedb.org/3/movie/{tmdb_id}/credits"
@@ -1121,17 +1307,22 @@ def identify_movie(torrent_hash, tmdb_id, api_key):
         movie.imdb_votes = imdb_votes
         movie.country_code = country_code
         movie.metadata_updated_at = datetime.now()
+        movie.tmdb_id = tmdb_id  # ✅ FIX: Save TMDB ID
         
-        # Update Images
+        # Update Images - force re-download with new TMDB data
+        logger.info(f"🖼️ [IDENTIFY] Downloading new images for '{movie.title}' from TMDB ID {tmdb_id}")
         if details.get('poster_path'):
             poster_url = f"https://image.tmdb.org/t/p/w500{details.get('poster_path')}"
+            logger.info(f"🖼️ [IDENTIFY] Poster URL: {poster_url}")
             movie.poster_path = download_image(poster_url, f"{torrent_hash}_poster.jpg", force=True)
+            logger.info(f"🖼️ [IDENTIFY] Poster saved to: {movie.poster_path}")
             
         if details.get('backdrop_path'):
             backdrop_url = f"https://image.tmdb.org/t/p/w1280{details.get('backdrop_path')}"
             movie.backdrop_path = download_image(backdrop_url, f"{torrent_hash}_backdrop.jpg", force=True)
             
         movie.save()
+        trigger_movies_update_callback()
         return True, "Movie identified successfully"
         
     except Exception as e:
@@ -1179,12 +1370,15 @@ def delete_movie(torrent_hash, ignore_movie=True):
     if ignore_movie:
         # Mark as ignored (do NOT delete) to prevent sync_movies from re-adding it
         movie.ignored = True
+        movie.ignored_at = datetime.now()
         movie.save()
         logger.info(f"Successfully removed movie from dashboard (ignored): {movie_title}")
+        trigger_movies_update_callback()
     else:
         # Hard delete from database
         movie.delete_instance()
         logger.info(f"Successfully deleted movie from database: {movie_title}")
+        trigger_movies_update_callback()
         
     return True
 
@@ -1533,7 +1727,9 @@ def get_movie_details(torrent_hash, api_key):
                 "imdb_rating": movie.imdb_rating,
                 "imdb_votes": movie.imdb_votes,
                 "tmdb_id": movie.tmdb_id if hasattr(movie, 'tmdb_id') else None,
-                "country_code": movie.country_code if hasattr(movie, 'country_code') else None
+                "country_code": movie.country_code if hasattr(movie, 'country_code') else None,
+                "poster_updated": int(movie.metadata_updated_at.timestamp()) if movie.metadata_updated_at else 0,
+                "status_reason": movie.status_reason if hasattr(movie, 'status_reason') else None
             }
         else:
             # No cache, fetch from TMDB
@@ -1584,7 +1780,8 @@ def get_movie_details(torrent_hash, api_key):
                     "imdb_rating": metadata.get('imdb_rating'),
                     "imdb_votes": metadata.get('imdb_votes'),
                     "tmdb_id": metadata.get('tmdb_id'),
-                    "country_code": metadata.get('country_code')
+                    "country_code": metadata.get('country_code'),
+                    "poster_updated": int(datetime.now().timestamp())
                 }
                 
                 # Update database with cached metadata
@@ -1701,10 +1898,14 @@ def get_movie_details(torrent_hash, api_key):
                             logger.info(f"DEBUG PATH CHECK - ✓ Path EXISTS: '{dest_path}'")
                             pass # Status remains moved
                         else:
-                            logger.warning(f"DEBUG PATH CHECK - ✗ Path NOT FOUND: '{dest_path}' - Setting status to 'missing'")
-                            status = 'missing'
+                            receptor_enabled = settings.get('receptor_enabled', False)
+                            if not receptor_enabled or (local_dest and os.path.exists(local_dest)):
+                                logger.warning(f"DEBUG PATH CHECK - ✗ Path NOT FOUND: '{dest_path}' - Setting status to 'missing'")
+                                status = 'missing'
+                            else:
+                                logger.info(f"DEBUG PATH CHECK - ✗ Path NOT FOUND: '{dest_path}', but local base dest '{local_dest}' does not exist (unmounted) and Receptor is enabled. Keeping moved/moved_manually status.")
                     elif history.status == 'skipped': status = 'skipped'
-                    elif history.status == 'error': status = 'error'
+                    elif history.status in ['error', 'receptor_offline']: status = 'error'
                 else:
                     # 3. No history and not downloading -> Pending or Error
                     if state in ['uploading', 'pausedUP', 'queuedUP', 'stalledUP', 'completed', 'checkingUP', 'checkingDL']:
@@ -1897,6 +2098,10 @@ def save_settings(settings):
     with open(SETTINGS_FILE, 'w') as f:
         json.dump(settings, f, indent=4)
 
+# Cache for Prowlarr stats to avoid repeated API calls
+_PROWLARR_STATS_CACHE = {}  # {indexer_url: (timestamp, stats_dict)}
+PROWLARR_CACHE_TTL = 86400  # 24 hours cache TTL
+
 def get_prowlarr_stats(indexer_config):
     """
     Consulta Prowlarr para obtener trackers configurados y sus idiomas.
@@ -1920,6 +2125,14 @@ def get_prowlarr_stats(indexer_config):
                 'success': False,
                 'message': 'Missing URL or API key'
             }
+            
+        # Check cache early
+        cache_key = url
+        if cache_key in _PROWLARR_STATS_CACHE:
+            timestamp, cached_stats = _PROWLARR_STATS_CACHE[cache_key]
+            if time.time() - timestamp < PROWLARR_CACHE_TTL:
+                logger.debug(f"🗄️ Prowlarr stats cache hit for {url}")
+                return cached_stats
         
         # Detectar si la URL es de Prowlarr (formato: http://host:port/N/api)
         # Remover la parte "/api" y el número de indexer si existe
@@ -1970,12 +2183,17 @@ def get_prowlarr_stats(indexer_config):
         
         logger.info(f"Found {tracker_count} active trackers with languages: {languages}")
         
-        return {
+        result = {
             'success': True,
             'tracker_count': tracker_count,
             'languages': sorted(list(languages)),
             'trackers': tracker_details
         }
+        
+        # Save to cache
+        _PROWLARR_STATS_CACHE[cache_key] = (time.time(), result)
+        
+        return result
         
     except requests.exceptions.Timeout:
         logger.error("Timeout connecting to Prowlarr")
@@ -2010,6 +2228,26 @@ def get_movie_titles_in_languages(tmdb_id, languages, api_key):
     Returns:
         Dict con títulos por idioma: {'es-ES': 'El Concursante', 'en-US': 'The Contestant'}
     """
+    import unicodedata
+    
+    def is_latin_script(text):
+        """Check if text is primarily Latin script (for Spanish/English/French etc.)"""
+        if not text:
+            return False
+        latin_chars = 0
+        total_chars = 0
+        for char in text:
+            if char.isalpha():
+                total_chars += 1
+                # Check if character is Latin
+                try:
+                    name = unicodedata.name(char, '')
+                    if 'LATIN' in name:
+                        latin_chars += 1
+                except:
+                    pass
+        return total_chars > 0 and latin_chars / total_chars > 0.5
+    
     # Usar caché para evitar consultas repetidas
     cache_key = f"{tmdb_id}_{'-'.join(sorted(languages))}"
     if cache_key in _TITLE_CACHE:
@@ -2017,8 +2255,38 @@ def get_movie_titles_in_languages(tmdb_id, languages, api_key):
         return _TITLE_CACHE[cache_key]
     
     titles = {}
+    english_title = None
     
     try:
+        # ✅ ALWAYS fetch original title first (usually English)
+        try:
+            url = f"https://api.themoviedb.org/3/movie/{tmdb_id}"
+            params = {"api_key": api_key}  # No language = original title
+            response = requests.get(url, params=params, timeout=5)
+            
+            if response.status_code == 200:
+                data = response.json()
+                original_title = data.get('original_title')
+                if original_title:
+                    titles['original'] = original_title
+                    logger.info(f"Fetched original title: '{original_title}'")
+                # Also get English title for fallback
+                english_title = data.get('title')  # Without language param, often returns English
+        except Exception as e:
+            logger.warning(f"Could not fetch original title: {e}")
+        
+        # Fetch English title explicitly for fallback
+        if not english_title or not is_latin_script(english_title):
+            try:
+                url = f"https://api.themoviedb.org/3/movie/{tmdb_id}"
+                params = {"api_key": api_key, "language": "en-US"}
+                response = requests.get(url, params=params, timeout=5)
+                if response.status_code == 200:
+                    english_title = response.json().get('title')
+            except:
+                pass
+        
+        # Then fetch requested language translations
         for lang in languages:
             try:
                 url = f"https://api.themoviedb.org/3/movie/{tmdb_id}"
@@ -2028,9 +2296,21 @@ def get_movie_titles_in_languages(tmdb_id, languages, api_key):
                 if response.status_code == 200:
                     data = response.json()
                     title = data.get('title')
+                    
+                    # ✅ FIX: Check if title is usable for Latin-based language searches
+                    # If TMDB returns non-Latin chars (Korean, Chinese, etc.) for es-ES/en-US,
+                    # use English fallback instead
                     if title:
-                        titles[lang] = title
-                        logger.info(f"Fetched title for {lang}: '{title}'")
+                        if is_latin_script(title):
+                            titles[lang] = title
+                            logger.info(f"Fetched title for {lang}: '{title}'")
+                        else:
+                            # Non-Latin title for Latin language - use English fallback
+                            if english_title and is_latin_script(english_title):
+                                titles[lang] = english_title
+                                logger.warning(f"⚠️ TMDB returned non-Latin '{title}' for {lang}, using English fallback: '{english_title}'")
+                            else:
+                                logger.warning(f"⚠️ No usable title for {lang} (got non-Latin: '{title}')")
                 else:
                     logger.warning(f"Failed to fetch title for {lang}, status: {response.status_code}")
                     
@@ -2126,12 +2406,20 @@ def get_active_torrents(config_ignored=None):
         # Get all torrents
         torrents = qb.torrents_info()
         
+        # Get global progress data
+        progress_data = get_copy_progress()
+        
         results = []
         for t in torrents:
-            # Check DB status
-            history = MoveHistory.select().where(MoveHistory.torrent_name == t.name).order_by(MoveHistory.timestamp.desc()).first()
-            
-            status = 'pending'
+            # First priority: Is it currently copying?
+            if t.hash in progress_data and progress_data[t.hash].get('status') == 'copying':
+                status = 'copying'
+                history = None # Skip history checks if it's currently actively copying
+            else:
+                # Check DB status
+                history = MoveHistory.select().where(MoveHistory.torrent_name == t.name).order_by(MoveHistory.timestamp.desc()).first()
+                status = 'pending'
+                
             if history:
                 if history.status == 'success' or history.status == 'manual':
                     # Verify existence
@@ -2152,7 +2440,9 @@ def get_active_torrents(config_ignored=None):
                              dest_path = os.path.join(local_dest, folder_name)
                              
                              if not os.path.exists(dest_path):
-                                 status = 'missing'
+                                 receptor_enabled = settings.get('receptor_enabled', False)
+                                 if not receptor_enabled or os.path.exists(local_dest):
+                                     status = 'missing'
                          # If match fails, we assume moved (fallback)
                 elif history.status == 'skipped':
                     status = 'skipped'
@@ -2259,6 +2549,11 @@ def process_single_torrent(qb, torrent, settings):
     source_path = find_file_in_path(local_source, item_name)
     
     if not source_path:
+        receptor_enabled = settings.get('receptor_enabled', False)
+        if receptor_enabled:
+            source_path = content_path
+            logger.info(f"Local file not found in {local_source}, but Receptor is enabled. Falling back to content_path: {content_path}")
+        else:
             logger.warning(f"Could not find {item_name} in {local_source}")
             MoveHistory.create(torrent_name=torrent.name, status='error', message=f"File not found in {local_source}", source_path="", dest_path="")
             return
@@ -2313,8 +2608,6 @@ def process_single_torrent(qb, torrent, settings):
     logger.info(f"Destination directory: {dest_dir}")
     
     try:
-        os.makedirs(dest_dir, exist_ok=True)
-        
         limit = settings.get('copy_speed_limit', 10)
         logger.info("=" * 80)
         logger.info(f"📁 [COPY] COPY STARTED")
@@ -2328,6 +2621,79 @@ def process_single_torrent(qb, torrent, settings):
         
         logger.info(f"Using copy speed limit: {limit} MB/s")
         
+        # === RECEPTOR LOGIC (Offloaded Copy) ===
+        receptor_enabled = settings.get('receptor_enabled', False)
+        if receptor_enabled:
+            host = settings.get('receptor_host')
+            port = settings.get('receptor_port', 8095)
+            
+            if not host:
+                logger.error("Receptor is enabled but no host is configured.")
+                MoveHistory.create(torrent_name=torrent.name, status='error', message="Receptor host missing", source_path=source_path, dest_path=dest_dir)
+                return
+                
+            logger.info(f"Receptor is ENABLED. Offloading copy to {host}:{port}")
+            try:
+                # Apply path mapping if configured
+                mapping_str = settings.get('receptor_path_mapping', '')
+                receptor_source = source_path
+                receptor_dest = dest_dir
+                
+                if mapping_str:
+                    for line in mapping_str.split('\n'):
+                        line = line.strip()
+                        if '=' in line:
+                            linux_path, win_path = line.split('=', 1)
+                            linux_path = linux_path.strip()
+                            win_path = win_path.strip()
+                            if receptor_source.startswith(linux_path):
+                                receptor_source = receptor_source.replace(linux_path, win_path, 1).replace('/', '\\')
+                            if receptor_dest.startswith(linux_path):
+                                receptor_dest = receptor_dest.replace(linux_path, win_path, 1).replace('/', '\\')
+                
+                logger.info(f"Receptor mapped path: Src: {receptor_source}")
+                logger.info(f"Receptor mapped path: Dst: {receptor_dest}")
+                
+                # 1. Inform the Receptor to start copying
+                payload = {
+                    "task_id": torrent.hash,
+                    "source": receptor_source,
+                    "destination": receptor_dest,
+                    "folder_name": folder_name
+                }
+                
+                resp = requests.post(f"http://{host}:{port}/copy", json=payload, timeout=5)
+                
+                if resp.status_code in [200, 202]:
+                    data = resp.json()
+                    if data.get("status") in ["started", "already_running", "accepted"]:
+                        logger.info(f"Receptor accepted copy task for {torrent.hash}")
+                        # Update progress tracking so UI shows "copying"
+                        COPY_PROGRESS[torrent.hash] = {
+                            'percent': 0,
+                            'speed': 0,
+                            'status': 'copying',
+                            'is_receptor': True
+                        }
+                        # Start background thread to poll Receptor status
+                        threading.Thread(target=_poll_receptor_status, args=(torrent, host, port, source_path, dest_dir, settings, title, year)).start()
+                        return
+                    else:
+                        error_msg = data.get("message", "Unknown Receptor Error")
+                        logger.error(f"Receptor returned error: {error_msg}")
+                        MoveHistory.create(torrent_name=torrent.name, status='error', message=f"Receptor: {error_msg}", source_path=source_path, dest_path=dest_dir)
+                        return
+                else:
+                    logger.error(f"Receptor HTTP error: {resp.status_code}")
+                    MoveHistory.create(torrent_name=torrent.name, status='receptor_offline', message=f"Receptor HTTP {resp.status_code}", source_path=source_path, dest_path=dest_dir)
+                    return
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Receptor is unreachable ({e}). Marking as waiting for automatic retry.")
+                MoveHistory.create(torrent_name=torrent.name, status='receptor_offline', message="Receptor unreachable, waiting...", source_path=source_path, dest_path=dest_dir)
+                return
+        
+        # === LOCAL COPY LOGIC (Fallback / Default) ===
+        os.makedirs(dest_dir, exist_ok=True)
         # If it's a file
         if os.path.isfile(source_path):
             logger.info(f"Source is a file: {source_path}")
@@ -2356,6 +2722,7 @@ def process_single_torrent(qb, torrent, settings):
                     logger.info(f"Copying {source_path} to {dest_file}")
                     copy_with_progress(source_path, dest_file, torrent.hash, limit)
                     MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_file, status='success')
+                    trigger_movies_update_callback()
                     
                     # Notify Telegram: Moved
                     if settings.get('telegram_notify_on_move', True):
@@ -2379,10 +2746,14 @@ def process_single_torrent(qb, torrent, settings):
             else:
                 logger.info(f"File already exists: {dest_file}")
                 MoveHistory.create(torrent_name=torrent.name, status='skipped', message="Destination exists", source_path=source_path, dest_path=dest_file)
+                trigger_movies_update_callback()
                 
         # If it's a directory
         elif os.path.isdir(source_path):
             logger.info(f"Source is a directory: {source_path}")
+            
+            # Ensure the base directory exists BEFORE checking disk space, as shutil.disk_usage will crash if the directory does not exist yet for directory-based torrents.
+            os.makedirs(dest_dir, exist_ok=True)
             
             # Check and reserve disk space BEFORE copying
             success, message, details = check_and_reserve_disk_space(source_path, dest_dir)
@@ -2424,6 +2795,7 @@ def process_single_torrent(qb, torrent, settings):
                             
                 if copied:
                     MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_dir, status='success')
+                    trigger_movies_update_callback()
                     
                     # Notify Telegram: Moved
                     if settings.get('telegram_notify_on_move', True):
@@ -2443,6 +2815,7 @@ def process_single_torrent(qb, torrent, settings):
                 else:
                     logger.warning(f"No video files found in {source_path}")
                     MoveHistory.create(torrent_name=torrent.name, status='skipped', message="No video file found in folder", source_path=source_path, dest_path=dest_dir)
+                    trigger_movies_update_callback()
                     
             finally:
                 # ALWAYS release reservation, even if copy fails
@@ -2450,6 +2823,7 @@ def process_single_torrent(qb, torrent, settings):
         else:
              logger.error(f"Source path is valid but neither file nor dir? {source_path}")
              MoveHistory.create(torrent_name=torrent.name, status='error', message="Invalid source type", source_path=source_path, dest_path="")
+             trigger_movies_update_callback()
 
     except InterruptedError:
         logger.info(f"Copy cancelled for {torrent.name}")
@@ -2457,6 +2831,116 @@ def process_single_torrent(qb, torrent, settings):
     except Exception as e:
         logger.error(f"Error moving {torrent.name}: {e}")
         MoveHistory.create(torrent_name=torrent.name, status='error', message=str(e), source_path="", dest_path="")
+        trigger_movies_update_callback()
+
+def _poll_receptor_status(torrent, host, port, source_path, dest_dir, settings, title, year):
+    """
+    Background thread to poll the receptor for copy progress and handle completion.
+    """
+    global COPY_PROGRESS, STOP_FLAGS
+    
+    url = f"http://{host}:{port}/status/{torrent.hash}"
+    stop_url = f"http://{host}:{port}/stop/{torrent.hash}"
+    
+    logger.info(f"Started polling Receptor for {torrent.hash}")
+    
+    while True:
+        try:
+            # Check for stop signal from Roverr UI
+            if torrent.hash in STOP_FLAGS:
+                logger.info(f"Sending stop signal to Receptor for {torrent.hash}")
+                requests.post(stop_url, timeout=5)
+                STOP_FLAGS.remove(torrent.hash)
+                if torrent.hash in COPY_PROGRESS:
+                    del COPY_PROGRESS[torrent.hash]
+                break
+                
+            resp = requests.get(url, timeout=3)
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                status = data.get("status")
+                
+                if status == "copying":
+                    COPY_PROGRESS[torrent.hash] = {
+                        'percent': data.get("percent", 0),
+                        'speed': data.get("speed", 0),
+                        'status': 'copying',
+                        'is_receptor': True
+                    }
+                elif status == "done":
+                    # Receptor finished copying
+                    logger.info(f"Receptor finished copying {torrent.hash}")
+                    COPY_PROGRESS[torrent.hash] = {
+                        'percent': 100,
+                        'speed': 0,
+                        'status': 'done',
+                        'is_receptor': True
+                    }
+                    MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_dir, status='success')
+                    trigger_movies_update_callback()
+                    
+                    # Notify Telegram
+                    if settings.get('telegram_notify_on_move', True):
+                        send_telegram_notification(f"🚀 <b>Movie Moved via Receptor</b>\n\n🎬 {title} ({year})\n📂 {dest_dir}")
+                        
+                    # Clear Watchlist
+                    try:
+                        movie = Movie.get_or_none(Movie.torrent_hash == torrent.hash)
+                        if movie and movie.watchlist:
+                            movie.watchlist = False
+                            movie.watchlist_expiry = None
+                            movie.save()
+                    except Exception as wl_err:
+                        logger.error(f"Error clearing watchlist for {title}: {wl_err}")
+                        
+                    time.sleep(2)
+                    if torrent.hash in COPY_PROGRESS:
+                        del COPY_PROGRESS[torrent.hash]
+                    break
+                    
+                elif status == "error":
+                    # Receptor encountered an error
+                    error_msg = data.get("error", "Unknown receptor error")
+                    logger.error(f"Receptor copy error for {torrent.hash}: {error_msg}")
+                    MoveHistory.create(torrent_name=torrent.name, status='error', message=f"Receptor Error: {error_msg}", source_path=source_path, dest_path=dest_dir)
+                    trigger_movies_update_callback()
+                    if torrent.hash in COPY_PROGRESS:
+                        del COPY_PROGRESS[torrent.hash]
+                    break
+                    
+                elif status == "not_found":
+                     # Task was likely cancelled or cleaned up
+                     logger.warning(f"Receptor task not found (cancelled?) for {torrent.hash}")
+                     if torrent.hash in COPY_PROGRESS:
+                         del COPY_PROGRESS[torrent.hash]
+                     break
+                
+            else:
+                 logger.warning(f"Receptor status returned {resp.status_code} for {torrent.hash}")
+                 
+        except Exception as e:
+            logger.error(f"Error polling receptor for {torrent.hash}: {e}")
+            
+        time.sleep(1) # Poll every 1 second
+
+def test_receptor_connection(host, port):
+    """
+    Tests connection to the Remote Copy Receptor.
+    """
+    try:
+        url = f"http://{host}:{port}/"
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("service") == "Roverr Receptor":
+                return True, "Successfully connected to Roverr Receptor."
+            else:
+                return False, "Connected to port, but the service is not Roverr Receptor."
+        return False, f"Receptor returned HTTP {resp.status_code}"
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Receptor connection test failed: {e}")
+        return False, f"Failed to connect to {host}:{port}. Is the script running?"
 
 def test_indexer_connection(url, api_key):
     """
@@ -2562,7 +3046,7 @@ def is_word_match(search_term, result_title):
     return bool(re.search(pattern, result_title, re.IGNORECASE))
 
 
-def filter_search_results(results, search_query, min_similarity=0.4):
+def filter_search_results(results, search_query, min_similarity=0.4, year=None):
     """
     Filtra resultados de búsqueda para eliminar coincidencias falsas.
     
@@ -2573,6 +3057,7 @@ def filter_search_results(results, search_query, min_similarity=0.4):
         results: Lista de resultados de search_indexers
         search_query: Query original de búsqueda (puede contener múltiples títulos separados por |)
         min_similarity: Umbral mínimo de similitud (0.0 a 1.0)
+        year: Año de la película para aplicar boost de similitud
     
     Returns:
         Lista filtrada de resultados con campo '_similarity' añadido
@@ -2612,9 +3097,28 @@ def filter_search_results(results, search_query, min_similarity=0.4):
         is_strict_match = False
         
         for base_query in base_queries:
+            # ✅ IMPROVED: If the result title contains the exact query as a word, calculate similarity
+            query_no_year = re.sub(r'\b\d{4}\b', '', base_query).strip()
+            if query_no_year and is_word_match(query_no_year, result_title):
+                # Exact word match found - calculate actual similarity
+                similarity = calculate_title_similarity(base_query, result_title)
+                
+                # ✅ SIMPLIFIED: Extract year from base_query and check if result contains it
+                year_match = re.search(r'\b(\d{4})\b', base_query)
+                if year_match:
+                    query_year = year_match.group(1)
+                    if query_year in result_title:
+                        similarity += 0.2
+                        logger.info(f"🎯 Year boost: '{result_title[:60]}' contains year {query_year}, similarity: {similarity:.3f}")
+                
+                if similarity > best_similarity:
+                    best_similarity = similarity
+                    matched_query = base_query
+                    is_strict_match = True
+                continue
+            
             # For very short titles, verify complete word match
             # But use queries_for_length_check to determine if it's "short"
-            query_no_year = re.sub(r'\b\d{4}\b', '', base_query).strip()
             is_short_query = len(query_no_year) <= 4 if query_no_year else len(base_query) <= 4
             
             if is_short_query:
@@ -2623,12 +3127,26 @@ def filter_search_results(results, search_query, min_similarity=0.4):
                     is_strict_match = True
                     # Calculate similarity with the full query (including year)
                     similarity = calculate_title_similarity(base_query, result_title)
+                    
+                    # ✅ SIMPLIFIED: Extract year from base_query
+                    year_match = re.search(r'\b(\d{4})\b', base_query)
+                    if year_match and year_match.group(1) in result_title:
+                        similarity += 0.2
+                        logger.info(f"🎯 Year boost (short): '{result_title[:60]}' contains year {year_match.group(1)}, similarity: {similarity:.3f}")
+                    
                     if similarity > best_similarity:
                         best_similarity = similarity
                         matched_query = base_query
             else:
                 # For normal titles, use fuzzy matching
                 similarity = calculate_title_similarity(base_query, result_title)
+                
+                # ✅ SIMPLIFIED: Extract year from base_query
+                year_match = re.search(r'\b(\d{4})\b', base_query)
+                if year_match and year_match.group(1) in result_title:
+                    similarity += 0.2
+                    logger.info(f"🎯 Year boost (normal): '{result_title[:60]}' contains year {year_match.group(1)}, similarity: {similarity:.3f}")
+                
                 if similarity > best_similarity:
                     best_similarity = similarity
                     matched_query = base_query
@@ -2652,13 +3170,37 @@ def filter_search_results(results, search_query, min_similarity=0.4):
         for query in queries_for_length_check:
             if result_title.lower().startswith(query.lower()):
                 accept = True
+                # ✅ FIXED: Don't overwrite year-boosted similarity, use max
                 best_similarity = max(best_similarity, 0.8)
                 break
         
+        
         if accept:
+            # ✅ FINAL YEAR BOOST/PENALTY: Apply based on year match
+            # Extract years from search_query (the multi-language query with years)
+            query_years = set(re.findall(r'\b(19|20)\d{2}\b', search_query))
+            result_years = set(re.findall(r'\b(19|20)\d{2}\b', result_title))
+            
+            if query_years:
+                if query_years & result_years:
+                    # Year match - apply boost if not already at 1.0
+                    matching_year = list(query_years & result_years)[0]
+                    if best_similarity < 1.0 and abs(best_similarity - 0.8) < 0.01:
+                        best_similarity += 0.2
+                        logger.info(f"🎯 Final year boost: '{result_title[:60]}' contains year {matching_year}, similarity: {best_similarity:.3f}")
+                elif result_years:
+                    # Result has a DIFFERENT year - apply penalty
+                    wrong_year = list(result_years)[0]
+                    query_year = list(query_years)[0]
+                    best_similarity -= 0.15
+                    logger.info(f"📉 Year penalty: '{result_title[:60]}' has year {wrong_year} (expected {query_year}), similarity: {best_similarity:.3f}")
+            
             result['_similarity'] = best_similarity
             result['_matched_query'] = matched_query
             filtered.append(result)
+            
+            # NOTE: Early exit removed - it was causing size filtering issues
+            # by stopping before processing smaller valid torrents
         else:
             rejected_count += 1
             logger.debug(f"Filter: REJECTED '{result_title}' (similarity: {best_similarity:.2f}, matched: {matched_query})")
@@ -2681,6 +3223,13 @@ def search_indexers(query, settings, tmdb_id=None):
     logger.info("=" * 80)
     logger.info(f"🔍 [SEARCH] INDEXER SEARCH STARTED - Query: '{query}'")
     logger.info("=" * 80)
+    
+    # Extract year from original query BEFORE multi-language conversion
+    original_year = None
+    year_match = re.search(r'\b(\d{4})\b', query)
+    if year_match:
+        original_year = year_match.group(1)
+        logger.debug(f"Extracted year {original_year} from original query")
     
     indexers = settings.get('indexers', [])
     if not indexers:
@@ -2719,6 +3268,22 @@ def search_indexers(query, settings, tmdb_id=None):
                     
                     # 3. Build query string with all language variants
                     unique_titles = list(set(titles_by_lang.values()))
+                    
+                    # ✅ FIX: Also include original query title as fallback
+                    # This ensures we search with user's title even if TMDB returns different
+                    original_title_clean = original_query.split('|')[0].strip()
+                    # Remove year if present
+                    import re
+                    original_title_clean = re.sub(r'\s+\d{4}$', '', original_title_clean).strip()
+                    if original_title_clean and original_title_clean not in unique_titles:
+                        unique_titles.insert(0, original_title_clean)  # Put user's query first
+                        logger.info(f"📌 Added user query title as priority: '{original_title_clean}'")
+                    
+                    # ✅ FIXED: Append year to EACH title, not just at the end
+                    if original_year:
+                        unique_titles = [f"{title} {original_year}" for title in unique_titles]
+                        logger.debug(f"Added year to each title: {unique_titles}")
+                    
                     query = " | ".join(unique_titles)
                     logger.info(f"🔍 Multi-language search query: {query}")
                 else:
@@ -2802,6 +3367,12 @@ def search_indexers(query, settings, tmdb_id=None):
             if ultra_short and ultra_short not in query_variants:
                 query_variants.append(ultra_short)
 
+    # ✅ PHASE 2: Limit search variants to reduce API calls
+    # Keep only the most useful variants (original + no year + 2 best alternates)
+    MAX_VARIANTS = 4
+    if len(query_variants) > MAX_VARIANTS:
+        logger.debug(f"🔄 Reducing {len(query_variants)} variants to {MAX_VARIANTS} to save API calls")
+        query_variants = query_variants[:MAX_VARIANTS]
     
     logger.info(f"Searching with {len(query_variants)} variants: {query_variants}")
     
@@ -2863,10 +3434,19 @@ def search_indexers(query, settings, tmdb_id=None):
                             # Extract year from title if possible
                             year = None
                             
-                            # Try to extract year from title (common formats: "Movie (2024)" or "Movie 2024")
-                            year_match = re.search(r'\((\d{4})\)|\s(\d{4})(?:\s|$)', title_text)
-                            if year_match:
-                                year = year_match.group(1) or year_match.group(2)
+                            # ✅ IMPROVED: Multiple patterns for year extraction
+                            # Handles: (2023), [2023], .2023., space before + space/dot/end after
+                            year_patterns = [
+                                r'\((\d{4})\)',           # (2023)
+                                r'\[(\d{4})\]',           # [2023]
+                                r'\.(\d{4})\.',           # .2023.
+                                r'\s(\d{4})(?:[\s\.]|$)', # space before, space/dot/end after
+                            ]
+                            for pattern in year_patterns:
+                                match = re.search(pattern, title_text)
+                                if match:
+                                    year = match.group(1)
+                                    break
                             
                             result = {
                                 'title': title_text,
@@ -2972,9 +3552,18 @@ def search_indexers(query, settings, tmdb_id=None):
                                             continue
                                         
                                         year = None
-                                        year_match = re.search(r'\((\d{4})\)|\s(\d{4})(?:\s|$)', title_text)
-                                        if year_match:
-                                            year = year_match.group(1) or year_match.group(2)
+                                        # ✅ IMPROVED: Multiple patterns for year extraction
+                                        year_patterns = [
+                                            r'\((\d{4})\)',           # (2023)
+                                            r'\[(\d{4})\]',           # [2023]
+                                            r'\.(\d{4})\.',           # .2023.
+                                            r'\s(\d{4})(?:[\s\.]|$)', # space before, space/dot/end after
+                                        ]
+                                        for pattern in year_patterns:
+                                            match = re.search(pattern, title_text)
+                                            if match:
+                                                year = match.group(1)
+                                                break
                                         
                                         result = {
                                             'title': title_text,
@@ -3015,9 +3604,16 @@ def search_indexers(query, settings, tmdb_id=None):
     
     logger.info(f"Total raw search results before filtering: {len(all_results)}")
     
+    # Extract year from query for similarity boost
+    year_for_boost = None
+    year_match = re.search(r'\b(\d{4})\b', query)
+    if year_match:
+        year_for_boost = year_match.group(1)
+        logger.debug(f"Extracted year {year_for_boost} from query for similarity boost")
+    
     # FILTER RESULTS TO REMOVE FALSE POSITIVES
     # This is critical for short titles like "Eli" which match "película", "rebelión", etc.
-    all_results = filter_search_results(all_results, query, min_similarity=0.4)
+    all_results = filter_search_results(all_results, query, min_similarity=0.4, year=year_for_boost)
     
     logger.info(f"Total filtered search results: {len(all_results)}")
     return all_results
@@ -3090,20 +3686,45 @@ def select_best_torrent(results, preferred_size_mb, max_size_mb):
     if not valid_results:
         return None
         
-    # 2. Sort by Preferred Size
-    if preferred_size_mb > 0:
-        # Sort by absolute difference from preferred size
-        valid_results.sort(key=lambda x: abs(x['size_mb'] - preferred_size_mb))
+    # 2. Sort by Similarity (if available) then by Preferred Size
+    # ✅ NEW: Prioritize similarity score from filter_false_positives
+    has_similarity = any('_similarity' in r for r in valid_results)
+    
+    logger.debug(f"🔍 select_best_torrent: has_similarity={has_similarity}, total_results={len(valid_results)}")
+    
+    if has_similarity:
+        # Log top 5 results with similarity scores before sorting
+        logger.info("📊 Top candidates before sorting:")
+        for i, r in enumerate(valid_results[:5]):
+            logger.info(f"  {i+1}. {r.get('title', 'Unknown')[:60]} - similarity: {r.get('_similarity', 0):.3f}, size: {r.get('size_mb', 0):.0f} MB")
+        
+        # Sort by similarity (highest first), then by size preference
+        if preferred_size_mb > 0:
+            valid_results.sort(
+                key=lambda x: (
+                    -x.get('_similarity', 0),  # Negative for descending (highest similarity first)
+                    abs(x['size_mb'] - preferred_size_mb)  # Then by size preference
+                )
+            )
+        else:
+            # Just sort by similarity
+            valid_results.sort(key=lambda x: x.get('_similarity', 0), reverse=True)
+        
+        # Log selected result
+        selected = valid_results[0]
+        logger.info(f"✅ Selected (by similarity): {selected.get('title', 'Unknown')[:60]} - similarity: {selected.get('_similarity', 0):.3f}")
     else:
-        # If no preference, stick to search result order (usually relevance/seeders)
-        pass
+        # Legacy behavior: sort by size only
+        if preferred_size_mb > 0:
+            valid_results.sort(key=lambda x: abs(x['size_mb'] - preferred_size_mb))
+        logger.info(f"⚠️ No similarity scores found, selected by size: {valid_results[0].get('title', 'Unknown')[:60]}")
         
     return valid_results[0]
 
 def auto_download_movie(title, year, preferred_size_gb, max_size_gb, label=None, tmdb_id=None):
     """
     Automatically searches for and downloads a movie torrent.
-    Returns (torrent_hash, torrent_name) if successful, (None, None) otherwise.
+    Returns (torrent_hash, torrent_name, reason) - reason is None on success, error message on failure.
     """
     logger.info("=" * 80)
     logger.info(f"📥 [DOWNLOAD] AUTO-DOWNLOAD STARTED - '{title}' ({year})")
@@ -3118,14 +3739,14 @@ def auto_download_movie(title, year, preferred_size_gb, max_size_gb, label=None,
     
     if not results:
         logger.info(f"No search results found for: {query}")
-        return None, None
+        return None, None, "No torrents found"
         
     # 2. Select Best Torrent
     best_torrent = select_best_torrent(results, preferred_size_gb, max_size_gb)
     
     if not best_torrent:
         logger.info(f"No suitable torrent found for {title} within size limits (Max: {max_size_gb}MB)")
-        return None, None
+        return None, None, f"No torrent within size limits (max: {max_size_gb} MB)"
         
     logger.info(f"Selected torrent: {best_torrent['title']} ({int(best_torrent['size_mb'])} MB)")
     
@@ -3178,21 +3799,97 @@ def auto_download_movie(title, year, preferred_size_gb, max_size_gb, label=None,
             # Use matching torrent if found, otherwise use the first new torrent
             selected = matching_torrent or new_torrents[0]
             logger.info(f"Added torrent to download client: {selected['name']} (hash: {selected['hash'][:8]}...)")
-            return selected['hash'], selected['name']
+            return selected['hash'], selected['name'], None  # Success - no reason needed
         
-        # Fallback: If no new torrents detected after all retries, get the most recent torrent
-        torrents_after = qb.torrents_info()
-        if torrents_after:
-            latest = sorted(torrents_after, key=lambda x: x.get('added_on', 0), reverse=True)[0]
-            logger.warning(f"Could not detect new torrent after {max_retries} retries, using most recent: {latest['name']}")
-            return latest['hash'], latest['name']
-            
-        logger.warning(f"Torrent added but could not find hash for: {best_torrent['title']}")
-        return None, None
+        
+        # ❌ REMOVED UNSAFE FALLBACK: Do not use "most recent" torrent as it may be wrong
+        # If we can't detect the new torrent, it's better to fail than to assign wrong hash
+        logger.error(f"❌ Could not detect new torrent after {max_retries} retries for: {best_torrent['title']}")
+        logger.error(f"⚠️ This movie will NOT be added to the database to prevent data corruption")
+        logger.error(f"💡 Possible causes: Torrent client slow to respond, network issues, or torrent already exists")
+        return None, None, "Torrent client did not respond"
         
     except Exception as e:
         logger.error(f"Error adding torrent to download client: {e}")
-        return None, None
+        return None, None, f"Download client error: {str(e)}"
+
+def is_movie_ignored(title, year, tmdb_id, ignored_movies):
+    def normalize(t):
+        if not t: return ""
+        return "".join(re.sub(r'[^\w\s]', '', t.lower()).split())
+        
+    norm_title = normalize(title)
+    
+    for m in ignored_movies:
+        if tmdb_id and m.tmdb_id:
+            if int(tmdb_id) == int(m.tmdb_id):
+                return True
+                
+        norm_db_title = normalize(m.title)
+        norm_db_torrent = normalize(m.torrent_name)
+        
+        title_matches = (norm_title == norm_db_title or (norm_db_torrent and norm_title == norm_db_torrent))
+        
+        year_matches = True
+        if year and m.year:
+            year_matches = str(year) == str(m.year)
+            
+        if title_matches and year_matches:
+            return True
+            
+    return False
+
+def get_watchlist_movie(title, year, tmdb_id, watchlist_movies):
+    def normalize(t):
+        if not t: return ""
+        return "".join(re.sub(r'[^\w\s]', '', t.lower()).split())
+        
+    norm_title = normalize(title)
+    
+    for m in watchlist_movies:
+        if tmdb_id and m.tmdb_id:
+            if int(tmdb_id) == int(m.tmdb_id):
+                return m
+                
+        norm_db_title = normalize(m.title)
+        norm_db_torrent = normalize(m.torrent_name)
+        
+        title_matches = (norm_title == norm_db_title or (norm_db_torrent and norm_title == norm_db_torrent))
+        
+        year_matches = True
+        if year and m.year:
+            year_matches = str(year) == str(m.year)
+            
+        if title_matches and year_matches:
+            return m
+            
+    return None
+
+def is_duplicate_movie(title, year, tmdb_id, existing_movies):
+    def normalize(t):
+        if not t: return ""
+        return "".join(re.sub(r'[^\w\s]', '', t.lower()).split())
+        
+    norm_title = normalize(title)
+    
+    for m in existing_movies:
+        if tmdb_id and m.tmdb_id:
+            if int(tmdb_id) == int(m.tmdb_id):
+                return True
+                
+        norm_db_title = normalize(m.title)
+        norm_db_torrent = normalize(m.torrent_name)
+        
+        title_matches = (norm_title == norm_db_title or (norm_db_torrent and norm_title == norm_db_torrent))
+        
+        year_matches = True
+        if year and m.year:
+            year_matches = str(year) == str(m.year)
+            
+        if title_matches and year_matches:
+            return True
+            
+    return False
 
 def fetch_rss_movies(limit=30):
     """
@@ -3205,6 +3902,13 @@ def fetch_rss_movies(limit=30):
     settings = load_settings()
     feeds = settings.get('rss_feeds', [])
     api_key = settings.get('tmdb_api_key')
+    
+    ignored_movies = list(Movie.select().where(Movie.ignored == True))
+    watchlist_movies = list(Movie.select().where(Movie.watchlist == True))
+    existing_movies = list(Movie.select().where(
+        (Movie.ignored == False) & 
+        ((Movie.watchlist == False) | (Movie.watchlist.is_null()))
+    ))
     
     if not feeds:
         logger.warning("⚠️  [RSS] No RSS feeds configured")
@@ -3320,22 +4024,38 @@ def fetch_rss_movies(limit=30):
             if Movie.select().where(Movie.torrent_hash == pseudo_hash).exists():
                 logger.info(f"RSS movie '{title}' ({year}) already exists with exact hash {pseudo_hash[:8]}..., skipping")
                 continue
+
+            # Year filtering check (only for RSS entry)
+            feed_config = feed_map.get(entry['feed_name'])
+            min_year = feed_config.get('min_year') if feed_config else None
+            if min_year:
+                try:
+                    min_year_val = int(min_year)
+                    if year and int(year) < min_year_val:
+                        logger.info(f"Skipping RSS movie '{title}' ({year}) as it is older than minimum year filter {min_year_val}. Auto-ignoring in DB.")
+                        # Save in DB as ignored to avoid duplicate checks in future
+                        Movie.create(
+                            torrent_hash=pseudo_hash,
+                            title=title,
+                            year=year,
+                            ignored=True,
+                            ignored_at=datetime.now(),
+                            state='rss',
+                            status='new',
+                            torrent_name=entry['title'],
+                            overview=f"Auto-ignored: released before {min_year_val}"
+                        )
+                        continue
+                except ValueError:
+                    pass
             
             # First check if movie is ignored (skip completely - no RSS entry, no auto-download)
-            ignored_query = Movie.select().where(Movie.title == title, Movie.ignored == True)
-            if year:
-                ignored_query = ignored_query.where(Movie.year == year)
-            
-            if ignored_query.exists():
-                logger.info(f"Movie '{title}' ({year}) is in ignored list. Skipping RSS entry and auto-download.")
+            if is_movie_ignored(title, year, entry.get('tmdb_id'), ignored_movies):
+                logger.info(f"Movie '{title}' ({year}) is in ignored list. Skipping RSS entry.")
                 continue
             
             # CHECK IF MOVIE IS IN WATCHLIST
-            watchlist_query = Movie.select().where(Movie.title == title, Movie.watchlist == True)
-            if year:
-                watchlist_query = watchlist_query.where(Movie.year == year)
-            
-            watchlist_movie = watchlist_query.first()
+            watchlist_movie = get_watchlist_movie(title, year, entry.get('tmdb_id'), watchlist_movies)
             if watchlist_movie:
                 # Movie is in watchlist - check expiration and size
                 if watchlist_movie.watchlist_expiry and datetime.now() > watchlist_movie.watchlist_expiry:
@@ -3376,17 +4096,8 @@ def fetch_rss_movies(limit=30):
                 
             # CRITICAL FIX: Check if movie already exists in dashboard by title+year (not ignored, not watchlist)
             # This prevents duplicate entries for the same movie in different qualities/formats
-            existing_query = Movie.select().where(
-                Movie.title == title, 
-                Movie.ignored == False,
-                (Movie.watchlist == False) | (Movie.watchlist.is_null())
-            )
-            if year:
-                existing_query = existing_query.where(Movie.year == year)
-            
-            existing_movie = existing_query.first()
-            if existing_movie:
-                logger.info(f"Movie '{title}' ({year}) already exists in dashboard with hash {existing_movie.torrent_hash[:8]}... Skipping duplicate RSS entry.")
+            if is_duplicate_movie(title, year, entry.get('tmdb_id'), existing_movies):
+                logger.info(f"Movie '{title}' ({year}) already exists in dashboard. Skipping duplicate RSS entry.")
                 continue
             
             # CHECK FOR AUTO-DOWNLOAD (only for new, non-ignored movies)
@@ -3408,123 +4119,184 @@ def fetch_rss_movies(limit=30):
                     for t in existing_torrents:
                         t_title, t_year = clean_torrent_name(t['name'])
                         if t_title.lower() == title.lower() and (not year or str(t_year) == str(year)):
-                            logger.info(f"Movie '{title}' ({year}) already exists in torrent client. Adding to dashboard as RSS entry (no auto-download).")
+                            logger.info(f"Movie '{title}' ({year}) already exists in torrent client. Skipping duplicate RSS entry.")
                             torrent_exists = True
                             break
                     
-                    if not torrent_exists:
-                        # Torrent doesn't exist, proceed with auto-download
-                        logger.info(f"Auto-download enabled for {title} from feed '{entry['feed_name']}' with label '{feed_label}'")
+                    if torrent_exists:
+                        # Skip this entry entirely - no auto-download, no RSS entry
+                        continue
+                    
+                    # Torrent doesn't exist, proceed with auto-download
+                    logger.info(f"Auto-download enabled for {title} from feed '{entry['feed_name']}' with label '{feed_label}'")
+                    
+                    # Get TMDB ID from entry for intelligent multi-language search
+                    entry_tmdb_id = entry.get('tmdb_id')
+                    if entry_tmdb_id:
+                        logger.info(f"Using TMDB ID {entry_tmdb_id} for intelligent multi-language search")
+                    
+                    torrent_hash, torrent_name, download_reason = auto_download_movie(
+                        title, year, preferred_size, max_size, 
+                        label=feed_label, 
+                        tmdb_id=entry_tmdb_id
+                    )
+                    if torrent_hash:
+                        logger.info(f"Successfully auto-downloaded {title} from RSS. Adding to DB with real hash.")
                         
-                        # Get TMDB ID from entry for intelligent multi-language search
-                        entry_tmdb_id = entry.get('tmdb_id')
-                        if entry_tmdb_id:
-                            logger.info(f"Using TMDB ID {entry_tmdb_id} for intelligent multi-language search")
+                        # Fetch Metadata (same as non-auto-download path)
+                        metadata = None
+                        if api_key:
+                            metadata = fetch_complete_movie_metadata(title, year, api_key, tmdb_id=entry_tmdb_id)
                         
-                        torrent_hash, torrent_name = auto_download_movie(
-                            title, year, preferred_size, max_size, 
-                            label=feed_label, 
-                            tmdb_id=entry_tmdb_id
+                        poster_local = None
+                        backdrop_local = None
+                        
+                        if metadata:
+                            # Download Images using torrent hash (not pseudo-hash)
+                            if metadata.get('poster_path'):
+                                poster_url = f"https://image.tmdb.org/t/p/w500{metadata.get('poster_path')}"
+                                poster_local = download_image(poster_url, f"{torrent_hash}_poster.jpg")
+                                
+                            if metadata.get('backdrop_path'):
+                                backdrop_url = f"https://image.tmdb.org/t/p/w1280{metadata.get('backdrop_path')}"
+                                backdrop_local = download_image(backdrop_url, f"{torrent_hash}_backdrop.jpg")
+                        
+                        # Create DB Entry with REAL torrent hash
+                        try:
+                            Movie.create(
+                                torrent_hash=torrent_hash,
+                                title=metadata.get('title', title) if metadata else title,
+                                year=metadata.get('year', year) if metadata else year,
+                                poster_path=poster_local,
+                                backdrop_path=backdrop_local,
+                                overview=metadata.get('overview') if metadata else "Auto-downloaded from RSS",
+                                runtime=metadata.get('runtime') if metadata else 0,
+                                genres=metadata.get('genres') if metadata else None,
+                                state='downloading',  # Mark as downloading (not 'rss')
+                                progress=0.0,
+                                size=0,
+                                status='new',
+                                cast=metadata.get('cast') if metadata else None,
+                                crew=metadata.get('crew') if metadata else None,
+                                vote_average=metadata.get('vote_average') if metadata else 0,
+                                vote_count=metadata.get('vote_count') if metadata else 0,
+                                imdb_id=metadata.get('imdb_id') if metadata else None,
+                                imdb_rating=metadata.get('imdb_rating') if metadata else None,
+                                imdb_votes=metadata.get('imdb_votes') if metadata else None,
+                                tmdb_id=int(entry_tmdb_id) if entry_tmdb_id else None,  # Save TMDB ID for intelligent search
+                                country_code=metadata.get('country_code') if metadata else None,  # Save country code for flag display
+                                metadata_updated_at=datetime.now(),
+                                torrent_name=torrent_name
+                            )
+                            logger.info(f"Created DB entry for auto-downloaded movie: {title} ({year})")
+                            
+                            # Notify Telegram: New Movie Found (RSS Auto-Download)
+                            settings = load_settings()
+                            if settings.get('telegram_notify_on_new_movie', True):
+                                movie_title = metadata.get('title', title) if metadata else title
+                                movie_year = metadata.get('year', year) if metadata else year
+                                send_telegram_notification(f"🆕 <b>New Movie Found</b>\n\n🎬 {movie_title} ({movie_year})\n📥 Auto-downloaded from RSS.")
+                            
+                        except Exception as create_error:
+                            # Handle race condition: sync_movies may have already created this entry
+                            if "UNIQUE constraint failed" in str(create_error):
+                                logger.info(f"Movie '{title}' ({year}) already added to DB by sync_movies (race condition). Updating with RSS metadata.")
+                                
+                                # Update the existing entry with proper metadata
+                                try:
+                                    existing_movie = Movie.get(Movie.torrent_hash == torrent_hash)
+                                    
+                                    # Update all metadata fields
+                                    existing_movie.title = metadata.get('title', title) if metadata else title
+                                    existing_movie.year = metadata.get('year', year) if metadata else year
+                                    existing_movie.poster_path = poster_local
+                                    existing_movie.backdrop_path = backdrop_local
+                                    existing_movie.overview = metadata.get('overview') if metadata else "Auto-downloaded from RSS"
+                                    existing_movie.runtime = metadata.get('runtime') if metadata else 0
+                                    existing_movie.genres = metadata.get('genres') if metadata else None
+                                    existing_movie.cast = metadata.get('cast') if metadata else None
+                                    existing_movie.crew = metadata.get('crew') if metadata else None
+                                    existing_movie.vote_average = metadata.get('vote_average') if metadata else 0
+                                    existing_movie.vote_count = metadata.get('vote_count') if metadata else 0
+                                    existing_movie.imdb_id = metadata.get('imdb_id') if metadata else None
+                                    existing_movie.imdb_rating = metadata.get('imdb_rating') if metadata else None
+                                    existing_movie.imdb_votes = metadata.get('imdb_votes') if metadata else None
+                                    existing_movie.tmdb_id = int(entry_tmdb_id) if entry_tmdb_id else None  # Save TMDB ID
+                                    existing_movie.metadata_updated_at = datetime.now()
+                                    existing_movie.torrent_name = torrent_name
+                                    
+                                    # Override status to 'new' - this was just auto-downloaded from RSS
+                                    # Fixes race condition where sync_movies assigns incorrect 'pending' status
+                                    existing_movie.status = 'new'
+                                    
+                                    existing_movie.save()
+                                    logger.info(f"Successfully updated existing movie '{title}' ({year}) with RSS metadata")
+                                    
+                                except Exception as update_error:
+                                    logger.error(f"Failed to update existing movie '{title}' with RSS metadata: {update_error}")
+                            else:
+                                logger.error(f"Error creating DB entry for '{title}': {create_error}")
+                        
+                        added_count += 1
+                        continue  # Skip the normal RSS entry creation path
+
+                    else:
+                        # Auto-download failed - create RSS entry with reason
+                        logger.info(f"Auto-download failed for {title}: {download_reason}. Creating RSS entry.")
+                        
+                        # Fetch Metadata for the failed entry
+                        metadata = None
+                        if api_key:
+                            metadata = fetch_complete_movie_metadata(title, year, api_key, tmdb_id=entry_tmdb_id)
+                        
+                        poster_local = None
+                        backdrop_local = None
+                        
+                        if metadata:
+                            if metadata.get('poster_path'):
+                                poster_url = f"https://image.tmdb.org/t/p/w500{metadata.get('poster_path')}"
+                                poster_local = download_image(poster_url, f"{pseudo_hash}_poster.jpg")
+                            if metadata.get('backdrop_path'):
+                                backdrop_url = f"https://image.tmdb.org/t/p/w1280{metadata.get('backdrop_path')}"
+                                backdrop_local = download_image(backdrop_url, f"{pseudo_hash}_backdrop.jpg")
+                        else:
+                            poster_local = 'posters/placeholder_unidentified.png'
+                        
+                        Movie.create(
+                            torrent_hash=pseudo_hash,
+                            title=metadata.get('title', title) if metadata else title,
+                            year=metadata.get('year', year) if metadata else year,
+                            poster_path=poster_local,
+                            backdrop_path=backdrop_local,
+                            overview=metadata.get('overview') if metadata else "Imported from RSS",
+                            runtime=metadata.get('runtime') if metadata else 0,
+                            genres=metadata.get('genres') if metadata else None,
+                            state='rss',
+                            progress=0.0,
+                            size=0,
+                            status='new',
+                            status_reason=download_reason,  # Save the reason for failure
+                            cast=metadata.get('cast') if metadata else None,
+                            crew=metadata.get('crew') if metadata else None,
+                            vote_average=metadata.get('vote_average') if metadata else 0,
+                            vote_count=metadata.get('vote_count') if metadata else 0,
+                            imdb_id=metadata.get('imdb_id') if metadata else None,
+                            imdb_rating=metadata.get('imdb_rating') if metadata else None,
+                            imdb_votes=metadata.get('imdb_votes') if metadata else None,
+                            tmdb_id=int(entry_tmdb_id) if entry_tmdb_id else None,
+                            metadata_updated_at=datetime.now(),
+                            torrent_name=entry['title']
                         )
-                        if torrent_hash:
-                            logger.info(f"Successfully auto-downloaded {title} from RSS. Adding to DB with real hash.")
-                            
-                            # Fetch Metadata (same as non-auto-download path)
-                            metadata = None
-                            if api_key:
-                                metadata = fetch_complete_movie_metadata(title, year, api_key)
-                            
-                            poster_local = None
-                            backdrop_local = None
-                            
-                            if metadata:
-                                # Download Images using torrent hash (not pseudo-hash)
-                                if metadata.get('poster_path'):
-                                    poster_url = f"https://image.tmdb.org/t/p/w500{metadata.get('poster_path')}"
-                                    poster_local = download_image(poster_url, f"{torrent_hash}_poster.jpg")
-                                    
-                                if metadata.get('backdrop_path'):
-                                    backdrop_url = f"https://image.tmdb.org/t/p/w1280{metadata.get('backdrop_path')}"
-                                    backdrop_local = download_image(backdrop_url, f"{torrent_hash}_backdrop.jpg")
-                            
-                            # Create DB Entry with REAL torrent hash
-                            try:
-                                Movie.create(
-                                    torrent_hash=torrent_hash,
-                                    title=metadata.get('title', title) if metadata else title,
-                                    year=metadata.get('year', year) if metadata else year,
-                                    poster_path=poster_local,
-                                    backdrop_path=backdrop_local,
-                                    overview=metadata.get('overview') if metadata else "Auto-downloaded from RSS",
-                                    runtime=metadata.get('runtime') if metadata else 0,
-                                    genres=metadata.get('genres') if metadata else None,
-                                    state='downloading',  # Mark as downloading (not 'rss')
-                                    progress=0.0,
-                                    size=0,
-                                    status='new',
-                                    cast=metadata.get('cast') if metadata else None,
-                                    crew=metadata.get('crew') if metadata else None,
-                                    vote_average=metadata.get('vote_average') if metadata else 0,
-                                    vote_count=metadata.get('vote_count') if metadata else 0,
-                                    imdb_id=metadata.get('imdb_id') if metadata else None,
-                                    imdb_rating=metadata.get('imdb_rating') if metadata else None,
-                                    imdb_votes=metadata.get('imdb_votes') if metadata else None,
-                                    tmdb_id=int(entry_tmdb_id) if entry_tmdb_id else None,  # Save TMDB ID for intelligent search
-                                    country_code=metadata.get('country_code') if metadata else None,  # Save country code for flag display
-                                    metadata_updated_at=datetime.now(),
-                                    torrent_name=torrent_name
-                                )
-                                logger.info(f"Created DB entry for auto-downloaded movie: {title} ({year})")
-                                
-                                # Notify Telegram: New Movie Found (RSS Auto-Download)
-                                settings = load_settings()
-                                if settings.get('telegram_notify_on_new_movie', True):
-                                    movie_title = metadata.get('title', title) if metadata else title
-                                    movie_year = metadata.get('year', year) if metadata else year
-                                    send_telegram_notification(f"🆕 <b>New Movie Found</b>\n\n🎬 {movie_title} ({movie_year})\n📥 Auto-downloaded from RSS.")
-                                
-                            except Exception as create_error:
-                                # Handle race condition: sync_movies may have already created this entry
-                                if "UNIQUE constraint failed" in str(create_error):
-                                    logger.info(f"Movie '{title}' ({year}) already added to DB by sync_movies (race condition). Updating with RSS metadata.")
-                                    
-                                    # Update the existing entry with proper metadata
-                                    try:
-                                        existing_movie = Movie.get(Movie.torrent_hash == torrent_hash)
-                                        
-                                        # Update all metadata fields
-                                        existing_movie.title = metadata.get('title', title) if metadata else title
-                                        existing_movie.year = metadata.get('year', year) if metadata else year
-                                        existing_movie.poster_path = poster_local
-                                        existing_movie.backdrop_path = backdrop_local
-                                        existing_movie.overview = metadata.get('overview') if metadata else "Auto-downloaded from RSS"
-                                        existing_movie.runtime = metadata.get('runtime') if metadata else 0
-                                        existing_movie.genres = metadata.get('genres') if metadata else None
-                                        existing_movie.cast = metadata.get('cast') if metadata else None
-                                        existing_movie.crew = metadata.get('crew') if metadata else None
-                                        existing_movie.vote_average = metadata.get('vote_average') if metadata else 0
-                                        existing_movie.vote_count = metadata.get('vote_count') if metadata else 0
-                                        existing_movie.imdb_id = metadata.get('imdb_id') if metadata else None
-                                        existing_movie.imdb_rating = metadata.get('imdb_rating') if metadata else None
-                                        existing_movie.imdb_votes = metadata.get('imdb_votes') if metadata else None
-                                        existing_movie.tmdb_id = int(entry_tmdb_id) if entry_tmdb_id else None  # Save TMDB ID
-                                        existing_movie.metadata_updated_at = datetime.now()
-                                        existing_movie.torrent_name = torrent_name
-                                        
-                                        # Override status to 'new' - this was just auto-downloaded from RSS
-                                        # Fixes race condition where sync_movies assigns incorrect 'pending' status
-                                        existing_movie.status = 'new'
-                                        
-                                        existing_movie.save()
-                                        logger.info(f"Successfully updated existing movie '{title}' ({year}) with RSS metadata")
-                                        
-                                    except Exception as update_error:
-                                        logger.error(f"Failed to update existing movie '{title}' with RSS metadata: {update_error}")
-                                else:
-                                    logger.error(f"Error creating DB entry for '{title}': {create_error}")
-                            
-                            added_count += 1
-                            continue  # Skip the normal RSS entry creation path
+                        
+                        if settings.get('telegram_notify_on_new_movie', True):
+                            movie_title = metadata.get('title', title) if metadata else title
+                            movie_year = metadata.get('year', year) if metadata else year
+                            send_telegram_notification(f"🆕 <b>New Movie Found</b>\n\n🎬 {movie_title} ({movie_year})\n⚠️ {download_reason}")
+                        
+                        added_count += 1
+                        added_movies.append(entry['title'])
+                        continue
+
                 except Exception as e:
                     # Catch errors from torrent client check or auto_download_movie (NOT from Movie.create)
                     logger.error(f"Error in auto-download process: {e}")
@@ -3556,7 +4328,7 @@ def fetch_rss_movies(limit=30):
                 logger.warning(f"TMDB metadata not found for '{title}' ({year}), using placeholder")
                 poster_local = 'posters/placeholder_unidentified.png'
             
-            # Create DB Entry
+            # Create DB Entry (for feeds without auto_add)
             Movie.create(
                 torrent_hash=pseudo_hash,
                 title=metadata.get('title', title) if metadata else title,
@@ -3570,6 +4342,7 @@ def fetch_rss_movies(limit=30):
                 progress=0.0,
                 size=0,
                 status='new', # Changed from 'rss_new' to 'new' per user request
+                status_reason="Auto-download disabled for this feed",  # Reason for 'new' status
                 cast=metadata.get('cast') if metadata else None,
                 crew=metadata.get('crew') if metadata else None,
                 vote_average=metadata.get('vote_average') if metadata else 0,
@@ -3593,6 +4366,9 @@ def fetch_rss_movies(limit=30):
             
         except Exception as e:
             logger.error(f"Error adding RSS movie {entry['title']}: {e}")
+            
+    if added_count > 0:
+        trigger_movies_update_callback()
             
     return {
         "success": True, 

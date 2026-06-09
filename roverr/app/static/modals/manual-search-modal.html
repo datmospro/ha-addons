@@ -5,6 +5,13 @@
             <h3 class="modal-title">Manual Search</h3>
         </div>
         <div class="modal-body">
+            <!-- Custom search input -->
+            <div id="manual-search-custom" style="margin-bottom: 1rem;">
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="manual-search-input" class="input" placeholder="Enter custom search query..." style="flex: 1;">
+                    <button id="manual-search-submit-btn" class="btn primary"><i class="fa-solid fa-search"></i> Search</button>
+                </div>
+            </div>
             <div id="manual-search-loading" style="display: none; text-align: center; padding: 2rem;">
                 <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem;"></i>
                 <p style="margin-top: 1rem;">Searching indexers...</p>

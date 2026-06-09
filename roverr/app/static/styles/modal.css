@@ -10,8 +10,6 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(4px);
     z-index: 1000;
     display: none;
     align-items: center;
@@ -20,29 +18,45 @@
 
 .modal-backdrop.active {
     display: flex;
+    animation: backdropFadeIn var(--duration-normal) var(--ease-out) forwards;
+}
+
+@keyframes backdropFadeIn {
+    from {
+        background: rgba(0, 0, 0, 0);
+        backdrop-filter: blur(0px);
+        -webkit-backdrop-filter: blur(0px);
+    }
+    to {
+        background: rgba(9, 9, 11, 0.75);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+    }
 }
 
 /* Modal Dialog */
 .modal-dialog {
-    background: var(--card-bg);
-    border-radius: 12px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-lg);
     border: 1px solid var(--border);
     max-width: 500px;
     width: 90%;
     padding: 2rem;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-    animation: modalSlideIn 0.3s ease;
+    box-shadow: var(--shadow-xl);
 }
 
-@keyframes modalSlideIn {
+.modal-backdrop.active .modal-dialog {
+    animation: modalScaleIn var(--duration-normal) var(--ease-out) forwards;
+}
+
+@keyframes modalScaleIn {
     from {
         opacity: 0;
-        transform: translateY(-30px) scale(0.95);
+        transform: scale(0.95) translateY(12px);
     }
-
     to {
         opacity: 1;
-        transform: translateY(0) scale(1);
+        transform: scale(1) translateY(0);
     }
 }
 
@@ -55,8 +69,9 @@
 }
 
 .modal-title {
-    font-size: 1.5rem;
-    font-weight: 600;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
     color: var(--text-primary);
     margin: 0;
 }
@@ -71,34 +86,37 @@
     gap: 0.75rem;
     padding: 0.75rem;
     margin-bottom: 0.5rem;
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.03);
-    transition: background 0.2s;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border);
+    transition: all var(--duration-fast) var(--ease-out);
 }
 
 .modal-option:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--border-hover);
 }
 
 .modal-option input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     cursor: pointer;
+    accent-color: var(--accent);
 }
 
 .modal-option label {
     flex: 1;
     color: var(--text-primary);
     cursor: pointer;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     margin: 0;
 }
 
 .modal-option-description {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
+    font-size: 0.8rem;
+    color: var(--text-muted);
     margin-left: 2rem;
-    margin-top: 0.25rem;
+    margin-top: 0.15rem;
 }
 
 .modal-footer {
@@ -119,15 +137,20 @@
     background: transparent;
     border: none;
     color: var(--text-muted);
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     cursor: pointer;
-    padding: 0.5rem;
+    padding: 0.375rem;
+    border-radius: var(--radius-sm);
     line-height: 1;
-    transition: color 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--duration-fast) var(--ease-out);
 }
 
 .modal-close-btn:hover {
     color: var(--text-primary);
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
 #trailer-container iframe {
@@ -137,7 +160,7 @@
     width: 100%;
     height: 100%;
     border: none;
-    border-radius: 0 0 12px 12px;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
 /* Trailer Modal Dialog */
@@ -163,9 +186,25 @@
 
 #manual-search-modal .modal-body {
     max-height: calc(85vh - 180px);
-    /* Subtract header and footer height */
     overflow-y: auto;
     overflow-x: hidden;
+}
+
+#manual-search-modal .modal-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+#manual-search-modal .modal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#manual-search-modal .modal-body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+}
+
+#manual-search-modal .modal-body::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.16);
 }
 
 #manual-search-modal .modal-header {
@@ -174,4 +213,41 @@
 
 #manual-search-modal .modal-footer {
     flex-shrink: 0;
+}
+
+/* ========== Custom Modal Styling (Cleanups) ========== */
+#trailer-container {
+    position: relative;
+    padding-bottom: 56.25%;
+    height: 0;
+    overflow: hidden;
+}
+
+#watchlist-movies-modal .modal-dialog {
+    max-width: 800px;
+}
+
+#watchlist-movies-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+#watchlist-movies-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+#watchlist-movies-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#watchlist-movies-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+}
+
+#watchlist-movies-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.16);
 }

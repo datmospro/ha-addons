@@ -1,4 +1,4 @@
-﻿/**
+/**
  * MÃ³dulo Settings para Roverr
  * Gestiona toda la configuraciÃ³n de la aplicaciÃ³n
  * ExtraÃ­do de app.js - lÃ­neas 631-986, 1840-2009
@@ -29,6 +29,7 @@ export function initSettings() {
     document.getElementById('test-telegram-btn')?.addEventListener('click', handleTestTelegram);
     document.getElementById('reset-ignored-btn')?.addEventListener('click', handleResetIgnored);
     document.getElementById('view-ignored-btn')?.addEventListener('click', openIgnoredMoviesModal);
+    document.getElementById('test-receptor-btn')?.addEventListener('click', handleTestReceptor);
 
     // Setup ignored movies modal listeners
     document.getElementById('ignored-movies-close-btn')?.addEventListener('click', () => closeModal('ignored-movies-modal'));
@@ -131,11 +132,27 @@ function renderSettings() {
     document.getElementById('setting-local-source').value = settings.local_source_path || '';
     document.getElementById('setting-local-dest').value = settings.local_dest_path || '';
 
+    // Receptor
+    document.getElementById('setting-receptor-enabled').checked = settings.receptor_enabled || false;
+    document.getElementById('setting-receptor-host').value = settings.receptor_host || '';
+    document.getElementById('setting-receptor-port').value = settings.receptor_port || 8095;
+    document.getElementById('setting-receptor-path-mapping').value = settings.receptor_path_mapping || '';
+
     // Advanced
     document.getElementById('setting-auto-copy-manual').checked = settings.auto_copy_manual_search || false;
-    document.getElementById('setting-speed-limit').value = settings.copy_speed_limit || 10;
+
     document.getElementById('setting-tmdb-key').value = settings.tmdb_api_key || '';
     document.getElementById('setting-language').value = settings.language || 'es-ES';
+
+    // Backdrop Options
+    const blurVal = settings.backdrop_blur !== undefined ? settings.backdrop_blur : 35;
+    const opacityVal = settings.backdrop_opacity !== undefined ? settings.backdrop_opacity : 18;
+    document.getElementById('setting-backdrop-blur').value = blurVal;
+    document.getElementById('setting-backdrop-opacity').value = opacityVal;
+
+    // Apply backdrop CSS variables dynamically
+    document.documentElement.style.setProperty('--backdrop-blur', `${blurVal}px`);
+    document.documentElement.style.setProperty('--backdrop-opacity', opacityVal / 100);
 
     // Telegram
     document.getElementById('setting-telegram-token').value = settings.telegram_bot_token || '';
@@ -211,7 +228,12 @@ async function handleTestIndexer() {
     const btn = document.getElementById('test-indexer-btn');
     setButtonLoading(btn, true, 'Testing...');
 
+    const startTime = Date.now();
     const data = await testIndexer(url, key);
+    const duration = Date.now() - startTime;
+    if (duration < 500) {
+        await new Promise(resolve => setTimeout(resolve, 500 - duration));
+    }
 
     if (data.success) {
         showToast(data.message, 'success');
@@ -291,7 +313,7 @@ function renderRSSFeedsList() {
                     ${feed.enabled ? '<span style="color: var(--success); font-size: 0.75rem;"><i class="fa-solid fa-circle" style="font-size: 0.5rem;"></i> Enabled</span>' : '<span style="color: var(--text-muted); font-size: 0.75rem;"><i class="fa-regular fa-circle" style="font-size: 0.5rem;"></i> Disabled</span>'}
                 </div>
                 <span style="font-size: 0.8rem; color: var(--text-secondary); text-overflow: ellipsis; overflow: hidden;">${feed.url}</span>
-                <span style="font-size: 0.75rem; color: var(--text-muted);">Refresh: ${feed.refresh_interval}s ${feed.label ? `&bull; Label: ${feed.label}` : ''}</span>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Refresh: ${feed.refresh_interval}s ${feed.label ? `&bull; Label: ${feed.label}` : ''} ${feed.min_year ? `&bull; Min Year: ${feed.min_year}` : ''}</span>
             </div>
             <div style="display: flex; gap: 0.5rem;">
                 <button class="btn secondary sm edit-rss-btn" data-index="${index}"><i class="fa-solid fa-pencil"></i></button>
@@ -352,12 +374,53 @@ async function handleTestTelegram() {
     const btn = document.getElementById('test-telegram-btn');
     setButtonLoading(btn, true, 'Testing...');
 
+    const startTime = Date.now();
     const data = await testTelegram(token, chatId);
+    const duration = Date.now() - startTime;
+    if (duration < 500) {
+        await new Promise(resolve => setTimeout(resolve, 500 - duration));
+    }
 
     if (data.success) {
         showToast(data.message, 'success');
     } else {
         showToast(data.message, 'error');
+    }
+
+    setButtonLoading(btn, false);
+}
+
+/**
+ * Prueba la conexion del Receptor
+ */
+async function handleTestReceptor() {
+    const host = document.getElementById('setting-receptor-host').value.trim();
+    const port = parseInt(document.getElementById('setting-receptor-port').value) || 8095;
+
+    if (!host) {
+        showToast('Please enter the receptor IP or host', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('test-receptor-btn');
+    setButtonLoading(btn, true, 'Testing...');
+
+    try {
+        const { testReceptor } = await import('./api.js');
+        const startTime = Date.now();
+        const data = await testReceptor(host, port);
+        const duration = Date.now() - startTime;
+        if (duration < 500) {
+            await new Promise(resolve => setTimeout(resolve, 500 - duration));
+        }
+
+        if (data.success) {
+            showToast(data.message, 'success');
+        } else {
+            showToast(data.message, 'error');
+        }
+    } catch (e) {
+        showToast('Error testing receptor connection locally', 'error');
     }
 
     setButtonLoading(btn, false);
@@ -377,6 +440,7 @@ function addRSSFeed() {
     const urlInput = document.getElementById('rss-url');
     const preferredSizeInput = document.getElementById('rss-preferred-size');
     const maxSizeInput = document.getElementById('rss-max-size');
+    const minYearInput = document.getElementById('rss-min-year');
 
     const name = nameInput.value.trim();
     const enabled = enabledInput.checked;
@@ -387,6 +451,7 @@ function addRSSFeed() {
     const url = urlInput.value.trim();
     const preferredSize = parseInt(preferredSizeInput.value) || 0;
     const maxSize = parseInt(maxSizeInput.value) || 0;
+    const minYear = minYearInput && minYearInput.value.trim() !== '' ? (parseInt(minYearInput.value) || '') : '';
 
     if (!name || !url) {
         showToast('Please fill in Name and RSS URL', 'error');
@@ -409,7 +474,8 @@ function addRSSFeed() {
         refresh_interval: refreshInterval,
         url,
         preferred_size: preferredSize,
-        max_size: maxSize
+        max_size: maxSize,
+        min_year: minYear
     });
 
     nameInput.value = '';
@@ -421,6 +487,7 @@ function addRSSFeed() {
     urlInput.value = '';
     preferredSizeInput.value = '';
     maxSizeInput.value = '';
+    if (minYearInput) minYearInput.value = '';
 
     // Reset visibility
     toggleAutoDownloadSettings('rss-auto-add', 'rss-size-fields');
@@ -449,6 +516,19 @@ function removeRSSFeed(index) {
  * LÃ­neas 951-986 de app.js
  */
 async function handleSaveSettings() {
+    const sourcePathInput = document.getElementById('setting-local-source');
+    const destPathInput = document.getElementById('setting-local-dest');
+    
+    const sourcePath = sourcePathInput.value.trim();
+    const destPath = destPathInput.value.trim();
+    
+    if (!sourcePath || !destPath) {
+        showToast('Source Path and Destination Path are required and cannot be empty', 'error');
+        if (!sourcePath) sourcePathInput.focus();
+        else destPathInput.focus();
+        return;
+    }
+
     const settings = state.getSettings();
 
     const newSettings = {
@@ -457,12 +537,16 @@ async function handleSaveSettings() {
         qb_port: parseInt(document.getElementById('setting-qb-port').value),
         qb_user: document.getElementById('setting-qb-user').value,
         qb_pass: document.getElementById('setting-qb-pass').value,
-        local_source_path: document.getElementById('setting-local-source').value,
-        local_dest_path: document.getElementById('setting-local-dest').value,
+        local_source_path: sourcePath,
+        local_dest_path: destPath,
+        receptor_enabled: document.getElementById('setting-receptor-enabled').checked,
+        receptor_host: document.getElementById('setting-receptor-host').value,
+        receptor_port: parseInt(document.getElementById('setting-receptor-port').value) || 8095,
+        receptor_path_mapping: document.getElementById('setting-receptor-path-mapping').value,
         auto_copy_manual_search: document.getElementById('setting-auto-copy-manual').checked,
-        copy_speed_limit: parseInt(document.getElementById('setting-speed-limit').value),
-        tmdb_api_key: document.getElementById('setting-tmdb-key').value,
         language: document.getElementById('setting-language').value,
+        backdrop_blur: isNaN(parseInt(document.getElementById('setting-backdrop-blur').value)) ? 35 : parseInt(document.getElementById('setting-backdrop-blur').value),
+        backdrop_opacity: isNaN(parseInt(document.getElementById('setting-backdrop-opacity').value)) ? 18 : parseInt(document.getElementById('setting-backdrop-opacity').value),
         telegram_bot_token: document.getElementById('setting-telegram-token').value,
         telegram_chat_id: document.getElementById('setting-telegram-chat-id').value,
         telegram_notify_on_new_movie: document.getElementById('setting-notify-new').checked,
@@ -476,6 +560,9 @@ async function handleSaveSettings() {
 
     if (result.success) {
         state.setSettings(newSettings);
+        // Apply backdrop CSS variables immediately for a responsive live update
+        document.documentElement.style.setProperty('--backdrop-blur', `${newSettings.backdrop_blur}px`);
+        document.documentElement.style.setProperty('--backdrop-opacity', newSettings.backdrop_opacity / 100);
     }
 }
 
@@ -669,7 +756,12 @@ async function testEditedIndexer() {
     const btn = document.getElementById('edit-indexer-test-btn');
     setButtonLoading(btn, true, 'Testing...');
 
+    const startTime = Date.now();
     const data = await testIndexer(url, key);
+    const duration = Date.now() - startTime;
+    if (duration < 500) {
+        await new Promise(resolve => setTimeout(resolve, 500 - duration));
+    }
 
     if (data.success) {
         showToast(data.message, 'success');
@@ -696,6 +788,7 @@ function openEditRSSModal(index) {
     document.getElementById('edit-rss-url').value = feed.url || '';
     document.getElementById('edit-rss-preferred-size').value = feed.preferred_size || '';
     document.getElementById('edit-rss-max-size').value = feed.max_size || '';
+    document.getElementById('edit-rss-min-year').value = feed.min_year || '';
 
     toggleAutoDownloadSettings('edit-rss-auto-add', 'edit-rss-auto-download-settings');
 
@@ -719,6 +812,8 @@ async function saveEditedRSS() {
     const url = document.getElementById('edit-rss-url').value.trim();
     const preferredSize = parseInt(document.getElementById('edit-rss-preferred-size').value) || 0;
     const maxSize = parseInt(document.getElementById('edit-rss-max-size').value) || 0;
+    const minYearVal = document.getElementById('edit-rss-min-year').value.trim();
+    const minYear = minYearVal !== '' ? (parseInt(minYearVal) || '') : '';
 
     if (!name || !url) {
         showToast('Please fill in Name and RSS URL', 'error');
@@ -740,7 +835,8 @@ async function saveEditedRSS() {
         refresh_interval: refreshInterval,
         url,
         preferred_size: preferredSize,
-        max_size: maxSize
+        max_size: maxSize,
+        min_year: minYear
     };
 
     state.setSettings(settings);
@@ -760,7 +856,12 @@ async function testEditedRSS() {
     const btn = document.getElementById('edit-rss-test-btn');
     setButtonLoading(btn, true, 'Testing...');
 
+    const startTime = Date.now();
     const data = await testRSSFeed(url);
+    const duration = Date.now() - startTime;
+    if (duration < 500) {
+        await new Promise(resolve => setTimeout(resolve, 500 - duration));
+    }
 
     if (data.success) {
         const info = data.feed_info || {};

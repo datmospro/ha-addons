@@ -1,0 +1,38 @@
+<!-- Identify Movie Modal -->
+<div id="identify-modal" class="modal-backdrop">
+    <div class="modal-dialog" style="max-width: 700px; width: 90%;">
+        <div class="modal-header">
+            <h3 class="modal-title">Identify Movie Manually</h3>
+            <button class="modal-close-btn" id="identify-modal-close-btn" aria-label="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                Search TMDB for the correct movie details to associate with this torrent.
+            </p>
+            <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem;">
+                <input type="text" id="identify-search-input" placeholder="Enter movie title..." 
+                       style="flex: 1; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-secondary); color: var(--text); font-size: 1rem;">
+                <button id="identify-search-btn" class="btn primary" style="padding: 0.75rem 1.25rem; border-radius: 8px; font-weight: 600;">
+                    <i class="fa-solid fa-magnifying-glass"></i> Search
+                </button>
+            </div>
+            
+            <div id="identify-search-loading" style="display: none; text-align: center; padding: 2rem;">
+                <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary); margin-bottom: 0.5rem;"></i>
+                <p style="color: var(--text-muted);">Searching TMDB...</p>
+            </div>
+            
+            <div id="identify-search-results" style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 50vh; overflow-y: auto; padding-right: 0.25rem;">
+                <!-- Results populated dynamically -->
+                <p class="empty-state" style="text-align: center; color: var(--text-muted); font-style: italic; padding: 2rem 0;">
+                    Type a title and click Search to find matches.
+                </p>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="identify-modal-cancel-btn" class="btn secondary">Cancel</button>
+        </div>
+    </div>
+</div>

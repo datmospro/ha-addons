@@ -11,7 +11,7 @@ import { escapeHtml, formatBytes, formatDate, getProgressClass } from './ui.js';
  */
 function getStatusClass(status) {
     if (status === 'moved' || status === 'moved_manually') return 'moved';
-    if (status === 'error') return 'error';
+    if (status === 'error' || status === 'receptor_offline') return 'error';
     if (status === 'skipped') return 'skipped';
     if (status === 'copying') return 'copying';
     if (status === 'new') return 'new';
@@ -33,6 +33,7 @@ function getStatusIconAndLabel(status) {
         'orphaned': { icon: '<i class="fa-solid fa-link-slash"></i>', label: 'Orphaned' },
         'downloading': { icon: '<i class="fa-solid fa-download"></i>', label: 'Downloading' },
         'error': { icon: '<i class="fa-solid fa-triangle-exclamation"></i>', label: 'Error' },
+        'receptor_offline': { icon: '<i class="fa-solid fa-network-wired"></i>', label: 'Receptor Offline' },
         'skipped': { icon: '<i class="fa-solid fa-forward"></i>', label: 'Skipped' }
     };
 
