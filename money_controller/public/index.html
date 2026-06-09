@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MoneyController - Control de Gastos e Ingresos</title>
+  <!-- Google Fonts - Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">
+          <i data-lucide="trending-up"></i>
+        </div>
+        <div class="brand-name">
+          <h1>MoneyController</h1>
+          <span>Predicción Financiera</span>
+        </div>
+      </div>
+      
+      <nav class="nav-menu">
+        <button class="nav-btn active" data-tab="dashboard" id="btn-tab-dashboard">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Dashboard</span>
+        </button>
+        <button class="nav-btn" data-tab="transactions" id="btn-tab-transactions">
+          <i data-lucide="receipt"></i>
+          <span>Registro</span>
+        </button>
+        <button class="nav-btn" data-tab="recurring" id="btn-tab-recurring">
+          <i data-lucide="calendar-range"></i>
+          <span>Gastos Fijos</span>
+        </button>
+        <button class="nav-btn" data-tab="forecast" id="btn-tab-forecast">
+          <i data-lucide="line-chart"></i>
+          <span>Previsión</span>
+        </button>
+        <button class="nav-btn" data-tab="settings" id="btn-tab-settings">
+          <i data-lucide="settings"></i>
+          <span>Ajustes</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-profile">
+          <div class="avatar"><i data-lucide="user"></i></div>
+          <div class="user-info">
+            <h4>Mi Hogar</h4>
+            <p id="txt-currency-status">Euro (€)</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- Top Bar -->
+      <header class="top-bar">
+        <div class="page-title">
+          <h2 id="current-tab-title">Dashboard</h2>
+          <p id="current-tab-subtitle" class="text-muted">Vista general de tus finanzas y proyecciones de caja.</p>
+        </div>
+        
+        <div class="top-bar-actions">
+          <div class="status-indicator warning" id="forecast-status-badge">
+            <span class="dot"></span>
+            <span id="forecast-status-text">Analizando flujo de caja...</span>
+          </div>
+          <button class="btn btn-primary" id="btn-quick-add-transaction">
+            <i data-lucide="plus"></i>
+            <span>Nuevo Movimiento</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- PANELS (TAB CONTENTS) -->
+      
+      <!-- 1. DASHBOARD PANEL -->
+      <section class="tab-panel active" id="panel-dashboard">
+        
+        <!-- Summary Cards Grid -->
+        <div class="summary-cards">
+          <div class="card glass">
+            <div class="card-icon income"><i data-lucide="wallet"></i></div>
+            <div class="card-data">
+              <h3>Saldo Disponible</h3>
+              <p class="amount" id="card-balance">0.00 €</p>
+              <span class="trend neutral" id="card-balance-sub">Calculado hoy</span>
+            </div>
+          </div>
+          <div class="card glass">
+            <div class="card-icon income-alt"><i data-lucide="arrow-down-left"></i></div>
+            <div class="card-data">
+              <h3>Ingresos del Mes</h3>
+              <p class="amount green" id="card-incomes">0.00 €</p>
+              <span class="trend positive" id="card-incomes-sub">Nóminas y otros</span>
+            </div>
+          </div>
+          <div class="card glass">
+            <div class="card-icon expense"><i data-lucide="arrow-up-right"></i></div>
+            <div class="card-data">
+              <h3>Gastos del Mes</h3>
+              <p class="amount red" id="card-expenses">0.00 €</p>
+              <span class="trend negative" id="card-expenses-sub">Variables y fijos</span>
+            </div>
+          </div>
+          <div class="card glass">
+            <div class="card-icon" id="card-net-icon"><i data-lucide="piggy-bank"></i></div>
+            <div class="card-data">
+              <h3>Balance del Mes</h3>
+              <p class="amount" id="card-net">0.00 €</p>
+              <span class="trend" id="card-net-sub">Ahorro neto mensual</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dashboard Charts & Forecast Alert Grid -->
+        <div class="dashboard-grid">
+          
+          <!-- Forecast Line Chart -->
+          <div class="grid-item col-2 glass card-chart-container">
+            <div class="grid-item-header">
+              <div>
+                <h3>Previsión de Saldo Bancario (Próximos 12 Meses)</h3>
+                <p class="text-muted">Simulación día a día basada en gastos fijos, variables y nóminas.</p>
+              </div>
+              <div class="legend-badge">
+                <span class="legend-color safety-line"></span>
+                <span>Límite de Seguridad</span>
+              </div>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="chart-forecast-line"></canvas>
+            </div>
+          </div>
+
+          <!-- Forecast Alerts / Warnings List -->
+          <div class="grid-item col-1 glass">
+            <div class="grid-item-header">
+              <h3>Estado de Alertas de Caja</h3>
+              <p class="text-muted">Riesgos de saldo negativo en el año.</p>
+            </div>
+            <div class="forecast-alerts-list" id="dashboard-alerts-list">
+              <!-- Dynamically populated -->
+              <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Cargando previsión de caja...</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Expenses Doughnut Chart -->
+          <div class="grid-item col-1-5 glass card-chart-container">
+            <div class="grid-item-header">
+              <h3>Gastos por Categoría</h3>
+              <p class="text-muted">Distribución de los gastos de este mes.</p>
+            </div>
+            <div class="chart-wrapper doughnut">
+              <canvas id="chart-categories-doughnut"></canvas>
+            </div>
+          </div>
+
+          <!-- Incomes vs Expenses Monthly Bar Chart -->
+          <div class="grid-item col-1-5 glass card-chart-container">
+            <div class="grid-item-header">
+              <h3>Histórico Mensual</h3>
+              <p class="text-muted">Comparativa de ingresos y gastos.</p>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="chart-compare-bar"></canvas>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 2. TRANSACTIONS PANEL -->
+      <section class="tab-panel" id="panel-transactions">
+        <div class="glass panel-card">
+          
+          <!-- Filter Bar -->
+          <div class="filter-bar">
+            <div class="search-box">
+              <i data-lucide="search"></i>
+              <input type="text" id="tx-search" placeholder="Buscar movimiento...">
+            </div>
+            
+            <div class="filter-group">
+              <select id="tx-filter-type" class="form-select">
+                <option value="">Todos los Tipos</option>
+                <option value="income">Ingresos</option>
+                <option value="expense">Gastos</option>
+              </select>
+
+              <select id="tx-filter-category" class="form-select">
+                <option value="">Todas las Categorías</option>
+                <!-- Dynamically populated -->
+              </select>
+
+              <div class="date-range-inputs">
+                <input type="date" id="tx-filter-start" class="form-control" placeholder="Desde">
+                <span class="separator">a</span>
+                <input type="date" id="tx-filter-end" class="form-control" placeholder="Hasta">
+              </div>
+              
+              <button class="btn btn-secondary" id="btn-clear-filters" title="Limpiar filtros">
+                <i data-lucide="filter-x"></i>
+              </button>
+            </div>
+
+            <button class="btn btn-primary" id="btn-add-transaction">
+              <i data-lucide="plus"></i>
+              <span>Añadir</span>
+            </button>
+          </div>
+
+          <!-- Transactions Table -->
+          <div class="table-wrapper">
+            <table class="table" id="transactions-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Descripción</th>
+                  <th>Categoría</th>
+                  <th>Notas</th>
+                  <th class="text-right">Importe</th>
+                  <th class="text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="transactions-table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+            
+            <div class="table-empty-state hidden" id="tx-empty-state">
+              <i data-lucide="receipt-text"></i>
+              <p>No se encontraron movimientos con los filtros aplicados.</p>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 3. RECURRING PANEL (GASTOS FIJOS) -->
+      <section class="tab-panel" id="panel-recurring">
+        <div class="recurring-intro-card glass">
+          <div class="intro-icon"><i data-lucide="calendar-days"></i></div>
+          <div class="intro-content">
+            <h3>Gestión de Gastos e Ingresos Fijos (Recurrentes)</h3>
+            <p>Registra aquí tus préstamos, hipoteca, nómina, seguros, suscripciones recurrentes, etc. El motor de simulación los colocará en el calendario y proyectará tu saldo a lo largo del año para identificar si en algún momento tendrás tensiones de caja o números rojos.</p>
+          </div>
+          <button class="btn btn-primary" id="btn-add-recurring-rule">
+            <i data-lucide="plus-circle"></i>
+            <span>Nuevo Movimiento Fijo</span>
+          </button>
+        </div>
+
+        <!-- Recurring Rules Grid -->
+        <div class="recurring-grid" id="recurring-rules-container">
+          <!-- Dynamically populated -->
+        </div>
+      </section>
+
+      <!-- 4. FORECAST PANEL (PREVISIÓN) -->
+      <section class="tab-panel" id="panel-forecast">
+        <div class="forecast-layout">
+          
+          <!-- Left Column: Forecast Calendar and Alerts -->
+          <div class="forecast-main">
+            
+            <!-- Calendar Section -->
+            <div class="glass panel-card calendar-card">
+              <div class="calendar-header">
+                <div class="calendar-nav">
+                  <button class="btn-icon" id="btn-cal-prev"><i data-lucide="chevron-left"></i></button>
+                  <h3 id="calendar-month-year">Junio 2026</h3>
+                  <button class="btn-icon" id="btn-cal-next"><i data-lucide="chevron-right"></i></button>
+                </div>
+                <div class="calendar-legend">
+                  <span class="legend-item"><span class="dot green"></span> Seguro</span>
+                  <span class="legend-item"><span class="dot yellow"></span> Saldo Bajo</span>
+                  <span class="legend-item"><span class="dot red"></span> Descubierto</span>
+                </div>
+              </div>
+              
+              <div class="calendar-weekdays">
+                <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
+              </div>
+              
+              <div class="calendar-days-grid" id="calendar-days-container">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+
+            <!-- Detailed Alerts Chronology -->
+            <div class="glass panel-card">
+              <div class="panel-card-header">
+                <h3>Cronograma de Días Críticos (12 Meses)</h3>
+                <p class="text-muted">Listado cronológico de las fechas en las que se proyecta que el saldo caiga en negativo o esté por debajo del límite de seguridad.</p>
+              </div>
+              <div class="forecast-alerts-full-list" id="forecast-alerts-full-list">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Right Column: What-If Simulator & Selected Day details -->
+          <div class="forecast-side">
+            
+            <!-- Selected Day Panel -->
+            <div class="glass panel-card selected-day-card hidden" id="selected-day-details-panel">
+              <div class="panel-card-header">
+                <div class="flex-between">
+                  <h3 id="selected-day-title">Detalle del 15/06/2026</h3>
+                  <button class="btn-close" id="btn-close-day-details"><i data-lucide="x"></i></button>
+                </div>
+                <div class="day-projected-balance-container">
+                  <span>Saldo Proyectado al final del día:</span>
+                  <span class="day-projected-balance" id="selected-day-balance">0.00 €</span>
+                </div>
+              </div>
+              <div class="selected-day-events" id="selected-day-events-list">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+
+            <!-- What-if Simulator -->
+            <div class="glass panel-card what-if-card">
+              <div class="panel-card-header">
+                <div class="flex-between">
+                  <h3>Simulador "Qué pasaría si..." (What-If)</h3>
+                  <span class="badge badge-indigo">Herramienta de Previsión</span>
+                </div>
+                <p class="text-muted">Simula compras, gastos extras u otros ingresos puntuales futuros para comprobar al instante el impacto en tu flujo de caja anual sin alterar tus datos reales.</p>
+              </div>
+
+              <!-- Simulation List -->
+              <div class="simulation-list" id="simulation-scenarios-container">
+                <!-- Dynamically populated with simulated items -->
+                <p class="text-muted text-center" style="font-size: 0.9rem; padding: 10px 0;" id="empty-sim-msg">No hay simulaciones activas. Añade un evento hipotético abajo.</p>
+              </div>
+
+              <!-- Add simulation form -->
+              <form class="what-if-form" id="what-if-add-form">
+                <div class="form-group">
+                  <label for="sim-desc">Descripción de la simulación</label>
+                  <input type="text" id="sim-desc" class="form-control" placeholder="Ej: Compra de electrodoméstico o Seguro extra" required>
+                </div>
+                <div class="form-row">
+                  <div class="form-group col-6">
+                    <label for="sim-amount">Importe (€)</label>
+                    <input type="number" id="sim-amount" class="form-control" placeholder="0.00" step="0.01" min="0.01" required>
+                  </div>
+                  <div class="form-group col-6">
+                    <label for="sim-type">Tipo</label>
+                    <select id="sim-type" class="form-select">
+                      <option value="expense">Gasto extra</option>
+                      <option value="income">Ingreso extra</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="sim-date">Fecha prevista</label>
+                  <input type="date" id="sim-date" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-indigo btn-block" id="btn-add-simulation">
+                  <i data-lucide="play"></i>
+                  <span>Simular Escenario</span>
+                </button>
+              </form>
+
+              <!-- Clear all simulations -->
+              <button class="btn btn-link btn-block hidden" id="btn-clear-simulations">
+                Limpiar Simulaciones
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 5. SETTINGS PANEL (AJUSTES) -->
+      <section class="tab-panel" id="panel-settings">
+        <div class="settings-layout">
+          
+          <!-- Parameters Card -->
+          <div class="glass panel-card settings-card">
+            <div class="panel-card-header">
+              <h3>Parámetros de Configuración Financiera</h3>
+              <p class="text-muted">Ajusta los valores base sobre los que se calcula la salud financiera de tu cuenta.</p>
+            </div>
+            
+            <form id="settings-form" class="settings-form-body">
+              <div class="form-group">
+                <label for="set-initial-balance">
+                  <span>Saldo Actual en Cuenta Bancaria</span>
+                  <small class="form-help">Tu saldo hoy en el banco. La previsión futura comenzará a partir de aquí y se irá actualizando con tus transacciones.</small>
+                </label>
+                <div class="input-group">
+                  <input type="number" id="set-initial-balance" class="form-control" placeholder="0.00" step="0.01" required>
+                  <span class="input-group-addon currency-symbol">€</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="set-safety-threshold">
+                  <span>Umbral de Seguridad de Saldo</span>
+                  <small class="form-help">Si tu saldo baja de esta cantidad en algún momento del año, se generará una alerta de aviso (Color Amarillo).</small>
+                </label>
+                <div class="input-group">
+                  <input type="number" id="set-safety-threshold" class="form-control" placeholder="100.00" step="0.01" required>
+                  <span class="input-group-addon currency-symbol">€</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="set-variable-budget">
+                  <span>Gasto Variable Mensual Estimado</span>
+                  <small class="form-help">El presupuesto aproximado que gastas al mes en alimentación, gasolina, ocio y cosas del día a día. Se dividirá entre 30 y se aplicará como gasto diario para darte una predicción hiperrealista en los días vacíos entre facturas.</small>
+                </label>
+                <div class="input-group">
+                  <input type="number" id="set-variable-budget" class="form-control" placeholder="300.00" step="0.01" required>
+                  <span class="input-group-addon currency-symbol">€</span>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group col-6">
+                  <label for="set-currency">Divisa</label>
+                  <select id="set-currency" class="form-select">
+                    <option value="EUR">Euro (€)</option>
+                    <option value="USD">Dólar ($)</option>
+                    <option value="GBP">Libra (£)</option>
+                    <option value="MXN">Peso Mexicano ($)</option>
+                  </select>
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+            </form>
+          </div>
+
+          <!-- Backup & Recovery Card -->
+          <div class="glass panel-card settings-card">
+            <div class="panel-card-header">
+              <h3>Copia de Seguridad y Restauración</h3>
+              <p class="text-muted">Exporta todos tus datos financieros a un archivo local o restáuralos en caso de migración.</p>
+            </div>
+            <div class="settings-card-body">
+              <div class="backup-actions">
+                <button class="btn btn-secondary" id="btn-export-backup">
+                  <i data-lucide="download"></i>
+                  <span>Exportar Copia de Seguridad (JSON)</span>
+                </button>
+                <div class="restore-zone">
+                  <label class="btn btn-secondary" for="file-restore-db">
+                    <i data-lucide="upload"></i>
+                    <span>Restaurar Copia de Seguridad</span>
+                  </label>
+                  <input type="file" id="file-restore-db" class="hidden" accept=".json">
+                </div>
+              </div>
+              
+              <div class="danger-zone">
+                <h4>Zona de Peligro</h4>
+                <p class="text-muted">Estas opciones no se pueden deshacer. Procede con precaución.</p>
+                <button class="btn btn-danger" id="btn-reset-db">
+                  <i data-lucide="trash-2"></i>
+                  <span>Reiniciar Base de Datos (Wipe)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- MODALS -->
+  
+  <!-- 1. ADD/EDIT TRANSACTION MODAL -->
+  <div class="modal-backdrop hidden" id="modal-transaction">
+    <div class="modal glass">
+      <div class="modal-header">
+        <h3 id="modal-tx-title">Nuevo Movimiento</h3>
+        <button class="btn-close" id="btn-close-tx-modal"><i data-lucide="x"></i></button>
+      </div>
+      <form id="tx-form">
+        <input type="hidden" id="tx-id">
+        
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label for="tx-type">Tipo</label>
+            <select id="tx-type" class="form-select" required>
+              <option value="expense">Gasto</option>
+              <option value="income">Ingreso</option>
+            </select>
+          </div>
+          <div class="form-group col-6">
+            <label for="tx-amount">Importe</label>
+            <div class="input-group">
+              <input type="number" id="tx-amount" class="form-control" step="0.01" min="0.01" placeholder="0.00" required>
+              <span class="input-group-addon currency-symbol">€</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="tx-description">Descripción</label>
+          <input type="text" id="tx-description" class="form-control" placeholder="Ej: Compra Mercadona, Nómina Junio" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label for="tx-category">Categoría</label>
+            <select id="tx-category" class="form-select" required>
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+          <div class="form-group col-6">
+            <label for="tx-date">Fecha</label>
+            <input type="date" id="tx-date" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="tx-notes">Notas / Comentarios (Opcional)</label>
+          <textarea id="tx-notes" class="form-control" rows="2" placeholder="Detalles extra del movimiento..."></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-tx-modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-tx-modal">Guardar Movimiento</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. ADD/EDIT RECURRING RULE MODAL -->
+  <div class="modal-backdrop hidden" id="modal-recurring">
+    <div class="modal glass">
+      <div class="modal-header">
+        <h3 id="modal-rec-title">Nuevo Movimiento Fijo Recurrente</h3>
+        <button class="btn-close" id="btn-close-rec-modal"><i data-lucide="x"></i></button>
+      </div>
+      <form id="rec-form">
+        <input type="hidden" id="rec-id">
+
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label for="rec-type">Tipo</label>
+            <select id="rec-type" class="form-select" required>
+              <option value="expense">Gasto Fijo</option>
+              <option value="income">Ingreso Fijo</option>
+            </select>
+          </div>
+          <div class="form-group col-6">
+            <label for="rec-amount">Importe</label>
+            <div class="input-group">
+              <input type="number" id="rec-amount" class="form-control" step="0.01" min="0.01" placeholder="0.00" required>
+              <span class="input-group-addon currency-symbol">€</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="rec-description">Descripción</label>
+          <input type="text" id="rec-description" class="form-control" placeholder="Ej: Alquiler, Hipoteca BBVA, Nómina Rover, Seguro Coche" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label for="rec-category">Categoría</label>
+            <select id="rec-category" class="form-select" required>
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+          <div class="form-group col-6">
+            <label for="rec-frequency">Frecuencia</label>
+            <select id="rec-frequency" class="form-select" required>
+              <option value="monthly">Mensual</option>
+              <option value="bimonthly">Bimestral (cada 2 meses)</option>
+              <option value="quarterly">Trimestral (cada 3 meses)</option>
+              <option value="semiannually">Semestral (cada 6 meses)</option>
+              <option value="annually">Anual (cada año)</option>
+              <option value="weekly">Semanal</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-6" id="group-day-of-month">
+            <label for="rec-day-of-month">Día de Cobro/Pago</label>
+            <input type="number" id="rec-day-of-month" class="form-control" min="1" max="31" placeholder="Ej: 28" required>
+            <small class="form-help">Día del mes en el que se ejecuta.</small>
+          </div>
+          <div class="form-group col-6 hidden" id="group-specific-date">
+            <label for="rec-specific-date">Fecha Anual (MM-DD)</label>
+            <input type="text" id="rec-specific-date" class="form-control" placeholder="Ej: 10-15" pattern="\d{2}-\d{2}">
+            <small class="form-help">Mes y día (Formato: MM-DD, ej. 10-15 para 15 de Octubre).</small>
+          </div>
+          <div class="form-group col-6">
+            <label for="rec-start-date">Fecha de Inicio</label>
+            <input type="date" id="rec-start-date" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-12">
+            <label for="rec-end-date">Fecha de Fin (Opcional)</label>
+            <input type="date" id="rec-end-date" class="form-control">
+            <small class="form-help">Dejar vacío si es indefinido.</small>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="rec-notes">Notas / Comentarios (Opcional)</label>
+          <textarea id="rec-notes" class="form-control" rows="2" placeholder="Notas sobre el cobro recurrente..."></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-rec-modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-rec-modal">Guardar Regla</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Custom script -->
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+node_modules/
+moneycontroller.db
+moneycontroller.db-journal
+*.log

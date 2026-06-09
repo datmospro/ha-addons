@@ -1,0 +1,1442 @@
+// MoneyController Frontend Application
+
+// State
+let categories = [];
+let settings = {};
+let currentTab = 'dashboard';
+let transactions = [];
+let recurringRules = [];
+let forecastData = null;
+let currentCalendarDate = new Date();
+let selectedCalendarDay = null;
+
+// What-If scenarios (stored in memory)
+let simulatedScenarios = [];
+
+// Chart instances
+let forecastChart = null;
+let categoryChart = null;
+let historyChart = null;
+
+// Currency Formatter Helper
+function formatCurrency(amount, currency = settings.currency || 'EUR') {
+  const symbol = {
+    EUR: '€',
+    USD: '$',
+    GBP: '£',
+    MXN: '$'
+  }[currency] || '€';
+  
+  return `${amount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${symbol}`;
+}
+
+// Initialize Application
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadBaseData();
+  setupEventListeners();
+  switchTab('dashboard');
+  
+  // Initialize Lucide Icons
+  lucide.createIcons();
+});
+
+// Load Base Configuration & Data
+async function loadBaseData() {
+  try {
+    // 1. Load Settings
+    const settingsRes = await fetch('/api/settings');
+    settings = await settingsRes.json();
+    
+    // Update currency display elements
+    document.querySelectorAll('.currency-symbol').forEach(el => {
+      el.textContent = { EUR: '€', USD: '$', GBP: '£', MXN: '$' }[settings.currency] || '€';
+    });
+    document.getElementById('txt-currency-status').textContent = `Divisa: ${settings.currency || 'EUR'}`;
+    
+    // Fill Settings Form
+    document.getElementById('set-initial-balance').value = settings.initial_balance || 0;
+    document.getElementById('set-safety-threshold').value = settings.safety_threshold || 100;
+    document.getElementById('set-variable-budget').value = settings.variable_monthly_budget || 300;
+    document.getElementById('set-currency').value = settings.currency || 'EUR';
+
+    // 2. Load Categories
+    const categoriesRes = await fetch('/api/categories');
+    categories = await categoriesRes.json();
+    populateCategorySelects();
+
+    // 3. Trigger initial forecast calculation
+    await runForecastCalculation();
+
+  } catch (err) {
+    console.error('Error loading initial data:', err);
+    showToast('Error cargando la configuración base.', 'danger');
+  }
+}
+
+// Populate Category dropdown lists
+function populateCategorySelects() {
+  const txCatSelect = document.getElementById('tx-category');
+  const recCatSelect = document.getElementById('rec-category');
+  const filterCatSelect = document.getElementById('tx-filter-category');
+  
+  txCatSelect.innerHTML = '<option value="" disabled selected>Selecciona categoría...</option>';
+  recCatSelect.innerHTML = '<option value="" disabled selected>Selecciona categoría...</option>';
+  filterCatSelect.innerHTML = '<option value="">Todas las Categorías</option>';
+  
+  categories.forEach(cat => {
+    const optionHTML = `<option value="${cat.id}">${cat.type === 'income' ? '📥' : '📤'} ${cat.name}</option>`;
+    txCatSelect.insertAdjacentHTML('beforeend', optionHTML);
+    recCatSelect.insertAdjacentHTML('beforeend', optionHTML);
+    
+    // For filters
+    const filterOptionHTML = `<option value="${cat.id}">${cat.name}</option>`;
+    filterCatSelect.insertAdjacentHTML('beforeend', filterOptionHTML);
+  });
+}
+
+// Run Cash Flow Forecast Engine (Handles standard and simulated runs)
+async function runForecastCalculation() {
+  try {
+    let res;
+    if (simulatedScenarios.length > 0) {
+      // Run simulation
+      res = await fetch('/api/forecast/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ temporaryTransactions: simulatedScenarios })
+      });
+    } else {
+      // Standard run
+      res = await fetch('/api/forecast');
+    }
+    
+    forecastData = await res.json();
+    
+    // Update top warning badge
+    const badge = document.getElementById('forecast-status-badge');
+    const badgeText = document.getElementById('forecast-status-text');
+    
+    badge.className = 'status-indicator';
+    if (forecastData.daysInNegative > 0) {
+      badge.classList.add('danger');
+      badgeText.textContent = `Descubierto bancario previsto: ${forecastData.daysInNegative} días en números rojos.`;
+    } else {
+      // Check if minimum projected balance is below safety threshold
+      if (forecastData.minProjectedBalance < parseFloat(settings.safety_threshold || 100)) {
+        badge.classList.add('warning');
+        badgeText.textContent = `Atención: Saldo por debajo del umbral de seguridad el ${formatDisplayDate(forecastData.minProjectedBalanceDate)}.`;
+      } else {
+        badge.classList.add('success');
+        badgeText.textContent = 'Flujo de caja estable. Sin alertas detectadas en el año.';
+      }
+    }
+
+    // Refresh active tab views
+    if (currentTab === 'dashboard') {
+      renderDashboard();
+    } else if (currentTab === 'forecast') {
+      renderForecastTab();
+    }
+
+  } catch (err) {
+    console.error('Error running forecast:', err);
+    showToast('Error al procesar la previsión diaria.', 'danger');
+  }
+}
+
+// Render Dashboard Panel
+async function renderDashboard() {
+  if (!forecastData) return;
+  
+  // 1. Fetch transactions of current month for summary cards
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const startOfMonth = `${year}-${month}-01`;
+  const endOfMonth = `${year}-${month}-${new Date(year, now.getMonth() + 1, 0).getDate()}`;
+  
+  try {
+    const txRes = await fetch(`/api/transactions?start_date=${startOfMonth}&end_date=${endOfMonth}`);
+    const currentMonthTxs = await txRes.json();
+    
+    // Compute current month stats (from historical transactions)
+    let incomesSum = 0;
+    let expensesSum = 0;
+    
+    currentMonthTxs.forEach(t => {
+      if (t.type === 'income') incomesSum += t.amount;
+      else expensesSum += t.amount;
+    });
+
+    // Forecast projection for current month
+    // Display card values
+    document.getElementById('card-balance').textContent = formatCurrency(forecastData.todayBalance);
+    document.getElementById('card-incomes').textContent = formatCurrency(incomesSum);
+    document.getElementById('card-expenses').textContent = formatCurrency(expensesSum);
+    
+    const netSavings = incomesSum - expensesSum;
+    const netEl = document.getElementById('card-net');
+    const netIconEl = document.getElementById('card-net-icon');
+    const netSubEl = document.getElementById('card-net-sub');
+    
+    netEl.textContent = formatCurrency(netSavings);
+    netEl.className = 'amount';
+    
+    if (netSavings > 0) {
+      netEl.classList.add('green');
+      netIconEl.className = 'card-icon income';
+      netSubEl.textContent = 'Ahorro neto este mes';
+    } else if (netSavings < 0) {
+      netEl.classList.add('red');
+      netIconEl.className = 'card-icon expense';
+      netSubEl.textContent = 'Gasto supera ingresos este mes';
+    } else {
+      netIconEl.className = 'card-icon';
+      netSubEl.textContent = 'Sin balance neto este mes';
+    }
+
+    // 2. Render Charts
+    renderForecastLineChart();
+    renderCategoriesDoughnutChart(currentMonthTxs);
+    renderCompareMonthlyBarChart();
+
+    // 3. Render Dashboard Alerts List
+    renderDashboardAlertsList();
+
+  } catch (err) {
+    console.error('Error rendering dashboard:', err);
+  }
+}
+
+// Render Forecast Line Chart
+function renderForecastLineChart() {
+  const ctx = document.getElementById('chart-forecast-line').getContext('2d');
+  
+  if (forecastChart) {
+    forecastChart.destroy();
+  }
+  
+  // Thin out data for line chart (select one point every 3 days to keep chart snappy, but include all negative peaks)
+  const projection = forecastData.projection;
+  const labels = [];
+  const balanceData = [];
+  const safetyLine = [];
+  
+  const safetyLimit = parseFloat(settings.safety_threshold || 100);
+  
+  projection.forEach((p, idx) => {
+    // Show label every 30 days
+    if (idx % 3 === 0 || p.balance < safetyLimit || idx === 0 || idx === projection.length - 1) {
+      labels.push(formatDisplayDate(p.date));
+      balanceData.push(p.balance);
+      safetyLine.push(safetyLimit);
+    }
+  });
+
+  forecastChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Saldo Bancario Simulado',
+          data: balanceData,
+          borderColor: '#a855f7', // Purple/indigo
+          borderWidth: 2.5,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          fill: true,
+          backgroundColor: function(context) {
+            const chart = context.chart;
+            const {ctx, chartArea} = chart;
+            if (!chartArea) return null;
+            
+            const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+            gradient.addColorStop(0, 'rgba(168, 85, 247, 0.2)');
+            gradient.addColorStop(1, 'rgba(168, 85, 247, 0.0)');
+            return gradient;
+          },
+          tension: 0.25
+        },
+        {
+          label: 'Umbral de Seguridad',
+          data: safetyLine,
+          borderColor: '#ef4444',
+          borderWidth: 1.5,
+          borderDash: [5, 5],
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: {
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: {
+            color: '#9ca3af',
+            callback: (val) => `${val}€`
+          }
+        },
+        x: {
+          grid: { display: false },
+          ticks: { color: '#9ca3af', maxTicksLimit: 8 }
+        }
+      }
+    }
+  });
+}
+
+// Render Categories Doughnut Chart
+function renderCategoriesDoughnutChart(currentMonthTxs) {
+  const ctx = document.getElementById('chart-categories-doughnut').getContext('2d');
+  
+  if (categoryChart) {
+    categoryChart.destroy();
+  }
+  
+  // Aggregate expenses only
+  const expenses = currentMonthTxs.filter(t => t.type === 'expense');
+  const catSums = {};
+  
+  expenses.forEach(e => {
+    const catName = e.category_name || 'Otros Gastos';
+    catSums[catName] = (catSums[catName] || 0) + e.amount;
+  });
+  
+  const labels = Object.keys(catSums);
+  const data = Object.values(catSums);
+  
+  // Match colors with categories
+  const backgroundColors = labels.map(label => {
+    const cat = categories.find(c => c.name === label);
+    return cat ? cat.color : '#6b7280';
+  });
+
+  if (labels.length === 0) {
+    // Render placeholder
+    categoryChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Sin gastos este mes'],
+        datasets: [{ data: [1], backgroundColor: ['#374151'], borderWidth: 0 }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: true, position: 'bottom', labels: { color: '#9ca3af' } } }
+      }
+    });
+    return;
+  }
+
+  categoryChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: data,
+        backgroundColor: backgroundColors,
+        borderWidth: 0,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'bottom',
+          labels: {
+            color: '#9ca3af',
+            boxWidth: 12,
+            font: { size: 10 }
+          }
+        }
+      }
+    }
+  });
+}
+
+// Render historical Income vs Expenses Chart (Last 6 Months)
+async function renderCompareMonthlyBarChart() {
+  const ctx = document.getElementById('chart-compare-bar').getContext('2d');
+  
+  if (historyChart) {
+    historyChart.destroy();
+  }
+
+  // Calculate past 6 months limits
+  const monthData = [];
+  const now = new Date();
+  
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const start = `${y}-${m}-01`;
+    const end = `${y}-${m}-${new Date(y, d.getMonth() + 1, 0).getDate()}`;
+    monthData.push({
+      label: d.toLocaleString('es-ES', { month: 'short' }).toUpperCase(),
+      start,
+      end,
+      income: 0,
+      expense: 0
+    });
+  }
+
+  try {
+    // Fetch all transactions inside the range
+    const startRange = monthData[0].start;
+    const endRange = monthData[5].end;
+    const res = await fetch(`/api/transactions?start_date=${startRange}&end_date=${endRange}`);
+    const txs = await res.json();
+    
+    // Group transactions by month
+    txs.forEach(t => {
+      monthData.forEach(m => {
+        if (t.date >= m.start && t.date <= m.end) {
+          if (t.type === 'income') m.income += t.amount;
+          else m.expense += t.amount;
+        }
+      });
+    });
+
+    const labels = monthData.map(m => m.label);
+    const incomes = monthData.map(m => m.income);
+    const expenses = monthData.map(m => m.expense);
+
+    historyChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Ingresos',
+            data: incomes,
+            backgroundColor: '#10b981', // green
+            borderRadius: 4
+          },
+          {
+            label: 'Gastos',
+            data: expenses,
+            backgroundColor: '#f43f5e', // rose
+            borderRadius: 4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          y: {
+            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+            ticks: { color: '#9ca3af' }
+          },
+          x: {
+            grid: { display: false },
+            ticks: { color: '#9ca3af' }
+          }
+        }
+      }
+    });
+
+  } catch (err) {
+    console.error('Error fetching data for history chart:', err);
+  }
+}
+
+// Render Dashboard Alerts
+function renderDashboardAlertsList() {
+  const container = document.getElementById('dashboard-alerts-list');
+  container.innerHTML = '';
+  
+  if (!forecastData || forecastData.alerts.length === 0) {
+    container.innerHTML = `
+      <div class="table-empty-state" style="padding: 20px 0;">
+        <i data-lucide="check-circle" style="color: var(--income); width: 32px; height: 32px;"></i>
+        <p style="font-size: 0.85rem;">¡Todo correcto! No se prevén descubiertos bancarios ni saldo por debajo de tu límite en los próximos 12 meses.</p>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+
+  // Filter and show unique critical alert days (prioritizing 'danger' then 'warning')
+  const uniqueAlerts = [];
+  const seenDates = new Set();
+  
+  // Show max 5 warnings on dashboard
+  const displayAlerts = forecastData.alerts.slice(0, 15);
+  
+  displayAlerts.forEach(alert => {
+    if (!seenDates.has(alert.date)) {
+      seenDates.add(alert.date);
+      uniqueAlerts.push(alert);
+    }
+  });
+
+  // Limit to 5 elements for the dashboard dashboard
+  const dashboardAlerts = uniqueAlerts.slice(0, 5);
+
+  dashboardAlerts.forEach(alert => {
+    const alertHTML = `
+      <div class="forecast-alert-item ${alert.severity}">
+        <div class="alert-date-row">
+          <span class="alert-date">${formatDisplayDate(alert.date)}</span>
+          <span class="alert-bal">${alert.balance.toFixed(2)} €</span>
+        </div>
+        <div class="alert-msg">${alert.severity === 'danger' ? 'Descubierto previsto' : 'Saldo mínimo de seguridad'}</div>
+        <div class="alert-causes">Provocado por: ${alert.causes || 'Gastos Variables'}</div>
+      </div>
+    `;
+    container.insertAdjacentHTML('beforeend', alertHTML);
+  });
+  
+  if (uniqueAlerts.length > 5) {
+    container.insertAdjacentHTML('beforeend', `
+      <button class="btn btn-link btn-block" onclick="switchTab('forecast')">Ver las ${uniqueAlerts.length} alertas restantes...</button>
+    `);
+  }
+}
+
+// Render Transactions Tab Panel
+async function renderTransactionsTab() {
+  const tableBody = document.getElementById('transactions-table-body');
+  const emptyState = document.getElementById('tx-empty-state');
+  tableBody.innerHTML = '';
+  
+  const search = document.getElementById('tx-search').value;
+  const type = document.getElementById('tx-filter-type').value;
+  const category_id = document.getElementById('tx-filter-category').value;
+  const start_date = document.getElementById('tx-filter-start').value;
+  const end_date = document.getElementById('tx-filter-end').value;
+
+  try {
+    let query = `?search=${encodeURIComponent(search)}`;
+    if (type) query += `&type=${type}`;
+    if (category_id) query += `&category_id=${category_id}`;
+    if (start_date) query += `&start_date=${start_date}`;
+    if (end_date) query += `&end_date=${end_date}`;
+
+    const res = await fetch(`/api/transactions${query}`);
+    transactions = await res.json();
+
+    if (transactions.length === 0) {
+      emptyState.classList.remove('hidden');
+      return;
+    }
+    emptyState.classList.add('hidden');
+
+    transactions.forEach(t => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${formatDisplayDate(t.date)}</td>
+        <td><strong>${escapeHtml(t.description)}</strong></td>
+        <td>
+          <span class="category-tag">
+            <span class="category-dot" style="background-color: ${t.category_color || '#6b7280'}"></span>
+            ${escapeHtml(t.category_name || 'Sin Categoría')}
+          </span>
+        </td>
+        <td><span class="text-muted" style="font-size: 0.8rem;">${escapeHtml(t.notes || '')}</span></td>
+        <td class="text-right tx-amount ${t.type}">
+          ${t.type === 'income' ? '+' : '-'}${formatCurrency(t.amount)}
+        </td>
+        <td class="text-center">
+          <div class="action-buttons">
+            <button class="btn-table-action" onclick="openEditTransaction(${t.id})" title="Editar">
+              <i data-lucide="edit-3"></i>
+            </button>
+            <button class="btn-table-action delete" onclick="deleteTransaction(${t.id})" title="Eliminar">
+              <i data-lucide="trash-2"></i>
+            </button>
+          </div>
+        </td>
+      `;
+      tableBody.appendChild(row);
+    });
+
+    lucide.createIcons();
+
+  } catch (err) {
+    console.error('Error loading transactions:', err);
+  }
+}
+
+// Render Recurring Rules Tab
+async function renderRecurringTab() {
+  const container = document.getElementById('recurring-rules-container');
+  container.innerHTML = '';
+
+  try {
+    const res = await fetch('/api/recurring');
+    recurringRules = await res.json();
+
+    if (recurringRules.length === 0) {
+      container.innerHTML = `
+        <div class="grid-item col-3 glass text-center" style="padding: 40px; display: flex; flex-direction: column; align-items: center; gap: 12px;">
+          <i data-lucide="calendar-range" style="width: 48px; height: 48px; color: var(--text-muted)"></i>
+          <h3>No has registrado gastos ni ingresos fijos</h3>
+          <p class="text-muted" style="max-width: 400px; margin: 0 auto 12px;">Introduce tus recibos de agua, luz, hipoteca, seguros anuales, préstamos y nóminas periódicas para proyectar tu flujo de caja.</p>
+          <button class="btn btn-primary" onclick="openAddRecurringModal()">Añadir Primer Movimiento Fijo</button>
+        </div>
+      `;
+      lucide.createIcons();
+      return;
+    }
+
+    recurringRules.forEach(rule => {
+      const freqMap = {
+        weekly: 'Semanal',
+        monthly: 'Mensual',
+        bimonthly: 'Bimestral',
+        quarterly: 'Trimestral',
+        semiannually: 'Semestral',
+        annually: 'Anual'
+      };
+
+      const dateDetail = rule.frequency === 'annually' && rule.specific_date
+        ? `el día ${rule.specific_date.split('-')[1]} de ${new Date(2026, parseInt(rule.specific_date.split('-')[0]) - 1, 1).toLocaleString('es-ES', { month: 'long' })}`
+        : `el día ${rule.day_of_month || rule.start_date.split('-')[2]}`;
+
+      const card = document.createElement('div');
+      card.className = 'recurring-rule-card glass';
+      card.innerHTML = `
+        <div>
+          <div class="recurring-card-header">
+            <div class="recurring-title-box">
+              <h4>${escapeHtml(rule.description)}</h4>
+              <span class="recurring-category" style="color: ${rule.category_color || '#9ca3af'}">
+                ● ${escapeHtml(rule.category_name || 'Fijo')}
+              </span>
+            </div>
+            <span class="badge ${rule.type === 'income' ? 'badge-income' : 'badge-expense'}">
+              ${rule.type === 'income' ? 'Ingreso' : 'Gasto'}
+            </span>
+          </div>
+          <div class="recurring-amount ${rule.type}">
+            ${rule.type === 'income' ? '+' : '-'}${formatCurrency(rule.amount)}
+          </div>
+        </div>
+
+        <div class="recurring-details">
+          <span><i data-lucide="refresh-cw"></i> Frecuencia: ${freqMap[rule.frequency] || rule.frequency}</span>
+          <span><i data-lucide="calendar"></i> Cobro: ${dateDetail}</span>
+          <span><i data-lucide="calendar-days"></i> Inicio: ${formatDisplayDate(rule.start_date)}</span>
+          ${rule.end_date ? `<span><i data-lucide="calendar-off"></i> Fin: ${formatDisplayDate(rule.end_date)}</span>` : ''}
+          ${rule.notes ? `<span class="notes-txt" style="margin-top: 4px; font-style: italic;"><i data-lucide="file-text"></i> ${escapeHtml(rule.notes)}</span>` : ''}
+        </div>
+
+        <div class="recurring-card-actions">
+          <button class="btn-table-action" onclick="openEditRecurring(${rule.id})" title="Editar">
+            <i data-lucide="edit-3" style="width: 16px;"></i>
+          </button>
+          <button class="btn-table-action delete" onclick="deleteRecurringRule(${rule.id})" title="Eliminar">
+            <i data-lucide="trash-2" style="width: 16px;"></i>
+          </button>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+
+    lucide.createIcons();
+
+  } catch (err) {
+    console.error('Error loading recurring rules:', err);
+  }
+}
+
+// Render Forecast Tab (Includes Interactive Calendar & What-If panel)
+function renderForecastTab() {
+  renderCalendar();
+  renderForecastAlertsFullList();
+  renderWhatIfScenarios();
+}
+
+// Render Financial Interactive Calendar
+function renderCalendar() {
+  const container = document.getElementById('calendar-days-container');
+  const monthYearLabel = document.getElementById('calendar-month-year');
+  container.innerHTML = '';
+
+  const year = currentCalendarDate.getFullYear();
+  const month = currentCalendarDate.getMonth();
+  
+  // Set month label
+  monthYearLabel.textContent = currentCalendarDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
+
+  // First day of month
+  const firstDayIndex = (new Date(year, month, 1).getDay() + 6) % 7; // Convert to Monday-first (0=Mon, 6=Sun)
+  
+  // Days in month
+  const totalDays = new Date(year, month + 1, 0).getDate();
+
+  // Add empty squares for padding
+  for (let i = 0; i < firstDayIndex; i++) {
+    const emptyCell = document.createElement('div');
+    emptyCell.className = 'calendar-day empty';
+    container.appendChild(emptyCell);
+  }
+
+  // Draw day cells
+  const settingsSafety = parseFloat(settings.safety_threshold || 100);
+  
+  for (let dayNum = 1; dayNum <= totalDays; dayNum++) {
+    const dayDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+    
+    // Find if we have simulated balance for this date
+    const forecastDay = forecastData?.projection.find(p => p.date === dayDateStr);
+    
+    const dayCell = document.createElement('div');
+    dayCell.className = 'calendar-day';
+    
+    // Mark if today
+    const localTodayStr = new Date().toISOString().split('T')[0];
+    if (dayDateStr === localTodayStr) {
+      dayCell.classList.add('today');
+    }
+
+    // Mark if selected
+    if (selectedCalendarDay === dayDateStr) {
+      dayCell.classList.add('selected');
+    }
+
+    dayCell.innerHTML = `<span class="cal-day-num">${dayNum}</span>`;
+
+    if (forecastDay) {
+      const balance = forecastDay.balance;
+      let statusClass = 'green';
+      
+      if (balance < 0) {
+        statusClass = 'red';
+      } else if (balance < settingsSafety) {
+        statusClass = 'yellow';
+      }
+      
+      dayCell.innerHTML += `<span class="cal-day-bal ${statusClass}">${balance.toFixed(0)}€</span>`;
+      
+      // Set click event to show transactions
+      dayCell.addEventListener('click', () => {
+        selectCalendarDay(dayDateStr, forecastDay);
+        // Remove active class from all other days
+        document.querySelectorAll('.calendar-day').forEach(cell => cell.classList.remove('selected'));
+        dayCell.classList.add('selected');
+      });
+    }
+
+    container.appendChild(dayCell);
+  }
+}
+
+// Select a calendar day and show projected movements in the sidebar panel
+function selectCalendarDay(dateStr, forecastDay) {
+  selectedCalendarDay = dateStr;
+  
+  const panel = document.getElementById('selected-day-details-panel');
+  panel.classList.remove('hidden');
+
+  document.getElementById('selected-day-title').textContent = `Detalle del ${formatDisplayDate(dateStr)}`;
+  
+  const balanceEl = document.getElementById('selected-day-balance');
+  balanceEl.textContent = formatCurrency(forecastDay.balance);
+  
+  balanceEl.className = 'day-projected-balance';
+  if (forecastDay.balance < 0) {
+    balanceEl.classList.add('red');
+  } else if (forecastDay.balance < parseFloat(settings.safety_threshold || 100)) {
+    balanceEl.classList.add('yellow');
+  } else {
+    balanceEl.classList.add('green');
+  }
+
+  const eventsList = document.getElementById('selected-day-events-list');
+  eventsList.innerHTML = '';
+
+  // Pro-rated variable expense row (if any)
+  if (forecastDay.variableExpense > 0) {
+    eventsList.insertAdjacentHTML('beforeend', `
+      <div class="day-event-item expense">
+        <div>
+          <span class="event-desc">Gasto Variable Prorrateado</span>
+          <span class="event-cat">Alimentación, Gasolina, Ocio...</span>
+        </div>
+        <span class="event-val">-${forecastDay.variableExpense.toFixed(2)} €</span>
+      </div>
+    `);
+  }
+
+  // Transactions falling on this day
+  if (forecastDay.events && forecastDay.events.length > 0) {
+    forecastDay.events.forEach(e => {
+      // Info events like starting balance don't need formatting as expenses/income
+      if (e.type === 'info') return;
+
+      const isIncome = e.type === 'income';
+      eventsList.insertAdjacentHTML('beforeend', `
+        <div class="day-event-item ${e.type}">
+          <div>
+            <span class="event-desc">${escapeHtml(e.description)}</span>
+            <span class="event-cat">${escapeHtml(e.category || '')}</span>
+          </div>
+          <span class="event-val">${isIncome ? '+' : '-'}${e.amount.toFixed(2)} €</span>
+        </div>
+      `);
+    });
+  }
+
+  if (forecastDay.variableExpense === 0 && (!forecastDay.events || forecastDay.events.length <= 1)) {
+    eventsList.innerHTML = `<p class="text-muted text-center" style="padding: 20px 0; font-size: 0.85rem;">No hay transacciones ni gastos fijos programados para este día.</p>`;
+  }
+}
+
+// Render Full Alerts List on Previsión Tab
+function renderForecastAlertsFullList() {
+  const container = document.getElementById('forecast-alerts-full-list');
+  container.innerHTML = '';
+
+  if (!forecastData || forecastData.alerts.length === 0) {
+    container.innerHTML = `
+      <div class="table-empty-state">
+        <i data-lucide="shield-check" style="color: var(--income); width: 40px; height: 40px;"></i>
+        <h3>¡Tu caja está sana!</h3>
+        <p>No se prevé ningún día de descubierto bancario o por debajo del umbral de seguridad en los próximos 12 meses.</p>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+
+  // Group alerts by streak or show them chronologically
+  forecastData.alerts.forEach(alert => {
+    const alertHTML = `
+      <div class="forecast-alert-item ${alert.severity}" style="padding: 14px 20px;">
+        <div class="alert-date-row" style="margin-bottom: 4px;">
+          <span class="alert-date">${formatDisplayDate(alert.date)} (${getDayName(alert.date)})</span>
+          <span class="alert-bal">${alert.balance.toFixed(2)} €</span>
+        </div>
+        <div class="alert-msg" style="font-size: 0.9rem; margin-bottom: 2px;">
+          ${alert.severity === 'danger' ? '🚨 Descubierto Bancario Previsto' : '⚠️ Saldo por debajo del umbral de seguridad'}
+        </div>
+        <div class="alert-causes">Eventos en la fecha: ${alert.causes || 'Solo Gasto Variable Prorrateado'}</div>
+      </div>
+    `;
+    container.insertAdjacentHTML('beforeend', alertHTML);
+  });
+}
+
+// Render active What-If simulation scenarios
+function renderWhatIfScenarios() {
+  const container = document.getElementById('simulation-scenarios-container');
+  const emptyMsg = document.getElementById('empty-sim-msg');
+  const btnClearSim = document.getElementById('btn-clear-simulations');
+  
+  // Clear list preserving emptyMsg
+  container.querySelectorAll('.sim-item').forEach(el => el.remove());
+
+  if (simulatedScenarios.length === 0) {
+    emptyMsg.classList.remove('hidden');
+    btnClearSim.classList.add('hidden');
+    return;
+  }
+
+  emptyMsg.classList.add('hidden');
+  btnClearSim.classList.remove('hidden');
+
+  simulatedScenarios.forEach((sim, idx) => {
+    const simHTML = `
+      <div class="sim-item ${sim.type}">
+        <div class="sim-item-info">
+          <span class="sim-item-title">${escapeHtml(sim.description)}</span>
+          <span class="sim-item-meta">${formatDisplayDate(sim.date)}</span>
+        </div>
+        <div class="sim-item-right">
+          <span class="sim-item-val">${sim.type === 'income' ? '+' : '-'}${sim.amount.toFixed(2)} €</span>
+          <button class="btn-table-action delete" onclick="removeSimulationScenario(${idx})" title="Quitar Simulación" style="width:24px; height:24px;">
+            <i data-lucide="x" style="width:14px; height:14px;"></i>
+          </button>
+        </div>
+      </div>
+    `;
+    container.insertAdjacentHTML('afterbegin', simHTML);
+  });
+  
+  lucide.createIcons();
+}
+
+// Add Scenario to What-If list
+function addSimulationScenario(description, amount, type, date) {
+  simulatedScenarios.push({
+    description,
+    amount: parseFloat(amount),
+    type,
+    date,
+    isTemp: true // Flag to identify it in calculations
+  });
+  
+  runForecastCalculation();
+  showToast('Escenario simulado con éxito. Gráficos y alertas actualizados.', 'indigo');
+}
+
+// Remove simulation scenario
+window.removeSimulationScenario = function(index) {
+  simulatedScenarios.splice(index, 1);
+  runForecastCalculation();
+  showToast('Simulación eliminada.', 'neutral');
+};
+
+// Clear all simulation scenarios
+document.getElementById('btn-clear-simulations').addEventListener('click', () => {
+  simulatedScenarios = [];
+  runForecastCalculation();
+  showToast('Simulaciones limpiadas.', 'neutral');
+});
+
+// Setup Event Listeners
+function setupEventListeners() {
+  // Navigation
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      switchTab(btn.dataset.tab);
+    });
+  });
+
+  // Quick Add Action
+  document.getElementById('btn-quick-add-transaction').addEventListener('click', () => {
+    openAddTransactionModal();
+  });
+
+  // Filter Transactions Event Listeners
+  const txFilterInputs = ['tx-search', 'tx-filter-type', 'tx-filter-category', 'tx-filter-start', 'tx-filter-end'];
+  txFilterInputs.forEach(id => {
+    document.getElementById(id).addEventListener('change', renderTransactionsTab);
+  });
+  document.getElementById('tx-search').addEventListener('keyup', debounce(renderTransactionsTab, 300));
+  
+  document.getElementById('btn-clear-filters').addEventListener('click', () => {
+    document.getElementById('tx-search').value = '';
+    document.getElementById('tx-filter-type').value = '';
+    document.getElementById('tx-filter-category').value = '';
+    document.getElementById('tx-filter-start').value = '';
+    document.getElementById('tx-filter-end').value = '';
+    renderTransactionsTab();
+  });
+
+  document.getElementById('btn-add-transaction').addEventListener('click', () => {
+    openAddTransactionModal();
+  });
+
+  // Modals close button handlers
+  document.getElementById('btn-close-tx-modal').addEventListener('click', closeTxModal);
+  document.getElementById('btn-cancel-tx-modal').addEventListener('click', closeTxModal);
+  
+  document.getElementById('btn-close-rec-modal').addEventListener('click', closeRecModal);
+  document.getElementById('btn-cancel-rec-modal').addEventListener('click', closeRecModal);
+
+  // Forms submits
+  document.getElementById('tx-form').addEventListener('submit', handleTxSubmit);
+  document.getElementById('rec-form').addEventListener('submit', handleRecSubmit);
+  document.getElementById('settings-form').addEventListener('submit', handleSettingsSubmit);
+  document.getElementById('what-if-add-form').addEventListener('submit', handleWhatIfSubmit);
+
+  // Calendar navigation
+  document.getElementById('btn-cal-prev').addEventListener('click', () => {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+    renderCalendar();
+  });
+  document.getElementById('btn-cal-next').addEventListener('click', () => {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+    renderCalendar();
+  });
+  document.getElementById('btn-close-day-details').addEventListener('click', () => {
+    document.getElementById('selected-day-details-panel').classList.add('hidden');
+    selectedCalendarDay = null;
+    document.querySelectorAll('.calendar-day').forEach(cell => cell.classList.remove('selected'));
+  });
+
+  // Manage Frequency display changes in recurring modal
+  document.getElementById('rec-frequency').addEventListener('change', (e) => {
+    const freq = e.target.value;
+    const dayGroup = document.getElementById('group-day-of-month');
+    const specificGroup = document.getElementById('group-specific-date');
+    const dayInput = document.getElementById('rec-day-of-month');
+    const specificInput = document.getElementById('rec-specific-date');
+
+    if (freq === 'annually') {
+      dayGroup.classList.add('hidden');
+      dayInput.removeAttribute('required');
+      specificGroup.classList.remove('hidden');
+      specificInput.setAttribute('required', 'true');
+    } else if (freq === 'weekly') {
+      dayGroup.classList.add('hidden');
+      dayInput.removeAttribute('required');
+      specificGroup.classList.add('hidden');
+      specificInput.removeAttribute('required');
+    } else {
+      dayGroup.classList.remove('hidden');
+      dayInput.setAttribute('required', 'true');
+      specificGroup.classList.add('hidden');
+      specificInput.removeAttribute('required');
+    }
+  });
+
+  // Backup file import triggers
+  document.getElementById('file-restore-db').addEventListener('change', handleBackupImport);
+  document.getElementById('btn-export-backup').addEventListener('click', handleBackupExport);
+
+  // Danger zone reset db trigger
+  document.getElementById('btn-reset-db').addEventListener('click', handleDbReset);
+
+  // Direct buttons
+  document.getElementById('btn-add-recurring-rule').addEventListener('click', () => {
+    openAddRecurringModal();
+  });
+}
+
+// Switch navigation Tabs
+window.switchTab = function(tabName) {
+  currentTab = tabName;
+  
+  // Set tab button active
+  document.querySelectorAll('.nav-menu button').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const activeBtn = document.querySelector(`.nav-menu button[data-tab="${tabName}"]`);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  // Set subtitle and title
+  const titleMap = {
+    dashboard: { t: 'Tablero Principal', s: 'Resumen financiero e informe de previsión de caja.' },
+    transactions: { t: 'Historial de Movimientos', s: 'Listado completo, filtros y gestión de tus gastos e ingresos.' },
+    recurring: { t: 'Gastos e Ingresos Fijos', s: 'Gestiona tus hipotecas, préstamos, nóminas y recibos recurrentes.' },
+    forecast: { t: 'Previsión de Flujo de Caja', s: 'Calendario predictivo diario y alertas de números rojos para el año.' },
+    settings: { t: 'Configuración del Sistema', s: 'Modifica saldos iniciales, umbral de alertas y gestiona copias de seguridad.' }
+  };
+
+  document.getElementById('current-tab-title').textContent = titleMap[tabName].t;
+  document.getElementById('current-tab-subtitle').textContent = titleMap[tabName].s;
+
+  // Show panel
+  document.querySelectorAll('.tab-panel').forEach(panel => {
+    panel.classList.remove('active');
+  });
+  document.getElementById(`panel-${tabName}`).classList.add('active');
+
+  // Trigger loads for specific tabs
+  if (tabName === 'dashboard') {
+    renderDashboard();
+  } else if (tabName === 'transactions') {
+    renderTransactionsTab();
+  } else if (tabName === 'recurring') {
+    renderRecurringTab();
+  } else if (tabName === 'forecast') {
+    renderForecastTab();
+  }
+};
+
+// --- TRANSACTION MODAL & ACTIONS ---
+
+function openAddTransactionModal() {
+  document.getElementById('modal-tx-title').textContent = 'Nuevo Movimiento';
+  document.getElementById('tx-id').value = '';
+  document.getElementById('tx-type').value = 'expense';
+  document.getElementById('tx-amount').value = '';
+  document.getElementById('tx-description').value = '';
+  document.getElementById('tx-category').value = '';
+  document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('tx-notes').value = '';
+  
+  document.getElementById('modal-transaction').classList.remove('hidden');
+}
+
+window.openEditTransaction = function(id) {
+  const tx = transactions.find(t => t.id === id);
+  if (!tx) return;
+
+  document.getElementById('modal-tx-title').textContent = 'Editar Movimiento';
+  document.getElementById('tx-id').value = tx.id;
+  document.getElementById('tx-type').value = tx.type;
+  document.getElementById('tx-amount').value = tx.amount;
+  document.getElementById('tx-description').value = tx.description;
+  document.getElementById('tx-category').value = tx.category_id || '';
+  document.getElementById('tx-date').value = tx.date;
+  document.getElementById('tx-notes').value = tx.notes || '';
+
+  document.getElementById('modal-transaction').classList.remove('hidden');
+};
+
+function closeTxModal() {
+  document.getElementById('modal-transaction').classList.add('hidden');
+}
+
+async function handleTxSubmit(e) {
+  e.preventDefault();
+  
+  const id = document.getElementById('tx-id').value;
+  const description = document.getElementById('tx-description').value;
+  const amount = parseFloat(document.getElementById('tx-amount').value);
+  const type = document.getElementById('tx-type').value;
+  const category_id = document.getElementById('tx-category').value;
+  const date = document.getElementById('tx-date').value;
+  const notes = document.getElementById('tx-notes').value;
+
+  const data = { description, amount, type, category_id, date, notes };
+  const method = id ? 'PUT' : 'POST';
+  const url = id ? `/api/transactions/${id}` : '/api/transactions';
+
+  try {
+    const res = await fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    
+    if (res.ok) {
+      closeTxModal();
+      showToast(id ? 'Movimiento actualizado correctamente.' : 'Nuevo movimiento añadido.', 'success');
+      await runForecastCalculation();
+      if (currentTab === 'transactions') renderTransactionsTab();
+    } else {
+      const err = await res.json();
+      showToast(`Error: ${err.error}`, 'danger');
+    }
+  } catch (err) {
+    console.error('Error saving transaction:', err);
+    showToast('Error de red al guardar la transacción.', 'danger');
+  }
+}
+
+window.deleteTransaction = async function(id) {
+  if (!confirm('¿Seguro que deseas eliminar este movimiento?')) return;
+
+  try {
+    const res = await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      showToast('Movimiento eliminado.', 'success');
+      await runForecastCalculation();
+      if (currentTab === 'transactions') renderTransactionsTab();
+    } else {
+      showToast('Error al eliminar.', 'danger');
+    }
+  } catch (err) {
+    console.error('Error deleting transaction:', err);
+  }
+};
+
+// --- RECURRING MODAL & ACTIONS ---
+
+window.openAddRecurringModal = function() {
+  document.getElementById('modal-rec-title').textContent = 'Nuevo Movimiento Fijo Recurrente';
+  document.getElementById('rec-id').value = '';
+  document.getElementById('rec-type').value = 'expense';
+  document.getElementById('rec-amount').value = '';
+  document.getElementById('rec-description').value = '';
+  document.getElementById('rec-category').value = '';
+  document.getElementById('rec-frequency').value = 'monthly';
+  document.getElementById('rec-day-of-month').value = '1';
+  document.getElementById('rec-specific-date').value = '';
+  document.getElementById('rec-start-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('rec-end-date').value = '';
+  document.getElementById('rec-notes').value = '';
+
+  // Trigger frequency select change manually to reset inputs
+  document.getElementById('rec-frequency').dispatchEvent(new Event('change'));
+
+  document.getElementById('modal-recurring').classList.remove('hidden');
+};
+
+window.openEditRecurring = function(id) {
+  const rule = recurringRules.find(r => r.id === id);
+  if (!rule) return;
+
+  document.getElementById('modal-rec-title').textContent = 'Editar Movimiento Fijo Recurrente';
+  document.getElementById('rec-id').value = rule.id;
+  document.getElementById('rec-type').value = rule.type;
+  document.getElementById('rec-amount').value = rule.amount;
+  document.getElementById('rec-description').value = rule.description;
+  document.getElementById('rec-category').value = rule.category_id || '';
+  document.getElementById('rec-frequency').value = rule.frequency;
+  document.getElementById('rec-day-of-month').value = rule.day_of_month || '';
+  document.getElementById('rec-specific-date').value = rule.specific_date || '';
+  document.getElementById('rec-start-date').value = rule.start_date;
+  document.getElementById('rec-end-date').value = rule.end_date || '';
+  document.getElementById('rec-notes').value = rule.notes || '';
+
+  // Trigger frequency select change manually to update input groups
+  document.getElementById('rec-frequency').dispatchEvent(new Event('change'));
+
+  document.getElementById('modal-recurring').classList.remove('hidden');
+};
+
+function closeRecModal() {
+  document.getElementById('modal-recurring').classList.add('hidden');
+}
+
+async function handleRecSubmit(e) {
+  e.preventDefault();
+
+  const id = document.getElementById('rec-id').value;
+  const description = document.getElementById('rec-description').value;
+  const amount = parseFloat(document.getElementById('rec-amount').value);
+  const type = document.getElementById('rec-type').value;
+  const category_id = document.getElementById('rec-category').value;
+  const frequency = document.getElementById('rec-frequency').value;
+  const day_of_month = document.getElementById('rec-day-of-month').value;
+  const specific_date = document.getElementById('rec-specific-date').value;
+  const start_date = document.getElementById('rec-start-date').value;
+  const end_date = document.getElementById('rec-end-date').value;
+  const notes = document.getElementById('rec-notes').value;
+
+  const data = {
+    description, amount, type, category_id, frequency,
+    day_of_month: day_of_month ? parseInt(day_of_month) : null,
+    specific_date, start_date, end_date, notes
+  };
+
+  const method = id ? 'PUT' : 'POST';
+  const url = id ? `/api/recurring/${id}` : '/api/recurring';
+
+  try {
+    const res = await fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+
+    if (res.ok) {
+      closeRecModal();
+      showToast(id ? 'Regla recurrente actualizada.' : 'Nueva regla recurrente añadida.', 'success');
+      await runForecastCalculation();
+      if (currentTab === 'recurring') renderRecurringTab();
+    } else {
+      const err = await res.json();
+      showToast(`Error: ${err.error}`, 'danger');
+    }
+  } catch (err) {
+    console.error('Error saving recurring rule:', err);
+    showToast('Error de red al guardar la regla recurrente.', 'danger');
+  }
+}
+
+window.deleteRecurringRule = async function(id) {
+  if (!confirm('¿Seguro que deseas eliminar esta regla recurrente? Dejará de proyectarse en el flujo de caja del año.')) return;
+
+  try {
+    const res = await fetch(`/api/recurring/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      showToast('Regla recurrente eliminada.', 'success');
+      await runForecastCalculation();
+      if (currentTab === 'recurring') renderRecurringTab();
+    } else {
+      showToast('Error al eliminar.', 'danger');
+    }
+  } catch (err) {
+    console.error('Error deleting recurring rule:', err);
+  }
+};
+
+// --- SETTINGS ACTIONS ---
+
+async function handleSettingsSubmit(e) {
+  e.preventDefault();
+
+  const initial_balance = parseFloat(document.getElementById('set-initial-balance').value);
+  const safety_threshold = parseFloat(document.getElementById('set-safety-threshold').value);
+  const variable_monthly_budget = parseFloat(document.getElementById('set-variable-budget').value);
+  const currency = document.getElementById('set-currency').value;
+
+  try {
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'initial_balance', value: initial_balance })
+    });
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'safety_threshold', value: safety_threshold })
+    });
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'variable_monthly_budget', value: variable_monthly_budget })
+    });
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'currency', value: currency })
+    });
+
+    showToast('Configuración guardada correctamente.', 'success');
+    await loadBaseData(); // reload setting variables in memory
+  } catch (err) {
+    console.error('Error saving settings:', err);
+    showToast('Error al guardar la configuración.', 'danger');
+  }
+}
+
+// --- WHAT-IF SIMULATION SUBMITS ---
+
+function handleWhatIfSubmit(e) {
+  e.preventDefault();
+  
+  const desc = document.getElementById('sim-desc').value;
+  const amount = document.getElementById('sim-amount').value;
+  const type = document.getElementById('sim-type').value;
+  const date = document.getElementById('sim-date').value;
+
+  addSimulationScenario(desc, amount, type, date);
+
+  // Clear inputs
+  document.getElementById('sim-desc').value = '';
+  document.getElementById('sim-amount').value = '';
+  document.getElementById('sim-date').value = '';
+}
+
+// --- BACKUP & RESTORE ACTIONS ---
+
+async function handleBackupExport() {
+  try {
+    const res = await fetch('/api/backup');
+    const data = await res.json();
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+    const dlAnchorElem = document.createElement('a');
+    dlAnchorElem.setAttribute("href",     dataStr     );
+    dlAnchorElem.setAttribute("download", `moneycontroller_backup_${new Date().toISOString().split('T')[0]}.json`);
+    dlAnchorElem.click();
+    showToast('Copia de seguridad exportada con éxito.', 'success');
+  } catch (err) {
+    console.error('Error exporting backup:', err);
+    showToast('Error al exportar copia de seguridad.', 'danger');
+  }
+}
+
+async function handleBackupImport(e) {
+  const fileReader = new FileReader();
+  fileReader.onload = async function (event) {
+    try {
+      const parsedData = JSON.parse(event.target.result);
+      
+      const res = await fetch('/api/backup/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(parsedData)
+      });
+
+      if (res.ok) {
+        showToast('Base de datos restaurada correctamente.', 'success');
+        await loadBaseData();
+        if (currentTab === 'dashboard') renderDashboard();
+      } else {
+        showToast('Error al importar la copia. Formato incorrecto.', 'danger');
+      }
+    } catch (err) {
+      showToast('Error al procesar el archivo JSON.', 'danger');
+    }
+  };
+  fileReader.readAsText(e.target.files[0]);
+}
+
+async function handleDbReset() {
+  if (!confirm('🚨 ATENCIÓN: Esta opción borrará TODAS tus transacciones y reglas recurrentes registradas. Las configuraciones de categorías y ajustes permanecerán. ¿Deseas proceder?')) return;
+
+  try {
+    const res = await fetch('/api/reset', { method: 'POST' });
+    if (res.ok) {
+      showToast('Base de datos reiniciada.', 'success');
+      simulatedScenarios = [];
+      await loadBaseData();
+    } else {
+      showToast('Error al reiniciar.', 'danger');
+    }
+  } catch (err) {
+    console.error('Error resetting database:', err);
+  }
+}
+
+// --- GENERAL HELPERS ---
+
+// Debounce helper for searching
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// Format date for displays (YYYY-MM-DD -> DD/MM/YYYY)
+function formatDisplayDate(dateStr) {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+// Get Spanish Name of Week Day
+function getDayName(dateStr) {
+  const date = new Date(dateStr + 'T00:00:00');
+  return date.toLocaleString('es-ES', { weekday: 'long' });
+}
+
+// Simple HTML escaping helper
+function escapeHtml(text) {
+  if (!text) return '';
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+
+// Show Toast messages
+function showToast(message, type = 'success') {
+  const existingToast = document.querySelector('.toast-container');
+  if (existingToast) existingToast.remove();
+
+  const container = document.createElement('div');
+  container.className = `toast-container ${type}`;
+  
+  const iconMap = {
+    success: 'check-circle',
+    danger: 'alert-triangle',
+    warning: 'alert-circle',
+    indigo: 'sparkles',
+    neutral: 'info'
+  };
+  const iconName = iconMap[type] || 'info';
+
+  container.innerHTML = `
+    <i data-lucide="${iconName}"></i>
+    <span>${message}</span>
+  `;
+
+  document.body.appendChild(container);
+  lucide.createIcons();
+
+  setTimeout(() => {
+    container.classList.add('show');
+  }, 10);
+
+  setTimeout(() => {
+    container.classList.remove('show');
+    setTimeout(() => container.remove(), 300);
+  }, 4000);
+}
