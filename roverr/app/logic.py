@@ -2539,6 +2539,11 @@ def process_single_torrent(qb, torrent, settings):
     source_path = find_file_in_path(local_source, item_name)
     
     if not source_path:
+        receptor_enabled = settings.get('receptor_enabled', False)
+        if receptor_enabled:
+            source_path = content_path
+            logger.info(f"Local file not found in {local_source}, but Receptor is enabled. Falling back to content_path: {content_path}")
+        else:
             logger.warning(f"Could not find {item_name} in {local_source}")
             MoveHistory.create(torrent_name=torrent.name, status='error', message=f"File not found in {local_source}", source_path="", dest_path="")
             return
