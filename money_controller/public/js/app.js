@@ -18,7 +18,7 @@ let recSearch = '';
 let recFilterType = '';
 let recFilterCategory = '';
 let recSort = 'day';
-let recViewMode = 'grid';
+let recViewMode = localStorage.getItem('recViewMode') || 'grid';
 
 // Chart instances
 let forecastChart = null;
@@ -886,8 +886,7 @@ async function renderRecurringTab() {
             </span>
           </td>
           <td>${freqMap[rule.frequency] || rule.frequency}</td>
-          <td>${dateDetail}</td>
-          <td>${rule.lastChargeDate ? formatDisplayDate(formatDate(rule.lastChargeDate)) : 'N/A'}</td>
+          <td>${rule.end_date ? formatDisplayDate(rule.end_date) : 'Indefinido'}</td>
           <td>${rule.nextChargeDate ? formatDisplayDate(formatDate(rule.nextChargeDate)) : 'Finalizado'}</td>
           <td class="text-right tx-amount ${rule.type}">
             ${rule.type === 'income' ? '+' : '-'}${formatCurrency(rule.amount)}
@@ -1161,6 +1160,15 @@ document.getElementById('btn-clear-simulations').addEventListener('click', () =>
 
 // Setup Event Listeners
 function setupEventListeners() {
+  // Set initial view mode button states from localStorage
+  if (recViewMode === 'list') {
+    document.getElementById('btn-rec-view-grid').classList.remove('active');
+    document.getElementById('btn-rec-view-list').classList.add('active');
+  } else {
+    document.getElementById('btn-rec-view-grid').classList.add('active');
+    document.getElementById('btn-rec-view-list').classList.remove('active');
+  }
+
   // Navigation
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1216,6 +1224,7 @@ function setupEventListeners() {
 
   document.getElementById('btn-rec-view-grid').addEventListener('click', () => {
     recViewMode = 'grid';
+    localStorage.setItem('recViewMode', 'grid');
     document.getElementById('btn-rec-view-grid').classList.add('active');
     document.getElementById('btn-rec-view-list').classList.remove('active');
     renderRecurringTab();
@@ -1223,6 +1232,7 @@ function setupEventListeners() {
 
   document.getElementById('btn-rec-view-list').addEventListener('click', () => {
     recViewMode = 'list';
+    localStorage.setItem('recViewMode', 'list');
     document.getElementById('btn-rec-view-grid').classList.remove('active');
     document.getElementById('btn-rec-view-list').classList.add('active');
     renderRecurringTab();
