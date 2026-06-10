@@ -186,37 +186,54 @@ const dbOps = {
 
   // Transactions
   getTransactions: (filters = {}) => {
-    let sql = `
-      SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon 
-      FROM transactions t 
-      LEFT JOIN categories c ON t.category_id = c.id
-      WHERE 1=1
-    `;
+    let whereSql = ' WHERE 1=1';
     const params = [];
 
     if (filters.type) {
-      sql += ' AND t.type = ?';
+      whereSql += ' AND t.type = ?';
       params.push(filters.type);
     }
     if (filters.category_id) {
-      sql += ' AND t.category_id = ?';
+      whereSql += ' AND t.category_id = ?';
       params.push(Number(filters.category_id));
     }
     if (filters.start_date) {
-      sql += ' AND t.date >= ?';
+      whereSql += ' AND t.date >= ?';
       params.push(filters.start_date);
     }
     if (filters.end_date) {
-      sql += ' AND t.date <= ?';
+      whereSql += ' AND t.date <= ?';
       params.push(filters.end_date);
     }
     if (filters.search) {
-      sql += ' AND t.description LIKE ?';
+      whereSql += ' AND t.description LIKE ?';
       params.push(`%${filters.search}%`);
     }
 
-    sql += ' ORDER BY t.date DESC, t.id DESC';
-    return db.prepare(sql).all(...params);
+    if (filters.limit !== undefined && filters.offset !== undefined) {
+      const countSql = `SELECT COUNT(*) as count FROM transactions t ${whereSql}`;
+      const totalCount = db.prepare(countSql).get(...params).count;
+
+      const sql = `
+        SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon 
+        FROM transactions t 
+        LEFT JOIN categories c ON t.category_id = c.id
+        ${whereSql}
+        ORDER BY t.date DESC, t.id DESC
+        LIMIT ? OFFSET ?
+      `;
+      const txs = db.prepare(sql).all(...params, Number(filters.limit), Number(filters.offset));
+      return { transactions: txs, totalCount };
+    } else {
+      const sql = `
+        SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon 
+        FROM transactions t 
+        LEFT JOIN categories c ON t.category_id = c.id
+        ${whereSql}
+        ORDER BY t.date DESC, t.id DESC
+      `;
+      return db.prepare(sql).all(...params);
+    }
   },
   addTransaction: (description, amount, type, category_id, date, notes = '', recurring_rule_id = null, recurrence_date = null) => {
     return db.prepare('INSERT INTO transactions (description, amount, type, category_id, date, notes, recurring_rule_id, recurrence_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')

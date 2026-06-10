@@ -162,8 +162,13 @@ app.delete('/api/categories/:id', (req, res) => {
 // Transactions
 app.get('/api/transactions', (req, res) => {
   try {
-    const { type, category_id, start_date, end_date, search } = req.query;
-    const transactions = dbOps.getTransactions({ type, category_id, start_date, end_date, search });
+    const { type, category_id, start_date, end_date, search, limit, offset } = req.query;
+    const filters = { type, category_id, start_date, end_date, search };
+    if (limit !== undefined && offset !== undefined) {
+      filters.limit = Number(limit);
+      filters.offset = Number(offset);
+    }
+    const transactions = dbOps.getTransactions(filters);
     res.json(transactions);
   } catch (err) {
     res.status(500).json({ error: err.message });

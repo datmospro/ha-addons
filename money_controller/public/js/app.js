@@ -5,6 +5,8 @@ let categories = [];
 let settings = {};
 let currentTab = 'dashboard';
 let transactions = [];
+let txCurrentPage = 1;
+const txLimit = 50;
 let recurringRules = [];
 let forecastData = null;
 let currentCalendarDate = new Date();
@@ -642,6 +644,7 @@ function renderDashboardAlertsList() {
 async function renderTransactionsTab() {
   const tableBody = document.getElementById('transactions-table-body');
   const emptyState = document.getElementById('tx-empty-state');
+  const paginationContainer = document.getElementById('tx-pagination');
   tableBody.innerHTML = '';
   
   const search = document.getElementById('tx-search').value;
@@ -651,22 +654,30 @@ async function renderTransactionsTab() {
   const end_date = document.getElementById('tx-filter-end').value;
 
   try {
-    let query = `?search=${encodeURIComponent(search)}`;
+    const offset = (txCurrentPage - 1) * txLimit;
+    let query = `?search=${encodeURIComponent(search)}&limit=${txLimit}&offset=${offset}`;
     if (type) query += `&type=${type}`;
     if (category_id) query += `&category_id=${category_id}`;
     if (start_date) query += `&start_date=${start_date}`;
     if (end_date) query += `&end_date=${end_date}`;
 
     const res = await fetch(`/api/transactions${query}`);
-    transactions = await res.json();
+    const resultObj = await res.json();
 
-    if (transactions.length === 0) {
+    const transactionsList = resultObj.transactions || [];
+    const totalCount = resultObj.totalCount || 0;
+
+    transactions = transactionsList;
+
+    if (totalCount === 0) {
       emptyState.classList.remove('hidden');
+      paginationContainer.classList.add('hidden');
       return;
     }
     emptyState.classList.add('hidden');
+    paginationContainer.classList.remove('hidden');
 
-    transactions.forEach(t => {
+    transactionsList.forEach(t => {
       const row = document.createElement('tr');
       
       const descriptionHTML = `
@@ -716,11 +727,77 @@ async function renderTransactionsTab() {
       tableBody.appendChild(row);
     });
 
+    renderPaginationControls(totalCount);
     lucide.createIcons();
 
   } catch (err) {
     console.error('Error loading transactions:', err);
   }
+}
+
+function renderPaginationControls(totalCount) {
+  const totalPages = Math.ceil(totalCount / txLimit);
+  
+  const start = totalCount === 0 ? 0 : (txCurrentPage - 1) * txLimit + 1;
+  const end = Math.min(txCurrentPage * txLimit, totalCount);
+  
+  document.getElementById('pagination-start').textContent = start;
+  document.getElementById('pagination-end').textContent = end;
+  document.getElementById('pagination-total').textContent = totalCount;
+  
+  const prevBtn = document.getElementById('btn-prev-page');
+  const nextBtn = document.getElementById('btn-next-page');
+  
+  prevBtn.disabled = txCurrentPage === 1;
+  nextBtn.disabled = txCurrentPage === totalPages || totalPages === 0;
+  
+  const pagesContainer = document.getElementById('pagination-pages');
+  pagesContainer.innerHTML = '';
+  
+  if (totalPages <= 1) {
+    return;
+  }
+  
+  const range = [];
+  const delta = 1;
+  
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || (i >= txCurrentPage - delta && i <= txCurrentPage + delta)) {
+      range.push(i);
+    }
+  }
+  
+  let l;
+  range.forEach(i => {
+    if (l) {
+      if (i - l === 2) {
+        pagesContainer.appendChild(createPageButton(l + 1));
+      } else if (i - l > 2) {
+        const dots = document.createElement('span');
+        dots.textContent = '...';
+        dots.style.padding = '0 4px';
+        dots.style.color = 'var(--text-muted)';
+        pagesContainer.appendChild(dots);
+      }
+    }
+    pagesContainer.appendChild(createPageButton(i, i === txCurrentPage));
+    l = i;
+  });
+}
+
+function createPageButton(pageNumber, isActive = false) {
+  const btn = document.createElement('button');
+  btn.className = `btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-sm`;
+  btn.textContent = pageNumber;
+  btn.style.padding = '4px 10px';
+  btn.style.fontSize = '0.85rem';
+  btn.style.minWidth = '32px';
+  btn.disabled = isActive;
+  btn.addEventListener('click', () => {
+    txCurrentPage = pageNumber;
+    renderTransactionsTab();
+  });
+  return btn;
 }
 
 // Helper to normalize a Date object to YYYY-MM-DD local string
@@ -1456,9 +1533,15 @@ function setupEventListeners() {
   // Filter Transactions Event Listeners
   const txFilterInputs = ['tx-search', 'tx-filter-type', 'tx-filter-category', 'tx-filter-start', 'tx-filter-end'];
   txFilterInputs.forEach(id => {
-    document.getElementById(id).addEventListener('change', renderTransactionsTab);
+    document.getElementById(id).addEventListener('change', () => {
+      txCurrentPage = 1;
+      renderTransactionsTab();
+    });
   });
-  document.getElementById('tx-search').addEventListener('keyup', debounce(renderTransactionsTab, 300));
+  document.getElementById('tx-search').addEventListener('keyup', debounce(() => {
+    txCurrentPage = 1;
+    renderTransactionsTab();
+  }, 300));
   
   document.getElementById('btn-clear-filters').addEventListener('click', () => {
     document.getElementById('tx-search').value = '';
@@ -1466,6 +1549,20 @@ function setupEventListeners() {
     document.getElementById('tx-filter-category').value = '';
     document.getElementById('tx-filter-start').value = '';
     document.getElementById('tx-filter-end').value = '';
+    txCurrentPage = 1;
+    renderTransactionsTab();
+  });
+
+  // Pagination Event Listeners
+  document.getElementById('btn-prev-page').addEventListener('click', () => {
+    if (txCurrentPage > 1) {
+      txCurrentPage--;
+      renderTransactionsTab();
+    }
+  });
+
+  document.getElementById('btn-next-page').addEventListener('click', () => {
+    txCurrentPage++;
     renderTransactionsTab();
   });
 
