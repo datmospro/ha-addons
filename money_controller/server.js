@@ -538,16 +538,36 @@ app.post('/api/bank/sync', async (req, res) => {
         const status = (tx.status || '').toLowerCase();
         if (status !== 'booked' && status !== 'book') continue;
         
-        const txId = tx.transaction_id || tx.entry_reference || tx.transactionId || tx.entryReference;
-        if (!txId) continue;
-
-        const amountNum = parseFloat(tx.amount);
-        const type = amountNum >= 0 ? 'income' : 'expense';
+        // 1. Resolve amount and sign (debit vs credit indicator)
+        const amountStr = tx.transaction_amount?.amount || tx.amount || '0';
+        let amountNum = parseFloat(amountStr);
+        if (isNaN(amountNum)) amountNum = 0;
+        
+        let type = 'expense';
+        const indicator = tx.credit_debit_indicator || '';
+        if (indicator.toUpperCase() === 'CRDT' || indicator.toLowerCase() === 'credit') {
+          type = 'income';
+        } else if (indicator.toUpperCase() === 'DBIT' || indicator.toLowerCase() === 'debit') {
+          type = 'expense';
+        } else {
+          type = amountNum >= 0 ? 'income' : 'expense';
+        }
+        
         const absoluteAmount = Math.abs(amountNum);
         
+        // 2. Resolve date and description
         const date = tx.booking_date || tx.value_date || tx.bookingDate || tx.valueDate || new Date().toISOString().split('T')[0];
+        const descText = (tx.remittance_information && tx.remittance_information[0]) || tx.description || '';
         
-        let description = tx.description || 'Transacción Bancaria';
+        // 3. Resolve transaction ID (generate synthetic hash since Unicaja returns null)
+        let txId = tx.transaction_id || tx.entry_reference || tx.transactionId || tx.entryReference;
+        if (!txId) {
+          const bal = tx.balance_after_transaction?.amount || '';
+          const rawString = `${date}_${amountStr}_${indicator}_${descText}_${bal}`;
+          txId = crypto.createHash('sha256').update(rawString).digest('hex');
+        }
+        
+        let description = descText || 'Transacción Bancaria';
         description = description.replace(/\s+/g, ' ').trim();
         if (description.length > 80) {
           description = description.substring(0, 77) + '...';
