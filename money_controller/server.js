@@ -530,6 +530,9 @@ app.post('/api/bank/sync', async (req, res) => {
       const data = await response.json();
       const txList = data.transactions || [];
       console.log(`Found ${txList.length} transaction(s) for account ${accountId}`);
+      if (txList.length > 0) {
+        console.log('DEBUG - Sample transaction keys/values:', JSON.stringify(txList[0]));
+      }
       
       for (const tx of txList) {
         const status = (tx.status || '').toLowerCase();
