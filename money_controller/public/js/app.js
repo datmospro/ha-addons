@@ -986,7 +986,6 @@ async function renderRecurringTab() {
     parentEl.appendChild(row);
   }
 }
-}
 
 // Render Forecast Tab (Includes Interactive Calendar & What-If panel)
 function renderForecastTab() {
