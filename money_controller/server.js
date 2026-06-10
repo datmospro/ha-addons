@@ -686,11 +686,25 @@ app.post('/api/bank/sync', async (req, res) => {
         
         const cleanDescUpper = description.toUpperCase();
         
-        const matchedRule = recurringRules.find(rule => {
+        const candidateRules = recurringRules.filter(rule => {
           if (rule.type !== type || !rule.match_patterns) return false;
           const patterns = rule.match_patterns.split(',').map(p => p.trim().toUpperCase());
           return patterns.some(pattern => pattern && cleanDescUpper.includes(pattern));
         });
+
+        let matchedRule = null;
+        if (candidateRules.length === 1) {
+          matchedRule = candidateRules[0];
+        } else if (candidateRules.length > 1) {
+          let minDiff = Infinity;
+          candidateRules.forEach(rule => {
+            const diff = Math.abs(rule.amount - absoluteAmount);
+            if (diff < minDiff) {
+              minDiff = diff;
+              matchedRule = rule;
+            }
+          });
+        }
         
         let finalDescription = description;
         if (matchedRule) {
