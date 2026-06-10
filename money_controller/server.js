@@ -293,7 +293,15 @@ app.get('/api/bank/institutions', async (req, res) => {
     });
 
     if (!response.ok) {
-      throw new Error(`Enable Banking API returned ${response.status}: ${response.statusText}`);
+      const errText = await response.text();
+      let details = '';
+      try {
+        const parsed = JSON.parse(errText);
+        details = parsed.message || parsed.error || errText;
+      } catch (e) {
+        details = errText;
+      }
+      throw new Error(`Enable Banking API returned ${response.status}: ${details}`);
     }
 
     const institutions = await response.json();
@@ -355,7 +363,14 @@ app.post('/api/bank/link', async (req, res) => {
     if (!response.ok) {
       const errText = await response.text();
       console.error('Error creating Enable Banking session:', errText);
-      throw new Error('Error al crear la solicitud de conexión: ' + response.statusText);
+      let details = '';
+      try {
+        const parsed = JSON.parse(errText);
+        details = parsed.message || parsed.error || errText;
+      } catch (e) {
+        details = errText;
+      }
+      throw new Error('Error al crear la solicitud de conexión: ' + details);
     }
 
     const authData = await response.json();
@@ -399,7 +414,14 @@ app.get('/api/bank/callback', async (req, res) => {
     if (!response.ok) {
       const errText = await response.text();
       console.error('Error exchanging session code:', errText);
-      throw new Error('Error al verificar la sesión con el banco.');
+      let details = '';
+      try {
+        const parsed = JSON.parse(errText);
+        details = parsed.message || parsed.error || errText;
+      } catch (e) {
+        details = errText;
+      }
+      throw new Error('Error al verificar la sesión con el banco: ' + details);
     }
 
     const sessionData = await response.json();
