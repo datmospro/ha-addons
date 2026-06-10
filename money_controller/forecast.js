@@ -256,6 +256,7 @@ function generateForecast(temporaryTransactions = []) {
           amount: t.amount,
           type: 'income',
           category: t.category_name || (t.category_id ? categoriesMap[t.category_id]?.name : 'Sin categoría'),
+          category_id: t.category_id,
           isPast: true
         });
       } else {
@@ -266,6 +267,7 @@ function generateForecast(temporaryTransactions = []) {
           amount: t.amount,
           type: 'expense',
           category: t.category_name || (t.category_id ? categoriesMap[t.category_id]?.name : 'Sin categoría'),
+          category_id: t.category_id,
           isPast: true
         });
       }
@@ -336,7 +338,8 @@ function generateForecast(temporaryTransactions = []) {
           description: t.description + (t.isTemp ? ' (Simulado)' : ''),
           amount: t.amount,
           type: 'income',
-          category: t.category_name || (t.category_id ? categoriesMap[t.category_id]?.name : 'Sin categoría')
+          category: t.category_name || (t.category_id ? categoriesMap[t.category_id]?.name : 'Sin categoría'),
+          category_id: t.category_id
         });
       } else {
         runningBalance -= t.amount;
@@ -345,7 +348,8 @@ function generateForecast(temporaryTransactions = []) {
           description: t.description + (t.isTemp ? ' (Simulado)' : ''),
           amount: t.amount,
           type: 'expense',
-          category: t.category_name || (t.category_id ? categoriesMap[t.category_id]?.name : 'Sin categoría')
+          category: t.category_name || (t.category_id ? categoriesMap[t.category_id]?.name : 'Sin categoría'),
+          category_id: t.category_id
         });
       }
     });
@@ -360,7 +364,8 @@ function generateForecast(temporaryTransactions = []) {
             description: rule.description + ' (Fijo)',
             amount: rule.amount,
             type: 'income',
-            category: rule.category_name || 'Ingresos Fijos'
+            category: rule.category_name || 'Ingresos Fijos',
+            category_id: rule.category_id
           });
         } else {
           runningBalance -= rule.amount;
@@ -369,7 +374,8 @@ function generateForecast(temporaryTransactions = []) {
             description: rule.description + ' (Fijo)',
             amount: rule.amount,
             type: 'expense',
-            category: rule.category_name || 'Gastos Fijos'
+            category: rule.category_name || 'Gastos Fijos',
+            category_id: rule.category_id
           });
         }
       }

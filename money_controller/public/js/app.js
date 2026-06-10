@@ -66,6 +66,8 @@ async function loadBaseData() {
     document.getElementById('set-safety-threshold').value = settings.safety_threshold || 100;
     document.getElementById('set-variable-budget').value = settings.variable_monthly_budget || 300;
     document.getElementById('set-currency').value = settings.currency || 'EUR';
+    document.getElementById('set-shift-income-category').value = settings.shift_income_category || '';
+    document.getElementById('set-shift-income-day').value = settings.shift_income_day || '25';
 
     // 2. Load Categories
     const categoriesRes = await fetch('/api/categories');
@@ -104,6 +106,16 @@ function populateCategorySelects() {
     filterCatSelect.insertAdjacentHTML('beforeend', filterOptionHTML);
     if (recFilterCatSelect) recFilterCatSelect.insertAdjacentHTML('beforeend', filterOptionHTML);
   });
+
+  // For shift category settings
+  const shiftCatSelect = document.getElementById('set-shift-income-category');
+  if (shiftCatSelect) {
+    shiftCatSelect.innerHTML = '<option value="">Ninguno (Desactivado)</option>';
+    categories.filter(c => c.type === 'income').forEach(cat => {
+      shiftCatSelect.insertAdjacentHTML('beforeend', `<option value="${cat.id}">${cat.name}</option>`);
+    });
+    shiftCatSelect.value = settings.shift_income_category || '';
+  }
 }
 
 // Run Cash Flow Forecast Engine (Handles standard and simulated runs)
@@ -156,28 +168,69 @@ async function runForecastCalculation() {
   }
 }
 
-// Render Dashboard Panel
 async function renderDashboard() {
   if (!forecastData) return;
   
-  // 1. Fetch transactions of current month for summary cards
+  // 1. Fetch transactions from the start of the previous month for summary cards (for shifted incomes)
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const startOfMonth = `${year}-${month}-01`;
   const endOfMonth = `${year}-${month}-${new Date(year, now.getMonth() + 1, 0).getDate()}`;
   
+  const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const startOfPrevMonth = formatDate(prevMonthDate);
+  
   try {
-    const txRes = await fetch(`/api/transactions?start_date=${startOfMonth}&end_date=${endOfMonth}`);
-    const currentMonthTxs = await txRes.json();
+    const txRes = await fetch(`/api/transactions?start_date=${startOfPrevMonth}&end_date=${endOfMonth}`);
+    const allTxs = await txRes.json();
     
-    // Compute current month stats (from historical transactions)
+    // Compute current month stats (applying shifted income rules)
     let incomesSum = 0;
     let expensesSum = 0;
     
-    currentMonthTxs.forEach(t => {
-      if (t.type === 'income') incomesSum += t.amount;
-      else expensesSum += t.amount;
+    const shiftCatId = settings.shift_income_category ? parseInt(settings.shift_income_category) : null;
+    const shiftDay = settings.shift_income_day ? parseInt(settings.shift_income_day) : 25;
+    
+    const prevYear = prevMonthDate.getFullYear();
+    const prevMonthStr = String(prevMonthDate.getMonth() + 1).padStart(2, '0');
+    
+    allTxs.forEach(t => {
+      const tDate = new Date(t.date + 'T00:00:00');
+      const tYear = tDate.getFullYear();
+      const tMonth = String(tDate.getMonth() + 1).padStart(2, '0');
+      const tDay = tDate.getDate();
+      
+      const isCurrentMonth = (tYear === now.getFullYear() && tMonth === month);
+      const isPrevMonth = (tYear === prevYear && tMonth === prevMonthStr);
+      
+      if (isCurrentMonth) {
+        if (t.type === 'expense') {
+          expensesSum += t.amount;
+        } else { // income
+          // Check if shifted to next month
+          const isShiftedToNext = (shiftCatId && t.category_id === shiftCatId && tDay >= shiftDay);
+          if (!isShiftedToNext) {
+            incomesSum += t.amount;
+          }
+        }
+      } else if (isPrevMonth) {
+        if (t.type === 'income') {
+          // Check if shifted from last month to this month
+          const isShiftedToCurrent = (shiftCatId && t.category_id === shiftCatId && tDay >= shiftDay);
+          if (isShiftedToCurrent) {
+            incomesSum += t.amount;
+          }
+        }
+      }
+    });
+    
+    // We also filter current month transactions (for categories doughnut chart, etc.)
+    const currentMonthTxs = allTxs.filter(t => {
+      const tDate = new Date(t.date + 'T00:00:00');
+      const tYear = tDate.getFullYear();
+      const tMonth = String(tDate.getMonth() + 1).padStart(2, '0');
+      return (tYear === now.getFullYear() && tMonth === month);
     });
 
     // Forecast projection for current month
@@ -194,7 +247,7 @@ async function renderDashboard() {
     netEl.textContent = formatCurrency(netSavings);
     netEl.className = 'amount';
     
-    // Calculate projected Month-End savings (Proposal 2)
+    // Calculate projected Month-End savings (Proposal 2 with shifting)
     let projIncomes = incomesSum;
     let projExpenses = expensesSum;
     const localTodayStr = formatDate(now);
@@ -209,8 +262,17 @@ async function renderDashboard() {
     forecastData.projection.forEach(p => {
       if (p.date >= startOfMonth && p.date <= endOfMonth && !p.isPast) {
         p.events.forEach(e => {
-          if (e.type === 'income') projIncomes += e.amount;
-          if (e.type === 'expense') projExpenses += e.amount;
+          if (e.type === 'income') {
+            const pDate = new Date(p.date + 'T00:00:00');
+            const pDay = pDate.getDate();
+            // Exclude future incomes that shift to next month
+            const isShiftedToNext = (shiftCatId && e.category_id === shiftCatId && pDay >= shiftDay);
+            if (!isShiftedToNext) {
+              projIncomes += e.amount;
+            }
+          } else if (e.type === 'expense') {
+            projExpenses += e.amount;
+          }
         });
         if (p.variableExpense > 0) {
           projExpenses += p.variableExpense;
@@ -224,14 +286,14 @@ async function renderDashboard() {
     if (netSavings > 0) {
       netEl.classList.add('green');
       netIconEl.className = 'card-icon income';
-      netSubEl.innerHTML = `Ahorro real acumulado<br><span style="color: ${projNet >= 0 ? 'var(--income)' : 'var(--expense)'}; font-weight: 600; margin-top: 2px; display: inline-block;">Prev. fin de mes: ${formattedProjNet}</span>`;
+      netSubEl.innerHTML = `Ahorro real acumulado<br><span style="color: ${projNet >= 0 ? 'var(--income)' : 'var(--expense)'}; font-weight: 600; margin-top: 2px; display: inline-block;">Previsión fin de mes: ${formattedProjNet}</span>`;
     } else if (netSavings < 0) {
       netEl.classList.add('red');
       netIconEl.className = 'card-icon expense';
-      netSubEl.innerHTML = `Gastos superan ingresos acumulados hoy<br><span style="color: ${projNet >= 0 ? 'var(--income)' : 'var(--expense)'}; font-weight: 600; margin-top: 2px; display: inline-block;">Prev. fin de mes: ${formattedProjNet}</span>`;
+      netSubEl.innerHTML = `Gastos superan ingresos acumulados hoy<br><span style="color: ${projNet >= 0 ? 'var(--income)' : 'var(--expense)'}; font-weight: 600; margin-top: 2px; display: inline-block;">Previsión fin de mes: ${formattedProjNet}</span>`;
     } else {
       netIconEl.className = 'card-icon';
-      netSubEl.innerHTML = `Sin balance neto hoy<br><span style="color: ${projNet >= 0 ? 'var(--income)' : 'var(--expense)'}; font-weight: 600; margin-top: 2px; display: inline-block;">Prev. fin de mes: ${formattedProjNet}</span>`;
+      netSubEl.innerHTML = `Sin balance neto hoy<br><span style="color: ${projNet >= 0 ? 'var(--income)' : 'var(--expense)'}; font-weight: 600; margin-top: 2px; display: inline-block;">Previsión fin de mes: ${formattedProjNet}</span>`;
     }
 
     // 2. Render Charts
@@ -1759,6 +1821,16 @@ async function handleSettingsSubmit(e) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: 'currency', value: currency })
+    });
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'shift_income_category', value: document.getElementById('set-shift-income-category').value })
+    });
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'shift_income_day', value: parseInt(document.getElementById('set-shift-income-day').value) || 25 })
     });
 
     showToast('Configuración guardada correctamente.', 'success');
