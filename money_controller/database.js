@@ -100,31 +100,30 @@ function initDb() {
     db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run('currency', 'EUR');
   }
 
-  // Insert default categories
-  const defaultCategories = [
-    // Incomes
-    { name: 'Nómina', type: 'income', color: '#10b981', icon: 'briefcase' },
-    { name: 'Otros Ingresos', type: 'income', color: '#34d399', icon: 'plus-circle' },
-    { name: 'Inversiones', type: 'income', color: '#059669', icon: 'trending-up' },
-    // Expenses
-    { name: 'Hipoteca / Alquiler', type: 'expense', color: '#f43f5e', icon: 'home' },
-    { name: 'Suministros', type: 'expense', color: '#fb923c', icon: 'zap' },
-    { name: 'Alimentación', type: 'expense', color: '#f59e0b', icon: 'shopping-cart' },
-    { name: 'Transporte / Vehículo', type: 'expense', color: '#3b82f6', icon: 'car' },
-    { name: 'Seguros', type: 'expense', color: '#a855f7', icon: 'shield' },
-    { name: 'Préstamos', type: 'expense', color: '#ec4899', icon: 'credit-card' },
-    { name: 'Ocio / Restaurantes', type: 'expense', color: '#14b8a6', icon: 'coffee' },
-    { name: 'Otros Gastos', type: 'expense', color: '#6b7280', icon: 'help-circle' }
-  ];
+  // Insert default categories if table is empty
+  const countCategories = db.prepare('SELECT COUNT(*) as count FROM categories').get().count;
+  if (countCategories === 0) {
+    const defaultCategories = [
+      // Incomes
+      { name: 'Nómina', type: 'income', color: '#10b981', icon: 'briefcase' },
+      { name: 'Otros Ingresos', type: 'income', color: '#34d399', icon: 'plus-circle' },
+      { name: 'Inversiones', type: 'income', color: '#059669', icon: 'trending-up' },
+      // Expenses
+      { name: 'Hipoteca / Alquiler', type: 'expense', color: '#f43f5e', icon: 'home' },
+      { name: 'Suministros', type: 'expense', color: '#fb923c', icon: 'zap' },
+      { name: 'Alimentación', type: 'expense', color: '#f59e0b', icon: 'shopping-cart' },
+      { name: 'Transporte / Vehículo', type: 'expense', color: '#3b82f6', icon: 'car' },
+      { name: 'Seguros', type: 'expense', color: '#a855f7', icon: 'shield' },
+      { name: 'Préstamos', type: 'expense', color: '#ec4899', icon: 'credit-card' },
+      { name: 'Ocio / Restaurantes', type: 'expense', color: '#14b8a6', icon: 'coffee' },
+      { name: 'Otros Gastos', type: 'expense', color: '#6b7280', icon: 'help-circle' }
+    ];
 
-  const checkCategory = db.prepare('SELECT id FROM categories WHERE name = ?');
-  const insertCategory = db.prepare('INSERT INTO categories (name, type, color, icon) VALUES (?, ?, ?, ?)');
-
-  defaultCategories.forEach(cat => {
-    if (!checkCategory.get(cat.name)) {
+    const insertCategory = db.prepare('INSERT INTO categories (name, type, color, icon) VALUES (?, ?, ?, ?)');
+    defaultCategories.forEach(cat => {
       insertCategory.run(cat.name, cat.type, cat.color, cat.icon);
-    }
-  });
+    });
+  }
 }
 
 // Initialize tables

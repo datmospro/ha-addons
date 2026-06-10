@@ -286,14 +286,15 @@ async function renderDashboard() {
     if (netSavings > 0) {
       netEl.classList.add('green');
       netIconEl.className = 'card-icon income';
+      netSubEl.textContent = 'Ahorro neto este mes';
     } else if (netSavings < 0) {
       netEl.classList.add('red');
       netIconEl.className = 'card-icon expense';
+      netSubEl.textContent = 'Gasto supera ingresos este mes';
     } else {
       netIconEl.className = 'card-icon';
+      netSubEl.textContent = 'Sin balance neto este mes';
     }
-    
-    netSubEl.innerHTML = `<span style="color: ${projNet >= 0 ? 'var(--income)' : 'var(--expense)'}; font-weight: 600; display: inline-block;">Previsión fin de mes: ${formattedProjNet}</span>`;
 
     // 2. Render Charts
     renderForecastLineChart();
