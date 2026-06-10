@@ -1176,7 +1176,8 @@ function selectCalendarDay(dateStr, forecastDay) {
     });
   }
 
-  if (forecastDay.variableExpense === 0 && (!forecastDay.events || forecastDay.events.length <= 1)) {
+  const realEvents = forecastDay.events ? forecastDay.events.filter(e => e.type !== 'info') : [];
+  if (forecastDay.variableExpense === 0 && realEvents.length === 0) {
     eventsList.innerHTML = `<p class="text-muted text-center" style="padding: 20px 0; font-size: 0.85rem;">No hay transacciones ni gastos fijos programados para este día.</p>`;
   }
 }
