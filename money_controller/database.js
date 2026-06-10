@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Determine database path. In HA addon, it must be in /data. Locally, use root folder.
-const dbPath = process.env.DB_PATH || path.join(__dirname, 'moneycontroller.db');
+const dbPath = process.env.DB_PATH || (fs.existsSync('/data') ? '/data/moneycontroller.db' : path.join(__dirname, 'moneycontroller.db'));
 
 // Ensure directory exists
 const dbDir = path.dirname(dbPath);
