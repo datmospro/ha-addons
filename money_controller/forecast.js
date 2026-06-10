@@ -170,23 +170,33 @@ function generateForecast(temporaryTransactions = []) {
   // Sincronizar ocurrencias pasadas antes de cargar datos
   syncPastRecurringOccurrences();
 
-  const settings = dbOps.getSettings();
-  const initialBalance = parseFloat(settings.initial_balance || 0);
-  const safetyThreshold = parseFloat(settings.safety_threshold || 100);
-  const monthlyVariableBudget = parseFloat(settings.variable_monthly_budget || 300);
-  
-  // Gasto variable diario prorrateado (Gasto Mensual / 30.4)
-  const dailyVariableExpense = monthlyVariableBudget / 30.417;
-
   // Obtener fecha actual local
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayStr = formatDate(today);
 
+  const settings = dbOps.getSettings();
+  const initialBalance = parseFloat(settings.initial_balance || 0);
+  const safetyThreshold = parseFloat(settings.safety_threshold || 100);
+  const monthlyVariableBudget = parseFloat(settings.variable_monthly_budget || 300);
+
   // 1. Obtener todas las transacciones reales en la base de datos
   const allActualTransactions = dbOps.getTransactions();
   const futurePlannedTransactions = allActualTransactions.filter(t => t.date > todayStr);
   const historicalTransactions = allActualTransactions.filter(t => t.date <= todayStr);
+
+  // Obtener transacciones variables reales del mes actual
+  const startOfMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+  const actualVariableSpent = historicalTransactions
+    .filter(t => t.date >= startOfMonthStr && t.date <= todayStr && t.type === 'expense' && !t.recurring_rule_id)
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  // Días restantes en el mes actual (después de hoy)
+  const daysInCurrentMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const daysRemaining = daysInCurrentMonth - today.getDate();
+
+  const remainingVariableBudget = Math.max(0, monthlyVariableBudget - actualVariableSpent);
+  const dailyVarCurrentMonth = daysRemaining > 0 ? remainingVariableBudget / daysRemaining : 0;
 
   // Calcular el saldo disponible "hoy" de forma estática para las tarjetas (sin prorrateo virtual)
   let todayBalance = initialBalance;
@@ -228,12 +238,8 @@ function generateForecast(temporaryTransactions = []) {
     const dateStr = formatDate(currentDate);
     const dayEvents = [];
 
-    // Aplicar gasto variable diario prorrateado
+    // No aplicar gasto variable virtual a días pasados o hoy (ya están cerrados y reflejados en el saldo real)
     let dailyVar = 0;
-    if (dailyVariableExpense > 0) {
-      dailyVar = dailyVariableExpense;
-      runningBalance -= dailyVar;
-    }
 
     // Aplicar transacciones reales pasadas
     const dayTransactions = historicalTransactions.filter(t => t.date === dateStr);
@@ -303,10 +309,16 @@ function generateForecast(temporaryTransactions = []) {
     const dateStr = formatDate(currentDate);
     const dayEvents = [];
 
-    // Aplicar gasto variable diario prorrateado
+    // Aplicar gasto variable diario prorrateado dinámico
     let dailyVar = 0;
-    if (dailyVariableExpense > 0) {
-      dailyVar = dailyVariableExpense;
+    if (monthlyVariableBudget > 0) {
+      const dayDate = new Date(dateStr + 'T12:00:00');
+      if (dayDate.getMonth() === today.getMonth() && dayDate.getFullYear() === today.getFullYear()) {
+        dailyVar = dailyVarCurrentMonth;
+      } else {
+        const daysInThatMonth = new Date(dayDate.getFullYear(), dayDate.getMonth() + 1, 0).getDate();
+        dailyVar = monthlyVariableBudget / daysInThatMonth;
+      }
       runningBalance -= dailyVar;
     }
 
