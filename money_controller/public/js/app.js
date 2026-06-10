@@ -738,6 +738,15 @@ async function renderRecurringTab() {
   container.innerHTML = '';
   if (listBody) listBody.innerHTML = '';
 
+  const freqMap = {
+    weekly: 'Semanal',
+    monthly: 'Mensual',
+    bimonthly: 'Bimestral',
+    quarterly: 'Trimestral',
+    semiannually: 'Semestral',
+    annually: 'Anual'
+  };
+
   try {
     const res = await fetch('/api/recurring');
     const rawRules = await res.json();
@@ -777,8 +786,11 @@ async function renderRecurringTab() {
       return matchesSearch && matchesType && matchesCategory;
     });
 
-    // Apply sorting in memory
-    filteredRules.sort((a, b) => {
+    // Split into active and finished lists
+    const activeRules = filteredRules.filter(r => r.nextChargeDate !== null);
+    const finishedRules = filteredRules.filter(r => r.nextChargeDate === null);
+
+    const sortFn = (a, b) => {
       if (recSort === 'amount-desc') {
         return b.amount - a.amount;
       } else if (recSort === 'amount-asc') {
@@ -791,9 +803,21 @@ async function renderRecurringTab() {
         if (!b.nextChargeDate) return -1;
         return a.nextChargeDate - b.nextChargeDate;
       }
+    };
+
+    // Apply sorting in memory to both lists
+    activeRules.sort(sortFn);
+    // For finished rules, if sorting by próximo cobro, sort by end_date descending (latest ended first)
+    finishedRules.sort((a, b) => {
+      if (recSort === 'day') {
+        const dateA = a.end_date ? new Date(a.end_date) : new Date(0);
+        const dateB = b.end_date ? new Date(b.end_date) : new Date(0);
+        return dateB - dateA;
+      }
+      return sortFn(a, b);
     });
 
-    if (filteredRules.length === 0) {
+    if (activeRules.length === 0 && finishedRules.length === 0) {
       container.classList.add('hidden');
       listContainer.classList.add('hidden');
       emptyState.classList.remove('hidden');
@@ -802,108 +826,65 @@ async function renderRecurringTab() {
     }
     emptyState.classList.add('hidden');
 
-    const freqMap = {
-      weekly: 'Semanal',
-      monthly: 'Mensual',
-      bimonthly: 'Bimestral',
-      quarterly: 'Trimestral',
-      semiannually: 'Semestral',
-      annually: 'Anual'
-    };
-
     if (recViewMode === 'grid') {
       container.classList.remove('hidden');
       listContainer.classList.add('hidden');
       
-      filteredRules.forEach(rule => {
-        const dateDetail = rule.frequency === 'annually' && rule.specific_date
-          ? `el día ${rule.specific_date.split('-')[1]} de ${new Date(2026, parseInt(rule.specific_date.split('-')[0]) - 1, 1).toLocaleString('es-ES', { month: 'long' })}`
-          : `el día ${rule.day_of_month || rule.start_date.split('-')[2]}`;
+      // Render Active Grid
+      if (activeRules.length > 0) {
+        activeRules.forEach(rule => {
+          renderGridCard(rule, container, false);
+        });
+      } else {
+        const noActivePlaceholder = document.createElement('div');
+        noActivePlaceholder.style.cssText = 'grid-column: 1 / -1; padding: 20px; text-align: center; color: var(--text-muted); font-style: italic;';
+        noActivePlaceholder.textContent = 'No hay movimientos fijos activos.';
+        container.appendChild(noActivePlaceholder);
+      }
 
-        const card = document.createElement('div');
-        card.className = 'recurring-rule-card glass';
-        card.innerHTML = `
-          <div>
-            <div class="recurring-card-header">
-              <div class="recurring-title-box">
-                <h4>${escapeHtml(rule.description)}</h4>
-                <span class="recurring-category" style="color: ${rule.category_color || '#9ca3af'}">
-                  ● ${escapeHtml(rule.category_name || 'Fijo')}
-                </span>
-              </div>
-              <span class="badge ${rule.type === 'income' ? 'badge-income' : 'badge-expense'}">
-                ${rule.type === 'income' ? 'Ingreso' : 'Gasto'}
-              </span>
-            </div>
-            <div class="recurring-amount ${rule.type}">
-              ${rule.type === 'income' ? '+' : '-'}${formatCurrency(rule.amount)}
-            </div>
-          </div>
+      // Render Finished Grid
+      if (finishedRules.length > 0) {
+        const sectionHeader = document.createElement('div');
+        sectionHeader.style.cssText = 'grid-column: 1 / -1; margin-top: 30px; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;';
+        sectionHeader.innerHTML = '<h3 style="color: var(--text-muted); font-size: 1.1rem; display: flex; align-items: center; gap: 8px;"><i data-lucide="archive" style="width: 18px;"></i> Historial de Movimientos Finalizados</h3>';
+        container.appendChild(sectionHeader);
 
-          <div class="recurring-details">
-            <span><i data-lucide="refresh-cw"></i> Frecuencia: ${freqMap[rule.frequency] || rule.frequency}</span>
-            <span><i data-lucide="calendar"></i> Ajuste Cobro: ${dateDetail}</span>
-            <span><i data-lucide="calendar-check"></i> Último cobro: ${rule.lastChargeDate ? formatDisplayDate(formatDate(rule.lastChargeDate)) : 'Ninguno'}</span>
-            <span><i data-lucide="calendar-clock"></i> Próximo cobro: ${rule.nextChargeDate ? formatDisplayDate(formatDate(rule.nextChargeDate)) : 'Finalizado'}</span>
-            <span><i data-lucide="calendar-days"></i> Inicio: ${formatDisplayDate(rule.start_date)}</span>
-            ${rule.end_date ? `<span><i data-lucide="calendar-off"></i> Fin: ${formatDisplayDate(rule.end_date)}</span>` : ''}
-            ${rule.notes ? `<span class="notes-txt" style="margin-top: 4px; font-style: italic;"><i data-lucide="file-text"></i> ${escapeHtml(rule.notes)}</span>` : ''}
-          </div>
-
-          <div class="recurring-card-actions">
-            <button class="btn-table-action" onclick="openEditRecurring(${rule.id})" title="Editar">
-              <i data-lucide="edit-3" style="width: 16px;"></i>
-            </button>
-            <button class="btn-table-action delete" onclick="deleteRecurringRule(${rule.id})" title="Eliminar">
-              <i data-lucide="trash-2" style="width: 16px;"></i>
-            </button>
-          </div>
-        `;
-        container.appendChild(card);
-      });
+        finishedRules.forEach(rule => {
+          renderGridCard(rule, container, true);
+        });
+      }
     } else {
       // List view
       container.classList.add('hidden');
       listContainer.classList.remove('hidden');
 
-      filteredRules.forEach(rule => {
-        const dateDetail = rule.frequency === 'annually' && rule.specific_date
-          ? `${rule.specific_date.split('-')[1]} de ${new Date(2026, parseInt(rule.specific_date.split('-')[0]) - 1, 1).toLocaleString('es-ES', { month: 'short' })}`
-          : `Día ${rule.day_of_month || rule.start_date.split('-')[2]}`;
+      // Render Active List Rows
+      if (activeRules.length > 0) {
+        activeRules.forEach(rule => {
+          renderListRow(rule, listBody, false);
+        });
+      } else {
+        const placeholderRow = document.createElement('tr');
+        placeholderRow.innerHTML = `<td colspan="8" class="text-center text-muted" style="padding: 20px; font-style: italic;">No hay movimientos fijos activos.</td>`;
+        listBody.appendChild(placeholderRow);
+      }
 
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td><strong>${escapeHtml(rule.description)}</strong></td>
-          <td>
-            <span class="badge ${rule.type === 'income' ? 'badge-income' : 'badge-expense'}">
-              ${rule.type === 'income' ? 'Ingreso' : 'Gasto'}
-            </span>
-          </td>
-          <td>
-            <span class="category-tag">
-              <span class="category-dot" style="background-color: ${rule.category_color || '#6b7280'}"></span>
-              ${escapeHtml(rule.category_name || 'Sin Categoría')}
-            </span>
-          </td>
-          <td>${freqMap[rule.frequency] || rule.frequency}</td>
-          <td>${rule.end_date ? formatDisplayDate(rule.end_date) : 'Indefinido'}</td>
-          <td>${rule.nextChargeDate ? formatDisplayDate(formatDate(rule.nextChargeDate)) : 'Finalizado'}</td>
-          <td class="text-right tx-amount ${rule.type}">
-            ${rule.type === 'income' ? '+' : '-'}${formatCurrency(rule.amount)}
-          </td>
-          <td class="text-center">
-            <div class="action-buttons">
-              <button class="btn-table-action" onclick="openEditRecurring(${rule.id})" title="Editar">
-                <i data-lucide="edit-3"></i>
-              </button>
-              <button class="btn-table-action delete" onclick="deleteRecurringRule(${rule.id})" title="Eliminar">
-                <i data-lucide="trash-2"></i>
-              </button>
+      // Render Finished List Rows
+      if (finishedRules.length > 0) {
+        const headerRow = document.createElement('tr');
+        headerRow.innerHTML = `
+          <td colspan="8" style="padding-top: 25px; padding-bottom: 10px; font-weight: 600; font-size: 1rem; color: var(--text-muted); border-bottom: 1px solid var(--border-color); background: transparent;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <i data-lucide="archive" style="width: 16px;"></i> Historial de Movimientos Finalizados
             </div>
           </td>
         `;
-        listBody.appendChild(row);
-      });
+        listBody.appendChild(headerRow);
+
+        finishedRules.forEach(rule => {
+          renderListRow(rule, listBody, true);
+        });
+      }
     }
 
     lucide.createIcons();
@@ -911,6 +892,100 @@ async function renderRecurringTab() {
   } catch (err) {
     console.error('Error loading recurring rules:', err);
   }
+
+  // Inner helpers to avoid duplicate code
+  function renderGridCard(rule, parentEl, isFinished) {
+    const dateDetail = rule.frequency === 'annually' && rule.specific_date
+      ? `el día ${rule.specific_date.split('-')[1]} de ${new Date(2026, parseInt(rule.specific_date.split('-')[0]) - 1, 1).toLocaleString('es-ES', { month: 'long' })}`
+      : `el día ${rule.day_of_month || rule.start_date.split('-')[2]}`;
+
+    const card = document.createElement('div');
+    card.className = 'recurring-rule-card glass';
+    if (isFinished) {
+      card.style.opacity = '0.6';
+    }
+    card.innerHTML = `
+      <div>
+        <div class="recurring-card-header">
+          <div class="recurring-title-box">
+            <h4>${escapeHtml(rule.description)}</h4>
+            <span class="recurring-category" style="color: ${rule.category_color || '#9ca3af'}">
+              ● ${escapeHtml(rule.category_name || 'Fijo')}
+            </span>
+          </div>
+          <span class="badge ${rule.type === 'income' ? 'badge-income' : 'badge-expense'}">
+            ${rule.type === 'income' ? 'Ingreso' : 'Gasto'}
+          </span>
+        </div>
+        <div class="recurring-amount ${rule.type}">
+          ${rule.type === 'income' ? '+' : '-'}${formatCurrency(rule.amount)}
+        </div>
+      </div>
+
+      <div class="recurring-details">
+        <span><i data-lucide="refresh-cw"></i> Frecuencia: ${freqMap[rule.frequency] || rule.frequency}</span>
+        <span><i data-lucide="calendar"></i> Ajuste Cobro: ${dateDetail}</span>
+        <span><i data-lucide="calendar-check"></i> Último cobro: ${rule.lastChargeDate ? formatDisplayDate(formatDate(rule.lastChargeDate)) : 'Ninguno'}</span>
+        <span><i data-lucide="calendar-clock"></i> Próximo cobro: ${rule.nextChargeDate ? formatDisplayDate(formatDate(rule.nextChargeDate)) : 'Finalizado'}</span>
+        <span><i data-lucide="calendar-days"></i> Inicio: ${formatDisplayDate(rule.start_date)}</span>
+        ${rule.end_date ? `<span><i data-lucide="calendar-off"></i> Fin: ${formatDisplayDate(rule.end_date)}</span>` : ''}
+        ${rule.notes ? `<span class="notes-txt" style="margin-top: 4px; font-style: italic;"><i data-lucide="file-text"></i> ${escapeHtml(rule.notes)}</span>` : ''}
+      </div>
+
+      <div class="recurring-card-actions">
+        <button class="btn-table-action" onclick="openEditRecurring(${rule.id})" title="Editar">
+          <i data-lucide="edit-3" style="width: 16px;"></i>
+        </button>
+        <button class="btn-table-action delete" onclick="deleteRecurringRule(${rule.id})" title="Eliminar">
+          <i data-lucide="trash-2" style="width: 16px;"></i>
+        </button>
+      </div>
+    `;
+    parentEl.appendChild(card);
+  }
+
+  function renderListRow(rule, parentEl, isFinished) {
+    const dateDetail = rule.frequency === 'annually' && rule.specific_date
+      ? `${rule.specific_date.split('-')[1]} de ${new Date(2026, parseInt(rule.specific_date.split('-')[0]) - 1, 1).toLocaleString('es-ES', { month: 'short' })}`
+      : `Día ${rule.day_of_month || rule.start_date.split('-')[2]}`;
+
+    const row = document.createElement('tr');
+    if (isFinished) {
+      row.style.opacity = '0.55';
+    }
+    row.innerHTML = `
+      <td><strong>${escapeHtml(rule.description)}</strong></td>
+      <td>
+        <span class="badge ${rule.type === 'income' ? 'badge-income' : 'badge-expense'}">
+          ${rule.type === 'income' ? 'Ingreso' : 'Gasto'}
+        </span>
+      </td>
+      <td>
+        <span class="category-tag">
+          <span class="category-dot" style="background-color: ${rule.category_color || '#6b7280'}"></span>
+          ${escapeHtml(rule.category_name || 'Sin Categoría')}
+        </span>
+      </td>
+      <td>${freqMap[rule.frequency] || rule.frequency}</td>
+      <td>${rule.end_date ? formatDisplayDate(rule.end_date) : 'Indefinido'}</td>
+      <td>${rule.nextChargeDate ? formatDisplayDate(formatDate(rule.nextChargeDate)) : 'Finalizado'}</td>
+      <td class="text-right tx-amount ${rule.type}">
+        ${rule.type === 'income' ? '+' : '-'}${formatCurrency(rule.amount)}
+      </td>
+      <td class="text-center">
+        <div class="action-buttons">
+          <button class="btn-table-action" onclick="openEditRecurring(${rule.id})" title="Editar">
+            <i data-lucide="edit-3"></i>
+          </button>
+          <button class="btn-table-action delete" onclick="deleteRecurringRule(${rule.id})" title="Eliminar">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </div>
+      </td>
+    `;
+    parentEl.appendChild(row);
+  }
+}
 }
 
 // Render Forecast Tab (Includes Interactive Calendar & What-If panel)
