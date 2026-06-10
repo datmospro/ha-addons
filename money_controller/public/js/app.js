@@ -194,17 +194,44 @@ async function renderDashboard() {
     netEl.textContent = formatCurrency(netSavings);
     netEl.className = 'amount';
     
+    // Calculate projected Month-End savings (Proposal 2)
+    let projIncomes = incomesSum;
+    let projExpenses = expensesSum;
+    const localTodayStr = formatDate(now);
+    
+    // Add today's virtual prorated variable expense if it was calculated
+    const todayProjection = forecastData.projection.find(p => p.date === localTodayStr);
+    if (todayProjection && todayProjection.variableExpense > 0) {
+      projExpenses += todayProjection.variableExpense;
+    }
+    
+    // Sum future events and variable expenses for the rest of the current month
+    forecastData.projection.forEach(p => {
+      if (p.date >= startOfMonth && p.date <= endOfMonth && !p.isPast) {
+        p.events.forEach(e => {
+          if (e.type === 'income') projIncomes += e.amount;
+          if (e.type === 'expense') projExpenses += e.amount;
+        });
+        if (p.variableExpense > 0) {
+          projExpenses += p.variableExpense;
+        }
+      }
+    });
+    
+    const projNet = projIncomes - projExpenses;
+    const formattedProjNet = (projNet >= 0 ? '+' : '') + formatCurrency(projNet);
+    
     if (netSavings > 0) {
       netEl.classList.add('green');
       netIconEl.className = 'card-icon income';
-      netSubEl.textContent = 'Ahorro neto este mes';
+      netSubEl.innerHTML = `Ahorro real acumulado<br><span style="color: ${projNet >= 0 ? 'var(--income)' : 'var(--expense)'}; font-weight: 600; margin-top: 2px; display: inline-block;">Prev. fin de mes: ${formattedProjNet}</span>`;
     } else if (netSavings < 0) {
       netEl.classList.add('red');
       netIconEl.className = 'card-icon expense';
-      netSubEl.textContent = 'Gasto supera ingresos este mes';
+      netSubEl.innerHTML = `Gastos superan ingresos acumulados hoy<br><span style="color: ${projNet >= 0 ? 'var(--income)' : 'var(--expense)'}; font-weight: 600; margin-top: 2px; display: inline-block;">Prev. fin de mes: ${formattedProjNet}</span>`;
     } else {
       netIconEl.className = 'card-icon';
-      netSubEl.textContent = 'Sin balance neto este mes';
+      netSubEl.innerHTML = `Sin balance neto hoy<br><span style="color: ${projNet >= 0 ? 'var(--income)' : 'var(--expense)'}; font-weight: 600; margin-top: 2px; display: inline-block;">Prev. fin de mes: ${formattedProjNet}</span>`;
     }
 
     // 2. Render Charts
