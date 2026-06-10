@@ -19,6 +19,7 @@ let recFilterType = '';
 let recFilterCategory = '';
 let recSort = 'day';
 let recViewMode = localStorage.getItem('recViewMode') || 'grid';
+let useHeatmap = localStorage.getItem('use_heatmap') === 'true';
 
 // Chart instances
 let forecastChart = null;
@@ -1022,6 +1023,19 @@ function renderCalendar() {
   // Draw day cells
   const settingsSafety = parseFloat(settings.safety_threshold || 100);
   
+  // Calculate min and max balances for heatmap of the current month
+  let monthBalances = [];
+  for (let dayNum = 1; dayNum <= totalDays; dayNum++) {
+    const dayDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+    const forecastDay = forecastData?.projection.find(p => p.date === dayDateStr);
+    if (forecastDay) {
+      monthBalances.push(forecastDay.balance);
+    }
+  }
+  const minMonthBal = monthBalances.length > 0 ? Math.min(...monthBalances) : 0;
+  const maxMonthBal = monthBalances.length > 0 ? Math.max(...monthBalances) : 0;
+  const diffMonthBal = maxMonthBal - minMonthBal;
+  
   for (let dayNum = 1; dayNum <= totalDays; dayNum++) {
     const dayDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
     
@@ -1052,6 +1066,17 @@ function renderCalendar() {
         statusClass = 'red';
       } else if (balance < settingsSafety) {
         statusClass = 'yellow';
+      }
+      
+      // Style heatmap if enabled
+      if (useHeatmap) {
+        const pct = diffMonthBal > 0 ? (balance - minMonthBal) / diffMonthBal : 0.5;
+        // Interpolate hue between 10 (amber/red) and 140 (emerald green)
+        const hue = 10 + pct * 130;
+        dayCell.classList.add('heatmap-day');
+        dayCell.style.setProperty('--heatmap-bg', `hsla(${hue}, 70%, 15%, 0.25)`);
+        dayCell.style.setProperty('--heatmap-border', `hsla(${hue}, 70%, 40%, 0.35)`);
+        dayCell.style.setProperty('--heatmap-glow', `hsla(${hue}, 70%, 15%, 0.3)`);
       }
       
       // Dim past historical days slightly
@@ -1248,6 +1273,14 @@ function setupEventListeners() {
     document.getElementById('btn-rec-view-list').classList.remove('active');
   }
 
+  // Set initial heatmap button state
+  const btnHeatmap = document.getElementById('btn-toggle-heatmap');
+  if (useHeatmap) {
+    btnHeatmap.classList.add('active');
+  } else {
+    btnHeatmap.classList.remove('active');
+  }
+
   // Navigation
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1331,6 +1364,18 @@ function setupEventListeners() {
   document.getElementById('what-if-add-form').addEventListener('submit', handleWhatIfSubmit);
 
   // Calendar navigation
+  document.getElementById('btn-toggle-heatmap').addEventListener('click', () => {
+    useHeatmap = !useHeatmap;
+    localStorage.setItem('use_heatmap', useHeatmap);
+    const btn = document.getElementById('btn-toggle-heatmap');
+    if (useHeatmap) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+    renderCalendar();
+  });
+
   document.getElementById('btn-cal-prev').addEventListener('click', () => {
     currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
     renderCalendar();

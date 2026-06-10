@@ -1,5 +1,5 @@
 name: "Money Controller"
-version: "1.0.7"
+version: "1.0.8"
 slug: "money_controller"
 description: "Gestión de ingresos y gastos con motor de predicción de saldo diario y flujo de caja a 12 meses."
 url: "https://github.com/datmospro/ha-addons/tree/main/money_controller"
