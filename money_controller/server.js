@@ -35,6 +35,26 @@ function cleanBankDescription(desc) {
   return clean || desc;
 }
 
+function getMerchantCore(desc) {
+  if (!desc) return '';
+  let core = desc.toUpperCase();
+  // Remove dates (DD-MM-YYYY or DD/MM/YYYY or YYYY-MM-DD)
+  core = core.replace(/\b\d{2}[-\/]\d{2}[-\/]\d{2,4}\b/g, '');
+  core = core.replace(/\b\d{4}[-\/]\d{2}[-\/]\d{2}\b/g, '');
+  // Remove alphanumeric codes that look like transaction IDs (letters + numbers, at least 4 chars)
+  core = core.split(' ').filter(word => {
+    const hasLetter = /[A-Z]/.test(word);
+    const hasDigit = /[0-9]/.test(word);
+    return !(hasLetter && hasDigit && word.length >= 4);
+  }).join(' ');
+  // Remove S.A., S.L.
+  core = core.replace(/\b(S\.?A\.?|S\.?L\.?)\b/g, '');
+  // Clean up punctuation and multiple spaces
+  core = core.replace(/[^A-Z0-9\s]/g, ' ');
+  core = core.replace(/\s+/g, ' ').trim();
+  return core;
+}
+
 function calculateRecurrenceDateForTxDate(rule, txDateStr) {
   const txDate = new Date(txDateStr + 'T12:00:00');
   const y = txDate.getFullYear();
@@ -675,49 +695,56 @@ app.post('/api/bank/sync', async (req, res) => {
           finalDescription = matchedRule.description;
           console.log(`Auto-matched bank transaction "${description}" to recurring rule "${matchedRule.description}"`);
         } else {
-          // Fallback to standard auto-categorization
-          const upperDesc = description.toUpperCase();
-          if (type === 'income') {
-            const nominaCat = categories.find(c => c.name.toUpperCase().includes('NÓMINA') || c.name.toUpperCase().includes('NOMINA'));
-            const inversioCat = categories.find(c => c.name.toUpperCase().includes('INVERSIO'));
-            const otrosIngresosCat = categories.find(c => c.name.toUpperCase().includes('OTROS INGRESOS') || c.type === 'income');
-
-            if (upperDesc.includes('NOMINA') || upperDesc.includes('SALARIO') || upperDesc.includes('SUELDO') || upperDesc.includes('HABERES')) {
-              categoryId = nominaCat ? nominaCat.id : (otrosIngresosCat ? otrosIngresosCat.id : null);
-            } else if (upperDesc.includes('INVER') || upperDesc.includes('DIVIDENDO') || upperDesc.includes('INTERESES')) {
-              categoryId = inversioCat ? inversioCat.id : (otrosIngresosCat ? otrosIngresosCat.id : null);
-            } else {
-              const firstIncome = categories.find(c => c.type === 'income');
-              categoryId = firstIncome ? firstIncome.id : null;
-            }
+          // Check if there is a similar transaction in the database to copy its category (smart learning)
+          const similarCategoryId = dbOps.findSimilarTransactionCategory(description, getMerchantCore);
+          if (similarCategoryId) {
+            categoryId = similarCategoryId;
+            console.log(`Smart-categorized bank transaction "${description}" to category ID ${categoryId} based on similar past transaction`);
           } else {
-            const hipotecaCat = categories.find(c => c.name.toUpperCase().includes('HIPOTECA') || c.name.toUpperCase().includes('ALQUILER'));
-            const suministrosCat = categories.find(c => c.name.toUpperCase().includes('SUMINISTROS') || c.name.toUpperCase().includes('LUZ') || c.name.toUpperCase().includes('AGUA'));
-            const alimentacionCat = categories.find(c => c.name.toUpperCase().includes('ALIMENTAC') || c.name.toUpperCase().includes('SUPERMERCADO') || c.name.toUpperCase().includes('COMPRA'));
-            const transporteCat = categories.find(c => c.name.toUpperCase().includes('TRANSPORTE') || c.name.toUpperCase().includes('VEHICULO') || c.name.toUpperCase().includes('COCHE') || c.name.toUpperCase().includes('GASOLINA'));
-            const segurosCat = categories.find(c => c.name.toUpperCase().includes('SEGURO'));
-            const prestamosCat = categories.find(c => c.name.toUpperCase().includes('PRÉSTAMO') || c.name.toUpperCase().includes('PRESTAMO') || c.name.toUpperCase().includes('CREDITO'));
-            const ocioCat = categories.find(c => c.name.toUpperCase().includes('OCIO') || c.name.toUpperCase().includes('RESTAURANTE') || c.name.toUpperCase().includes('COFFEE'));
-            
-            if (upperDesc.includes('HIPOTECA') || upperDesc.includes('ALQUILER') || upperDesc.includes('RENT') || upperDesc.includes('COMUNIDAD')) {
-              categoryId = hipotecaCat ? hipotecaCat.id : null;
-            } else if (upperDesc.includes('LUZ') || upperDesc.includes('AGUA') || upperDesc.includes('GAS') || upperDesc.includes('IBERDROLA') || upperDesc.includes('ENDESA') || upperDesc.includes('NATURGY') || upperDesc.includes('TELEFONO') || upperDesc.includes('MOVISTAR') || upperDesc.includes('VODAFONE') || upperDesc.includes('ORANGE') || upperDesc.includes('DIGI') || upperDesc.includes('INTERNET') || upperDesc.includes('FIBRA')) {
-              categoryId = suministrosCat ? suministrosCat.id : null;
-            } else if (upperDesc.includes('MERCADONA') || upperDesc.includes('CARREFOUR') || upperDesc.includes('DIA %') || upperDesc.includes('LIDL') || upperDesc.includes('ALCAMPO') || upperDesc.includes('SUPERMERCADO') || upperDesc.includes('ALIMENTACION') || upperDesc.includes('EROSKI') || upperDesc.includes('CONDIS') || upperDesc.includes('AUNAS') || upperDesc.includes('ALIMEN')) {
-              categoryId = alimentacionCat ? alimentacionCat.id : null;
-            } else if (upperDesc.includes('GASOLINA') || upperDesc.includes('REPSOL') || upperDesc.includes('CEPSA') || upperDesc.includes('BP') || upperDesc.includes('PEAJE') || upperDesc.includes('TALLER') || upperDesc.includes('COCHE') || upperDesc.includes('AUTO') || upperDesc.includes('PARKING') || upperDesc.includes('ESTACIONAMIENTO')) {
-              categoryId = transporteCat ? transporteCat.id : null;
-            } else if (upperDesc.includes('SEGURO') || upperDesc.includes('MUTUA') || upperDesc.includes('MAPFRE') || upperDesc.includes('AXA') || upperDesc.includes('ALLIANZ') || upperDesc.includes('ADESLAS') || upperDesc.includes('SANITAS')) {
-              categoryId = segurosCat ? segurosCat.id : null;
-            } else if (upperDesc.includes('PRESTAMO') || upperDesc.includes('CREDITO') || upperDesc.includes('FINANCIACION') || upperDesc.includes('AMORTIZACION')) {
-              categoryId = prestamosCat ? prestamosCat.id : null;
-            } else if (upperDesc.includes('RESTAURANTE') || upperDesc.includes('BAR ') || upperDesc.includes('COFFEE') || upperDesc.includes('CAFE') || upperDesc.includes('CINE') || upperDesc.includes('NETFLIX') || upperDesc.includes('SPOTIFY') || upperDesc.includes('HBO') || upperDesc.includes('PRIME VIDEO') || upperDesc.includes('PIZZERIA') || upperDesc.includes('BURGER') || upperDesc.includes('MCDONALD')) {
-              categoryId = ocioCat ? ocioCat.id : null;
-            }
-            
-            if (!categoryId) {
-              const otrosGastosCat = categories.find(c => c.name.toUpperCase().includes('OTROS GASTOS') || c.type === 'expense');
-              categoryId = otrosGastosCat ? otrosGastosCat.id : (categories.find(c => c.type === 'expense')?.id || null);
+            // Fallback to standard auto-categorization
+            const upperDesc = description.toUpperCase();
+            if (type === 'income') {
+              const nominaCat = categories.find(c => c.name.toUpperCase().includes('NÓMINA') || c.name.toUpperCase().includes('NOMINA'));
+              const inversioCat = categories.find(c => c.name.toUpperCase().includes('INVERSIO'));
+              const otrosIngresosCat = categories.find(c => c.name.toUpperCase().includes('OTROS INGRESOS') || c.type === 'income');
+
+              if (upperDesc.includes('NOMINA') || upperDesc.includes('SALARIO') || upperDesc.includes('SUELDO') || upperDesc.includes('HABERES')) {
+                categoryId = nominaCat ? nominaCat.id : (otrosIngresosCat ? otrosIngresosCat.id : null);
+              } else if (upperDesc.includes('INVER') || upperDesc.includes('DIVIDENDO') || upperDesc.includes('INTERESES')) {
+                categoryId = inversioCat ? inversioCat.id : (otrosIngresosCat ? otrosIngresosCat.id : null);
+              } else {
+                const firstIncome = categories.find(c => c.type === 'income');
+                categoryId = firstIncome ? firstIncome.id : null;
+              }
+            } else {
+              const hipotecaCat = categories.find(c => c.name.toUpperCase().includes('HIPOTECA') || c.name.toUpperCase().includes('ALQUILER'));
+              const suministrosCat = categories.find(c => c.name.toUpperCase().includes('SUMINISTROS') || c.name.toUpperCase().includes('LUZ') || c.name.toUpperCase().includes('AGUA'));
+              const alimentacionCat = categories.find(c => c.name.toUpperCase().includes('ALIMENTAC') || c.name.toUpperCase().includes('SUPERMERCADO') || c.name.toUpperCase().includes('COMPRA'));
+              const transporteCat = categories.find(c => c.name.toUpperCase().includes('TRANSPORTE') || c.name.toUpperCase().includes('VEHICULO') || c.name.toUpperCase().includes('COCHE') || c.name.toUpperCase().includes('GASOLINA'));
+              const segurosCat = categories.find(c => c.name.toUpperCase().includes('SEGURO'));
+              const prestamosCat = categories.find(c => c.name.toUpperCase().includes('PRÉSTAMO') || c.name.toUpperCase().includes('PRESTAMO') || c.name.toUpperCase().includes('CREDITO'));
+              const ocioCat = categories.find(c => c.name.toUpperCase().includes('OCIO') || c.name.toUpperCase().includes('RESTAURANTE') || c.name.toUpperCase().includes('COFFEE'));
+              
+              if (upperDesc.includes('HIPOTECA') || upperDesc.includes('ALQUILER') || upperDesc.includes('RENT') || upperDesc.includes('COMUNIDAD')) {
+                categoryId = hipotecaCat ? hipotecaCat.id : null;
+              } else if (upperDesc.includes('LUZ') || upperDesc.includes('AGUA') || upperDesc.includes('GAS') || upperDesc.includes('IBERDROLA') || upperDesc.includes('ENDESA') || upperDesc.includes('NATURGY') || upperDesc.includes('TELEFONO') || upperDesc.includes('MOVISTAR') || upperDesc.includes('VODAFONE') || upperDesc.includes('ORANGE') || upperDesc.includes('DIGI') || upperDesc.includes('INTERNET') || upperDesc.includes('FIBRA')) {
+                categoryId = suministrosCat ? suministrosCat.id : null;
+              } else if (upperDesc.includes('MERCADONA') || upperDesc.includes('CARREFOUR') || upperDesc.includes('DIA %') || upperDesc.includes('LIDL') || upperDesc.includes('ALCAMPO') || upperDesc.includes('SUPERMERCADO') || upperDesc.includes('ALIMENTACION') || upperDesc.includes('EROSKI') || upperDesc.includes('CONDIS') || upperDesc.includes('AUNAS') || upperDesc.includes('ALIMEN')) {
+                categoryId = alimentacionCat ? alimentacionCat.id : null;
+              } else if (upperDesc.includes('GASOLINA') || upperDesc.includes('REPSOL') || upperDesc.includes('CEPSA') || upperDesc.includes('BP') || upperDesc.includes('PEAJE') || upperDesc.includes('TALLER') || upperDesc.includes('COCHE') || upperDesc.includes('AUTO') || upperDesc.includes('PARKING') || upperDesc.includes('ESTACIONAMIENTO')) {
+                categoryId = transporteCat ? transporteCat.id : null;
+              } else if (upperDesc.includes('SEGURO') || upperDesc.includes('MUTUA') || upperDesc.includes('MAPFRE') || upperDesc.includes('AXA') || upperDesc.includes('ALLIANZ') || upperDesc.includes('ADESLAS') || upperDesc.includes('SANITAS')) {
+                categoryId = segurosCat ? segurosCat.id : null;
+              } else if (upperDesc.includes('PRESTAMO') || upperDesc.includes('CREDITO') || upperDesc.includes('FINANCIACION') || upperDesc.includes('AMORTIZACION')) {
+                categoryId = prestamosCat ? prestamosCat.id : null;
+              } else if (upperDesc.includes('RESTAURANTE') || upperDesc.includes('BAR ') || upperDesc.includes('COFFEE') || upperDesc.includes('CAFE') || upperDesc.includes('CINE') || upperDesc.includes('NETFLIX') || upperDesc.includes('SPOTIFY') || upperDesc.includes('HBO') || upperDesc.includes('PRIME VIDEO') || upperDesc.includes('PIZZERIA') || upperDesc.includes('BURGER') || upperDesc.includes('MCDONALD')) {
+                categoryId = ocioCat ? ocioCat.id : null;
+              }
+              
+              if (!categoryId) {
+                const otrosGastosCat = categories.find(c => c.name.toUpperCase().includes('OTROS GASTOS') || c.type === 'expense');
+                categoryId = otrosGastosCat ? otrosGastosCat.id : (categories.find(c => c.type === 'expense')?.id || null);
+              }
             }
           }
         }

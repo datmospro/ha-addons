@@ -287,13 +287,13 @@ const dbOps = {
     return !!row;
   },
   linkTransactionToRule: (transactionId, ruleId, recurrenceDate, pattern = null) => {
-    const rule = db.prepare('SELECT description, match_patterns FROM recurring_rules WHERE id = ?').get(Number(ruleId));
+    const rule = db.prepare('SELECT description, category_id, match_patterns FROM recurring_rules WHERE id = ?').get(Number(ruleId));
     if (rule) {
       db.prepare(`
         UPDATE transactions 
-        SET recurring_rule_id = ?, recurrence_date = ?, description = ? 
+        SET recurring_rule_id = ?, recurrence_date = ?, description = ?, category_id = ? 
         WHERE id = ?
-      `).run(Number(ruleId), recurrenceDate, rule.description, Number(transactionId));
+      `).run(Number(ruleId), recurrenceDate, rule.description, rule.category_id, Number(transactionId));
 
       if (pattern) {
         const cleanPattern = pattern.trim().toUpperCase();
@@ -351,6 +351,20 @@ const dbOps = {
       )
       WHERE recurring_rule_id IS NOT NULL
     `).run();
+  },
+
+  findSimilarTransactionCategory: (description, getMerchantCoreFn) => {
+    const targetCore = getMerchantCoreFn(description);
+    if (!targetCore) return null;
+
+    const txs = db.prepare('SELECT description, category_id FROM transactions WHERE category_id IS NOT NULL ORDER BY id DESC LIMIT 500').all();
+    for (const tx of txs) {
+      const existingCore = getMerchantCoreFn(tx.description);
+      if (existingCore && existingCore === targetCore) {
+        return tx.category_id;
+      }
+    }
+    return null;
   },
 
   // Dangerous but useful: Clear all data (excluding settings/categories)
