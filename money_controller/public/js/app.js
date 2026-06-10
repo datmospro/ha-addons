@@ -286,15 +286,14 @@ async function renderDashboard() {
     if (netSavings > 0) {
       netEl.classList.add('green');
       netIconEl.className = 'card-icon income';
-      netSubEl.innerHTML = `Ahorro real acumulado<br><span style="color: ${projNet >= 0 ? 'var(--income)' : 'var(--expense)'}; font-weight: 600; margin-top: 2px; display: inline-block;">Previsión fin de mes: ${formattedProjNet}</span>`;
     } else if (netSavings < 0) {
       netEl.classList.add('red');
       netIconEl.className = 'card-icon expense';
-      netSubEl.innerHTML = `Gastos superan ingresos acumulados hoy<br><span style="color: ${projNet >= 0 ? 'var(--income)' : 'var(--expense)'}; font-weight: 600; margin-top: 2px; display: inline-block;">Previsión fin de mes: ${formattedProjNet}</span>`;
     } else {
       netIconEl.className = 'card-icon';
-      netSubEl.innerHTML = `Sin balance neto hoy<br><span style="color: ${projNet >= 0 ? 'var(--income)' : 'var(--expense)'}; font-weight: 600; margin-top: 2px; display: inline-block;">Previsión fin de mes: ${formattedProjNet}</span>`;
     }
+    
+    netSubEl.innerHTML = `<span style="color: ${projNet >= 0 ? 'var(--income)' : 'var(--expense)'}; font-weight: 600; display: inline-block;">Previsión fin de mes: ${formattedProjNet}</span>`;
 
     // 2. Render Charts
     renderForecastLineChart();
