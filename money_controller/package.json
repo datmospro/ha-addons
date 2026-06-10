@@ -1,6 +1,6 @@
 {
   "name": "money-controller",
-  "version": "1.4.8",
+  "version": "1.4.9",
   "description": "Control de gastos e ingresos del hogar con predicción de saldo diaria a 12 meses",
   "main": "server.js",
   "scripts": {

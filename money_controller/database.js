@@ -320,6 +320,26 @@ const dbOps = {
   cleanExistingGeneratedTransactions: () => {
     return db.prepare("DELETE FROM transactions WHERE recurring_rule_id IS NOT NULL AND bank_transaction_id IS NULL").run();
   },
+  cleanAllTransactionDescriptions: (cleanFn) => {
+    const txs = db.prepare('SELECT id, description FROM transactions').all();
+    const updateStmt = db.prepare('UPDATE transactions SET description = ? WHERE id = ?');
+    db.exec('BEGIN TRANSACTION');
+    try {
+      let count = 0;
+      txs.forEach(tx => {
+        const cleaned = cleanFn(tx.description);
+        if (cleaned !== tx.description) {
+          updateStmt.run(cleaned, tx.id);
+          count++;
+        }
+      });
+      db.exec('COMMIT');
+      return count;
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+  },
 
   // Dangerous but useful: Clear all data (excluding settings/categories)
   resetDatabase: () => {

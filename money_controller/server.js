@@ -10,7 +10,7 @@ function cleanBankDescription(desc) {
   let clean = desc.trim();
   
   // Remove leading /TXT/ or /TXT (case-insensitive)
-  clean = clean.replace(/^\/?TXT\/?/i, '');
+  clean = clean.replace(/^\/?TXT\/?/i, '').trim();
   
   // Remove WWW. prefix
   clean = clean.replace(/\bWWW\./i, '');
@@ -26,8 +26,9 @@ function cleanBankDescription(desc) {
     if (/^\d{2}[-\/]\d{2}[-\/]\d{2,4}$/.test(word)) {
       return word;
     }
-    if (word === 's.a' || word === 'sa') return 'S.A.';
-    if (word === 's.l' || word === 'sl') return 'S.L.';
+    const norm = word.replace(/[.,]/g, '').trim();
+    if (norm === 'sa') return 'S.A.';
+    if (norm === 'sl') return 'S.L.';
     return word.charAt(0).toUpperCase() + word.slice(1);
   }).join(' ');
   
@@ -750,5 +751,13 @@ app.listen(port, '0.0.0.0', () => {
     console.log(`Cleared ${cleanResult.changes} historical auto-generated transaction(s)`);
   } catch (err) {
     console.error('Error cleaning historical auto-generated transactions:', err.message);
+  }
+
+  // Clean and normalize descriptions of existing transactions in the database
+  try {
+    const cleanedCount = dbOps.cleanAllTransactionDescriptions(cleanBankDescription);
+    console.log(`Cleaned and normalized ${cleanedCount} existing transaction description(s) in database`);
+  } catch (err) {
+    console.error('Error cleaning existing transaction descriptions:', err.message);
   }
 });
