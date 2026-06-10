@@ -532,16 +532,17 @@ app.post('/api/bank/sync', async (req, res) => {
       console.log(`Found ${txList.length} transaction(s) for account ${accountId}`);
       
       for (const tx of txList) {
-        if (tx.status !== 'booked') continue;
+        const status = (tx.status || '').toLowerCase();
+        if (status !== 'booked' && status !== 'book') continue;
         
-        const txId = tx.transactionId || tx.entryReference;
+        const txId = tx.transaction_id || tx.entry_reference || tx.transactionId || tx.entryReference;
         if (!txId) continue;
 
         const amountNum = parseFloat(tx.amount);
         const type = amountNum >= 0 ? 'income' : 'expense';
         const absoluteAmount = Math.abs(amountNum);
         
-        const date = tx.bookingDate || tx.valueDate || new Date().toISOString().split('T')[0];
+        const date = tx.booking_date || tx.value_date || tx.bookingDate || tx.valueDate || new Date().toISOString().split('T')[0];
         
         let description = tx.description || 'Transacción Bancaria';
         description = description.replace(/\s+/g, ' ').trim();
