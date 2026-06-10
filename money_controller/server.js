@@ -307,7 +307,7 @@ app.get('/api/bank/institutions', async (req, res) => {
     const institutions = await response.json();
     const list = institutions.aspsps || institutions;
     const mapped = list.map(inst => ({
-      id: inst.connector,
+      id: inst.name,
       name: inst.name
     }));
     res.json(mapped);
@@ -320,9 +320,9 @@ app.get('/api/bank/institutions', async (req, res) => {
 // Link Bank: create session auth, returns redirect URL
 app.post('/api/bank/link', async (req, res) => {
   try {
-    const { institutionId, country } = req.body; // institutionId is the connector name
+    const { institutionId, country } = req.body; // institutionId is the bank name (e.g., "Unicaja Banco")
     if (!institutionId) {
-      return res.status(400).json({ error: 'Falta el conector del banco.' });
+      return res.status(400).json({ error: 'Falta el nombre del banco.' });
     }
 
     const token = getEnableBankingToken(dbOps);
@@ -331,29 +331,6 @@ app.post('/api/bank/link', async (req, res) => {
     // Save institution and country in settings
     dbOps.updateSetting('enablebanking_institution_id', institutionId);
     dbOps.updateSetting('enablebanking_country', targetCountry);
-
-    // Fetch ASPSPs to find the official name
-    console.log(`Resolving ASPSP details for connector ${institutionId} in ${targetCountry}`);
-    const listResponse = await fetch(`https://api.enablebanking.com/aspsps?country=${targetCountry}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
-      }
-    });
-
-    if (!listResponse.ok) {
-      const errText = await listResponse.text();
-      console.error('Error fetching ASPSPs for resolution:', errText);
-      throw new Error('No se pudo verificar la lista de bancos en Enable Banking.');
-    }
-
-    const listData = await listResponse.json();
-    const aspsps = listData.aspsps || listData;
-    const selectedAspsp = aspsps.find(a => a.connector === institutionId);
-
-    if (!selectedAspsp) {
-      throw new Error(`El conector bancario '${institutionId}' no se encontró en la lista.`);
-    }
 
     // Create reference
     const reference = 'eb_' + Math.random().toString(36).substring(2, 15);
@@ -374,7 +351,7 @@ app.post('/api/bank/link', async (req, res) => {
       }
     }
     
-    console.log(`Creating Enable Banking auth session with redirect callback: ${redirectUrl}`);
+    console.log(`Creating Enable Banking auth session for "${institutionId}" in ${targetCountry} with redirect callback: ${redirectUrl}`);
 
     const validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -387,8 +364,8 @@ app.post('/api/bank/link', async (req, res) => {
       },
       body: JSON.stringify({
         aspsp: {
-          name: selectedAspsp.name,
-          country: selectedAspsp.country
+          name: institutionId,
+          country: targetCountry
         },
         redirect_url: redirectUrl,
         state: reference,
