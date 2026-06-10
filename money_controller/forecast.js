@@ -191,9 +191,9 @@ function generateForecast(temporaryTransactions = []) {
     .filter(t => t.date >= startOfMonthStr && t.date <= todayStr && t.type === 'expense' && !t.recurring_rule_id)
     .reduce((sum, t) => sum + t.amount, 0);
 
-  // Días restantes en el mes actual (después de hoy)
+  // Días restantes en el mes actual (incluyendo hoy)
   const daysInCurrentMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  const daysRemaining = daysInCurrentMonth - today.getDate();
+  const daysRemaining = daysInCurrentMonth - today.getDate() + 1;
 
   const remainingVariableBudget = Math.max(0, monthlyVariableBudget - actualVariableSpent);
   const dailyVarCurrentMonth = daysRemaining > 0 ? remainingVariableBudget / daysRemaining : 0;
@@ -238,8 +238,12 @@ function generateForecast(temporaryTransactions = []) {
     const dateStr = formatDate(currentDate);
     const dayEvents = [];
 
-    // No aplicar gasto variable virtual a días pasados o hoy (ya están cerrados y reflejados en el saldo real)
+    // Aplicar gasto variable virtual para hoy (los días anteriores están cerrados y reflejados en el saldo real)
     let dailyVar = 0;
+    if (dateStr === todayStr && monthlyVariableBudget > 0) {
+      dailyVar = dailyVarCurrentMonth;
+      runningBalance -= dailyVar;
+    }
 
     // Aplicar transacciones reales pasadas
     const dayTransactions = historicalTransactions.filter(t => t.date === dateStr);
