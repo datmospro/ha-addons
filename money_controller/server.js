@@ -326,10 +326,34 @@ app.post('/api/bank/link', async (req, res) => {
     }
 
     const token = getEnableBankingToken(dbOps);
+    const targetCountry = country || 'ES';
     
     // Save institution and country in settings
     dbOps.updateSetting('enablebanking_institution_id', institutionId);
-    dbOps.updateSetting('enablebanking_country', country || 'ES');
+    dbOps.updateSetting('enablebanking_country', targetCountry);
+
+    // Fetch ASPSPs to find the official name
+    console.log(`Resolving ASPSP details for connector ${institutionId} in ${targetCountry}`);
+    const listResponse = await fetch(`https://api.enablebanking.com/aspsps?country=${targetCountry}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!listResponse.ok) {
+      const errText = await listResponse.text();
+      console.error('Error fetching ASPSPs for resolution:', errText);
+      throw new Error('No se pudo verificar la lista de bancos en Enable Banking.');
+    }
+
+    const listData = await listResponse.json();
+    const aspsps = listData.aspsps || listData;
+    const selectedAspsp = aspsps.find(a => a.connector === institutionId);
+
+    if (!selectedAspsp) {
+      throw new Error(`El conector bancario '${institutionId}' no se encontró en la lista.`);
+    }
 
     // Create reference
     const reference = 'eb_' + Math.random().toString(36).substring(2, 15);
@@ -338,9 +362,21 @@ app.post('/api/bank/link', async (req, res) => {
     // Build the redirect URL
     const protocol = req.headers['x-forwarded-proto'] || req.protocol;
     const host = req.headers.host;
-    const redirectUrl = `${protocol}://${host}/api/bank/callback`;
+    let redirectUrl = `${protocol}://${host}/api/bank/callback`;
+    
+    // Fallback/override using Referer if it exists to preserve HTTPS protocol
+    if (req.headers.referer) {
+      try {
+        const refUrl = new URL(req.headers.referer);
+        redirectUrl = `${refUrl.protocol}//${refUrl.host}/api/bank/callback`;
+      } catch (e) {
+        // Ignore parsing errors
+      }
+    }
     
     console.log(`Creating Enable Banking auth session with redirect callback: ${redirectUrl}`);
+
+    const validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
 
     const response = await fetch('https://api.enablebanking.com/auth', {
       method: 'POST',
@@ -350,12 +386,17 @@ app.post('/api/bank/link', async (req, res) => {
         'Accept': 'application/json'
       },
       body: JSON.stringify({
-        connector: institutionId,
+        aspsp: {
+          name: selectedAspsp.name,
+          country: selectedAspsp.country
+        },
         redirect_url: redirectUrl,
         state: reference,
+        psu_type: 'personal',
         access: {
-          balances: {},
-          transactions: {}
+          balances: true,
+          transactions: true,
+          valid_until: validUntil
         }
       })
     });
