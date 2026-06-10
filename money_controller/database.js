@@ -287,17 +287,17 @@ const dbOps = {
     return !!row;
   },
   linkTransactionToRule: (transactionId, ruleId, recurrenceDate, pattern = null) => {
-    db.prepare(`
-      UPDATE transactions 
-      SET recurring_rule_id = ?, recurrence_date = ? 
-      WHERE id = ?
-    `).run(Number(ruleId), recurrenceDate, Number(transactionId));
+    const rule = db.prepare('SELECT description, match_patterns FROM recurring_rules WHERE id = ?').get(Number(ruleId));
+    if (rule) {
+      db.prepare(`
+        UPDATE transactions 
+        SET recurring_rule_id = ?, recurrence_date = ?, description = ? 
+        WHERE id = ?
+      `).run(Number(ruleId), recurrenceDate, rule.description, Number(transactionId));
 
-    if (pattern) {
-      const cleanPattern = pattern.trim().toUpperCase();
-      if (cleanPattern) {
-        const rule = db.prepare('SELECT match_patterns FROM recurring_rules WHERE id = ?').get(Number(ruleId));
-        if (rule) {
+      if (pattern) {
+        const cleanPattern = pattern.trim().toUpperCase();
+        if (cleanPattern) {
           let currentPatterns = rule.match_patterns ? rule.match_patterns.split(',').map(p => p.trim()) : [];
           if (!currentPatterns.includes(cleanPattern)) {
             currentPatterns.push(cleanPattern);
@@ -339,6 +339,18 @@ const dbOps = {
       db.exec('ROLLBACK');
       throw err;
     }
+  },
+
+  syncLinkedTransactionDescriptions: () => {
+    return db.prepare(`
+      UPDATE transactions 
+      SET description = (
+        SELECT r.description 
+        FROM recurring_rules r 
+        WHERE r.id = transactions.recurring_rule_id
+      )
+      WHERE recurring_rule_id IS NOT NULL
+    `).run();
   },
 
   // Dangerous but useful: Clear all data (excluding settings/categories)

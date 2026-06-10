@@ -667,10 +667,12 @@ app.post('/api/bank/sync', async (req, res) => {
           return patterns.some(pattern => pattern && cleanDescUpper.includes(pattern));
         });
         
+        let finalDescription = description;
         if (matchedRule) {
           matchedRuleId = matchedRule.id;
           categoryId = matchedRule.category_id;
           recurrenceDate = calculateRecurrenceDateForTxDate(matchedRule, date);
+          finalDescription = matchedRule.description;
           console.log(`Auto-matched bank transaction "${description}" to recurring rule "${matchedRule.description}"`);
         } else {
           // Fallback to standard auto-categorization
@@ -721,7 +723,7 @@ app.post('/api/bank/sync', async (req, res) => {
         }
         
         const notes = `Sincronizado de ${settings.enablebanking_bank_name || 'Banco'}`;
-        const result = dbOps.addBankTransaction(description, absoluteAmount, type, categoryId, date, notes, txId, matchedRuleId, recurrenceDate);
+        const result = dbOps.addBankTransaction(finalDescription, absoluteAmount, type, categoryId, date, notes, txId, matchedRuleId, recurrenceDate);
         if (result.changes > 0) {
           totalImported++;
         }
@@ -759,5 +761,13 @@ app.listen(port, '0.0.0.0', () => {
     console.log(`Cleaned and normalized ${cleanedCount} existing transaction description(s) in database`);
   } catch (err) {
     console.error('Error cleaning existing transaction descriptions:', err.message);
+  }
+
+  // Update existing linked bank transaction descriptions to match their pre-programmed rules
+  try {
+    const syncResult = dbOps.syncLinkedTransactionDescriptions();
+    console.log(`Synchronized ${syncResult.changes} linked transaction description(s) to match recurring rules`);
+  } catch (err) {
+    console.error('Error synchronizing linked transaction descriptions:', err.message);
   }
 });
