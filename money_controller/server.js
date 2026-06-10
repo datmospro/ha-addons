@@ -57,6 +57,18 @@ app.post('/api/categories', (req, res) => {
   }
 });
 
+app.put('/api/categories/:id', (req, res) => {
+  try {
+    const { name, type, color, icon } = req.body;
+    if (!name || !type) return res.status(400).json({ error: 'Name and type are required' });
+    const result = dbOps.updateCategory(req.params.id, name, type, color, icon);
+    if (result.changes === 0) return res.status(404).json({ error: 'Category not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/categories/:id', (req, res) => {
   try {
     dbOps.deleteCategory(req.params.id);

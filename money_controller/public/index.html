@@ -13,7 +13,7 @@
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="css/style.css?v=1.1.2">
+  <link rel="stylesheet" href="css/style.css?v=1.2.0">
 </head>
 <body>
   <div class="app-container">
@@ -522,6 +522,25 @@
             </form>
           </div>
 
+          <!-- Categories Management Card -->
+          <div class="glass panel-card settings-card" id="categories-settings-card">
+            <div class="panel-card-header">
+              <div class="flex-between">
+                <h3>Gestión de Categorías</h3>
+                <button class="btn btn-primary" id="btn-add-category" style="padding: 6px 12px; font-size: 0.85rem;">
+                  <i data-lucide="plus" style="width:16px; height:16px;"></i>
+                  <span>Nueva Categoría</span>
+                </button>
+              </div>
+              <p class="text-muted">Crea, edita y elimina las categorías de ingresos y gastos de tu hogar.</p>
+            </div>
+            <div class="settings-card-body">
+              <div class="category-manager-list" id="category-manager-list">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+          </div>
+
           <!-- Backup & Recovery Card -->
           <div class="glass panel-card settings-card">
             <div class="panel-card-header">
@@ -710,7 +729,68 @@
     </div>
   </div>
 
+  <!-- 3. ADD/EDIT CATEGORY MODAL -->
+  <div class="modal-backdrop hidden" id="modal-category">
+    <div class="modal glass">
+      <div class="modal-header">
+        <h3 id="modal-cat-title">Nueva Categoría</h3>
+        <button class="btn-close" id="btn-close-cat-modal"><i data-lucide="x"></i></button>
+      </div>
+      <form id="cat-form-element">
+        <input type="hidden" id="cat-id">
+        
+        <div class="form-group">
+          <label for="cat-name">Nombre de la Categoría</label>
+          <input type="text" id="cat-name" class="form-control" placeholder="Ej: Viajes, Mascotas, Regalos" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label for="cat-type">Tipo de Movimiento</label>
+            <select id="cat-type" class="form-select" required>
+              <option value="expense">Gasto</option>
+              <option value="income">Ingreso</option>
+            </select>
+          </div>
+          <div class="form-group col-6">
+            <label for="cat-color">Color</label>
+            <input type="color" id="cat-color" class="form-control" style="height: 42px; padding: 2px 6px; cursor: pointer;" value="#6b7280" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="cat-icon">Icono</label>
+          <select id="cat-icon" class="form-select" required>
+            <option value="help-circle">Ayuda / Otro (default)</option>
+            <option value="briefcase">Maletín (Nómina/Trabajo)</option>
+            <option value="plus-circle">Más (Otros Ingresos)</option>
+            <option value="trending-up">Gráfico (Inversiones)</option>
+            <option value="home">Hogar (Alquiler/Hipoteca)</option>
+            <option value="zap">Rayo (Suministros/Luz)</option>
+            <option value="shopping-cart">Carrito (Alimentación)</option>
+            <option value="car">Coche (Transporte)</option>
+            <option value="shield">Escudo (Seguros)</option>
+            <option value="credit-card">Tarjeta (Préstamos)</option>
+            <option value="coffee">Taza (Ocio/Restaurantes)</option>
+            <option value="plane">Avión (Viajes)</option>
+            <option value="gift">Regalo (Obsequios)</option>
+            <option value="heart">Corazón (Salud/Cuidado)</option>
+            <option value="book-open">Libro (Educación/Cultura)</option>
+            <option value="phone">Teléfono (Comunicaciones)</option>
+            <option value="tv">Televisión (Suscripciones)</option>
+            <option value="dollar-sign">Dólar (Finanzas)</option>
+          </select>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-cat-modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-cat-modal">Guardar Categoría</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Custom script -->
-  <script src="js/app.js?v=1.1.2"></script>
+  <script src="js/app.js?v=1.2.0"></script>
 </body>
 </html>

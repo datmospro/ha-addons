@@ -152,6 +152,9 @@ const dbOps = {
   addCategory: (name, type, color, icon) => {
     return db.prepare('INSERT INTO categories (name, type, color, icon) VALUES (?, ?, ?, ?)').run(name, type, color, icon);
   },
+  updateCategory: (id, name, type, color, icon) => {
+    return db.prepare('UPDATE categories SET name = ?, type = ?, color = ?, icon = ? WHERE id = ?').run(name, type, color, icon, Number(id));
+  },
   deleteCategory: (id) => {
     return db.prepare('DELETE FROM categories WHERE id = ?').run(id);
   },

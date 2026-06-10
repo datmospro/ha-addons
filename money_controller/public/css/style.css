@@ -1760,3 +1760,89 @@ body {
   font-weight: 500;
 }
 
+/* Category Manager styles */
+.category-manager-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.category-manager-list::-webkit-scrollbar {
+  width: 6px;
+}
+.category-manager-list::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 10px;
+}
+
+.category-manager-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: var(--border-radius-sm);
+  background-color: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  transition: var(--transition);
+}
+
+.category-manager-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: hsla(224, 40%, 35%, 0.4);
+}
+
+.category-manager-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.category-manager-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.category-manager-icon-box i {
+  width: 16px;
+  height: 16px;
+}
+
+.category-manager-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.category-manager-type-badge {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.category-manager-type-badge.income {
+  background-color: var(--income-bg);
+  color: var(--income);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.category-manager-type-badge.expense {
+  background-color: var(--expense-bg);
+  color: var(--expense);
+  border: 1px solid rgba(244, 63, 94, 0.2);
+}
+
+.category-manager-actions {
+  display: flex;
+  gap: 8px;
+}
+

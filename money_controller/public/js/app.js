@@ -71,6 +71,7 @@ async function loadBaseData() {
     const categoriesRes = await fetch('/api/categories');
     categories = await categoriesRes.json();
     populateCategorySelects();
+    renderCategoryManager();
 
     // 3. Trigger initial forecast calculation
     await runForecastCalculation();
@@ -1449,6 +1450,14 @@ function setupEventListeners() {
   document.getElementById('btn-add-recurring-rule').addEventListener('click', () => {
     openAddRecurringModal();
   });
+
+  // Category management events
+  document.getElementById('btn-add-category').addEventListener('click', () => {
+    openAddCategoryModal();
+  });
+  document.getElementById('btn-close-cat-modal').addEventListener('click', closeCatModal);
+  document.getElementById('btn-cancel-cat-modal').addEventListener('click', closeCatModal);
+  document.getElementById('cat-form-element').addEventListener('submit', handleCatSubmit);
 }
 
 // Switch navigation Tabs
@@ -1732,6 +1741,147 @@ async function handleSettingsSubmit(e) {
     showToast('Error al guardar la configuración.', 'danger');
   }
 }
+
+// --- CATEGORY ACTIONS ---
+
+function renderCategoryManager() {
+  const container = document.getElementById('category-manager-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (categories.length === 0) {
+    container.innerHTML = `<p class="text-muted text-center" style="padding: 20px 0;">No hay categorías registradas.</p>`;
+    return;
+  }
+
+  categories.forEach(cat => {
+    const typeLabel = cat.type === 'income' ? 'Ingreso' : 'Gasto';
+    const item = document.createElement('div');
+    item.className = 'category-manager-item';
+    item.innerHTML = `
+      <div class="category-manager-info">
+        <div class="category-manager-icon-box" style="background-color: ${cat.color || '#6b7280'};">
+          <i data-lucide="${cat.icon || 'help-circle'}"></i>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span class="category-manager-name">${escapeHtml(cat.name)}</span>
+          <span class="category-manager-type-badge ${cat.type}">${typeLabel}</span>
+        </div>
+      </div>
+      <div class="category-manager-actions">
+        <button class="btn-table-action" onclick="openEditCategory(${cat.id})" title="Editar">
+          <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
+        </button>
+        <button class="btn-table-action delete" onclick="deleteCategory(${cat.id})" title="Eliminar">
+          <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+        </button>
+      </div>
+    `;
+    container.appendChild(item);
+  });
+
+  lucide.createIcons();
+}
+
+window.openAddCategoryModal = function() {
+  document.getElementById('modal-cat-title').textContent = 'Nueva Categoría';
+  document.getElementById('cat-id').value = '';
+  document.getElementById('cat-name').value = '';
+  document.getElementById('cat-type').value = 'expense';
+  document.getElementById('cat-color').value = '#6b7280';
+  document.getElementById('cat-icon').value = 'help-circle';
+  
+  document.getElementById('modal-category').classList.remove('hidden');
+};
+
+window.openEditCategory = function(id) {
+  const cat = categories.find(c => c.id === id);
+  if (!cat) return;
+
+  document.getElementById('modal-cat-title').textContent = 'Editar Categoría';
+  document.getElementById('cat-id').value = cat.id;
+  document.getElementById('cat-name').value = cat.name;
+  document.getElementById('cat-type').value = cat.type;
+  document.getElementById('cat-color').value = cat.color || '#6b7280';
+  document.getElementById('cat-icon').value = cat.icon || 'help-circle';
+
+  document.getElementById('modal-category').classList.remove('hidden');
+};
+
+function closeCatModal() {
+  document.getElementById('modal-category').classList.add('hidden');
+}
+
+async function handleCatSubmit(e) {
+  e.preventDefault();
+
+  const id = document.getElementById('cat-id').value;
+  const name = document.getElementById('cat-name').value.trim();
+  const type = document.getElementById('cat-type').value;
+  const color = document.getElementById('cat-color').value;
+  const icon = document.getElementById('cat-icon').value;
+
+  if (!name) {
+    showToast('El nombre de la categoría es obligatorio.', 'danger');
+    return;
+  }
+
+  const data = { name, type, color, icon };
+  const method = id ? 'PUT' : 'POST';
+  const url = id ? `/api/categories/${id}` : '/api/categories';
+
+  try {
+    const res = await fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+
+    if (res.ok) {
+      closeCatModal();
+      showToast(id ? 'Categoría actualizada correctamente.' : 'Nueva categoría añadida.', 'success');
+      
+      const categoriesRes = await fetch('/api/categories');
+      categories = await categoriesRes.json();
+      populateCategorySelects();
+      renderCategoryManager();
+      
+      await runForecastCalculation();
+      if (currentTab === 'transactions') renderTransactionsTab();
+      if (currentTab === 'recurring') renderRecurringTab();
+    } else {
+      const err = await res.json();
+      showToast(`Error: ${err.error}`, 'danger');
+    }
+  } catch (err) {
+    console.error('Error saving category:', err);
+    showToast('Error de red al guardar la categoría.', 'danger');
+  }
+}
+
+window.deleteCategory = async function(id) {
+  if (!confirm('¿Seguro que deseas eliminar esta categoría? Las transacciones e ingresos/gastos fijos asociados no se borrarán, pero se quedarán "Sin Categoría".')) return;
+
+  try {
+    const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      showToast('Categoría eliminada.', 'success');
+      
+      const categoriesRes = await fetch('/api/categories');
+      categories = await categoriesRes.json();
+      populateCategorySelects();
+      renderCategoryManager();
+      
+      await runForecastCalculation();
+      if (currentTab === 'transactions') renderTransactionsTab();
+      if (currentTab === 'recurring') renderRecurringTab();
+    } else {
+      showToast('Error al eliminar la categoría.', 'danger');
+    }
+  } catch (err) {
+    console.error('Error deleting category:', err);
+  }
+};
 
 // --- WHAT-IF SIMULATION SUBMITS ---
 
