@@ -1054,6 +1054,11 @@ function renderCalendar() {
         statusClass = 'yellow';
       }
       
+      // Dim past historical days slightly
+      if (forecastDay.isPast && dayDateStr !== localTodayStr) {
+        dayCell.style.opacity = '0.7';
+      }
+      
       dayCell.innerHTML += `<span class="cal-day-bal ${statusClass}">${balance.toFixed(0)}€</span>`;
       
       // Set click event to show transactions

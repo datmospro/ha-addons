@@ -93,10 +93,83 @@ function doesRuleApply(rule, dateStr) {
 }
 
 /**
+ * Sincroniza y convierte ocurrencias de gastos fijos pasadas a transacciones reales.
+ * Ajusta el saldo inicial para que el saldo actual de hoy no varíe.
+ */
+function syncPastRecurringOccurrences() {
+  try {
+    const recurringRules = dbOps.getRecurringRules();
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = formatDate(today);
+    
+    // Historial desde el 01/06/2026 (Opción B elegida por el usuario)
+    const startDateLimitStr = todayStr < '2026-06-01' ? todayStr : '2026-06-01';
+
+    let initialBalanceAdjustment = 0;
+
+    recurringRules.forEach(rule => {
+      const ruleStart = rule.start_date;
+      // Empezamos desde el inicio de la regla o del límite del historial, lo que sea más reciente
+      const startCheckStr = ruleStart > startDateLimitStr ? ruleStart : startDateLimitStr;
+      
+      if (startCheckStr > todayStr) return; // Empieza en el futuro
+
+      let current = new Date(startCheckStr + 'T12:00:00');
+      const end = new Date(todayStr + 'T12:00:00'); // Evaluamos hasta hoy inclusive
+
+      while (current <= end) {
+        const dateStr = formatDate(current);
+        // Comprobar si aplica en esta fecha
+        if (doesRuleApply(rule, dateStr)) {
+          // Comprobar si ya existe la transacción para esta ocurrencia
+          if (!dbOps.hasTransactionForRecurrence(rule.id, dateStr)) {
+            // No existe, la insertamos como transacción real
+            console.log(`Auto-posting past recurrence of "${rule.description}" for date ${dateStr}`);
+            dbOps.addTransaction(
+              `${rule.description} (Fijo)`,
+              rule.amount,
+              rule.type,
+              rule.category_id,
+              dateStr,
+              rule.notes || 'Generado automáticamente desde movimiento fijo.',
+              rule.id,
+              dateStr
+            );
+            
+            // Calculamos el ajuste necesario para el saldo inicial
+            if (rule.type === 'expense') {
+              initialBalanceAdjustment += rule.amount;
+            } else {
+              initialBalanceAdjustment -= rule.amount;
+            }
+          }
+        }
+        current.setDate(current.getDate() + 1);
+      }
+    });
+
+    // Si hubo ajustes, actualizamos el saldo inicial
+    if (initialBalanceAdjustment !== 0) {
+      const settings = dbOps.getSettings();
+      const newInitialBalance = parseFloat(settings.initial_balance || 0) + initialBalanceAdjustment;
+      console.log(`Adjusting initial balance from ${settings.initial_balance} to ${newInitialBalance} to preserve current balance`);
+      dbOps.updateSetting('initial_balance', newInitialBalance);
+    }
+  } catch (err) {
+    console.error('Error syncing past recurring occurrences:', err);
+  }
+}
+
+/**
  * Calcula la proyección de flujo de caja diaria para un año entero (365 días)
  * @param {Array} temporaryTransactions - Transacciones ficticias para simulaciones "What-If"
  */
 function generateForecast(temporaryTransactions = []) {
+  // Sincronizar ocurrencias pasadas antes de cargar datos
+  syncPastRecurringOccurrences();
+
   const settings = dbOps.getSettings();
   const initialBalance = parseFloat(settings.initial_balance || 0);
   const safetyThreshold = parseFloat(settings.safety_threshold || 100);
@@ -110,60 +183,134 @@ function generateForecast(temporaryTransactions = []) {
   today.setHours(0, 0, 0, 0);
   const todayStr = formatDate(today);
 
-  // 1. Calcular saldo actual basado en todas las transacciones históricas reales hasta el día de HOY inclusive
+  // 1. Obtener todas las transacciones reales en la base de datos
   const allActualTransactions = dbOps.getTransactions();
-  
-  // Filtrar transacciones reales hasta hoy
+  const futurePlannedTransactions = allActualTransactions.filter(t => t.date > todayStr);
   const historicalTransactions = allActualTransactions.filter(t => t.date <= todayStr);
-  
-  let currentBalance = initialBalance;
+
+  // Calcular el saldo disponible "hoy" de forma estática para las tarjetas (sin prorrateo virtual)
+  let todayBalance = initialBalance;
   historicalTransactions.forEach(t => {
     if (t.type === 'income') {
-      currentBalance += t.amount;
+      todayBalance += t.amount;
     } else {
-      currentBalance -= t.amount;
+      todayBalance -= t.amount;
     }
   });
 
-  // 2. Obtener transacciones futuras planificadas y reglas recurrentes
-  const futurePlannedTransactions = allActualTransactions.filter(t => t.date > todayStr);
-  const recurringRules = dbOps.getRecurringRules();
-
-  // Combinar transacciones de simulación "What-If" con las transacciones planificadas futuras
-  const simulatedFutureTransactions = [...futurePlannedTransactions, ...temporaryTransactions];
+  // 2. Determinar saldo inicial al comienzo del historial (2026-06-01)
+  const historyStartStr = todayStr < '2026-06-01' ? todayStr : '2026-06-01';
+  let runningBalance = initialBalance;
+  
+  // Sumamos/restamos todas las transacciones previas al inicio del historial
+  const preHistoryTransactions = historicalTransactions.filter(t => t.date < historyStartStr);
+  preHistoryTransactions.forEach(t => {
+    if (t.type === 'income') {
+      runningBalance += t.amount;
+    } else {
+      runningBalance -= t.amount;
+    }
+  });
 
   // 3. Proyectar día a día
   const projection = [];
   const alerts = [];
-  
-  let runningBalance = currentBalance;
-  let runningDate = new Date(today); // Empezamos hoy
-
-  // Guardamos el día actual en la proyección
-  projection.push({
-    date: formatDate(runningDate),
-    balance: parseFloat(runningBalance.toFixed(2)),
-    variableExpense: 0,
-    events: [{ description: 'Saldo Inicial Hoy', amount: runningBalance, type: 'info' }]
-  });
 
   const categories = dbOps.getCategories();
   const categoriesMap = {};
   categories.forEach(c => { categoriesMap[c.id] = c; });
 
-  for (let i = 1; i <= 365; i++) {
-    runningDate = addDays(runningDate, 1);
-    const dateStr = formatDate(runningDate);
+  // A) Bucle histórico: desde el 01/06/2026 hasta hoy inclusive
+  let currentDate = new Date(historyStartStr + 'T12:00:00');
+  const todayDate = new Date(todayStr + 'T12:00:00');
+
+  while (currentDate <= todayDate) {
+    const dateStr = formatDate(currentDate);
     const dayEvents = [];
 
-    // A) Aplicar gasto variable diario (excepto si el presupuesto es 0)
+    // Aplicar gasto variable diario prorrateado
     let dailyVar = 0;
     if (dailyVariableExpense > 0) {
       dailyVar = dailyVariableExpense;
       runningBalance -= dailyVar;
     }
 
-    // B) Comprobar transacciones puntuales futuras (planificadas o What-If)
+    // Aplicar transacciones reales pasadas
+    const dayTransactions = historicalTransactions.filter(t => t.date === dateStr);
+    dayTransactions.forEach(t => {
+      if (t.type === 'income') {
+        runningBalance += t.amount;
+        dayEvents.push({
+          id: t.id,
+          description: t.description,
+          amount: t.amount,
+          type: 'income',
+          category: t.category_name || (t.category_id ? categoriesMap[t.category_id]?.name : 'Sin categoría'),
+          isPast: true
+        });
+      } else {
+        runningBalance -= t.amount;
+        dayEvents.push({
+          id: t.id,
+          description: t.description,
+          amount: t.amount,
+          type: 'expense',
+          category: t.category_name || (t.category_id ? categoriesMap[t.category_id]?.name : 'Sin categoría'),
+          isPast: true
+        });
+      }
+    });
+
+    const finalDayBalance = parseFloat(runningBalance.toFixed(2));
+
+    projection.push({
+      date: dateStr,
+      balance: finalDayBalance,
+      variableExpense: parseFloat(dailyVar.toFixed(2)),
+      events: dayEvents,
+      isPast: true
+    });
+
+    // Registrar alertas si aplica
+    if (finalDayBalance < 0) {
+      alerts.push({
+        date: dateStr,
+        balance: finalDayBalance,
+        severity: 'danger',
+        message: `¡Alerta de descubierto! Saldo de ${finalDayBalance.toFixed(2)}€ (supera el límite de 0.00€).`,
+        causes: dayEvents.map(e => `${e.description} (${e.type === 'income' ? '+' : '-'}${e.amount.toFixed(2)}€)`).join(', '),
+        isPast: true
+      });
+    } else if (finalDayBalance < safetyThreshold) {
+      alerts.push({
+        date: dateStr,
+        balance: finalDayBalance,
+        severity: 'warning',
+        message: `Saldo bajo: ${finalDayBalance.toFixed(2)}€ (por debajo de tu umbral de seguridad de ${safetyThreshold.toFixed(2)}€).`,
+        causes: dayEvents.map(e => `${e.description} (${e.type === 'income' ? '+' : '-'}${e.amount.toFixed(2)}€)`).join(', '),
+        isPast: true
+      });
+    }
+
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  // B) Bucle futuro: desde mañana hasta dentro de 365 días
+  const simulatedFutureTransactions = [...futurePlannedTransactions, ...temporaryTransactions];
+  const recurringRules = dbOps.getRecurringRules();
+
+  for (let i = 1; i <= 365; i++) {
+    const dateStr = formatDate(currentDate);
+    const dayEvents = [];
+
+    // Aplicar gasto variable diario prorrateado
+    let dailyVar = 0;
+    if (dailyVariableExpense > 0) {
+      dailyVar = dailyVariableExpense;
+      runningBalance -= dailyVar;
+    }
+
+    // Comprobar transacciones puntuales futuras
     const dayTransactions = simulatedFutureTransactions.filter(t => t.date === dateStr);
     dayTransactions.forEach(t => {
       if (t.type === 'income') {
@@ -187,7 +334,7 @@ function generateForecast(temporaryTransactions = []) {
       }
     });
 
-    // C) Comprobar reglas recurrentes
+    // Comprobar reglas recurrentes (gastos fijos)
     recurringRules.forEach(rule => {
       if (doesRuleApply(rule, dateStr)) {
         if (rule.type === 'income') {
@@ -214,7 +361,6 @@ function generateForecast(temporaryTransactions = []) {
 
     const finalDayBalance = parseFloat(runningBalance.toFixed(2));
 
-    // Registrar datos del día
     projection.push({
       date: dateStr,
       balance: finalDayBalance,
@@ -222,9 +368,8 @@ function generateForecast(temporaryTransactions = []) {
       events: dayEvents
     });
 
-    // D) Evaluar si hay alertas de descubierto o saldo bajo
+    // Registrar alertas
     if (finalDayBalance < 0) {
-      // Descubierto
       alerts.push({
         date: dateStr,
         balance: finalDayBalance,
@@ -233,7 +378,6 @@ function generateForecast(temporaryTransactions = []) {
         causes: dayEvents.map(e => `${e.description} (${e.type === 'income' ? '+' : '-'}${e.amount.toFixed(2)}€)`).join(', ')
       });
     } else if (finalDayBalance < safetyThreshold) {
-      // Saldo bajo
       alerts.push({
         date: dateStr,
         balance: finalDayBalance,
@@ -242,25 +386,25 @@ function generateForecast(temporaryTransactions = []) {
         causes: dayEvents.map(e => `${e.description} (${e.type === 'income' ? '+' : '-'}${e.amount.toFixed(2)}€)`).join(', ')
       });
     }
+
+    currentDate.setDate(currentDate.getDate() + 1);
   }
 
-  // Resumen del estado financiero proyectado
-  const balancesOnly = projection.map(p => p.balance);
-  const minBalance = Math.min(...balancesOnly);
-  const minBalanceDate = projection[balancesOnly.indexOf(minBalance)].date;
-  const daysInNegative = projection.filter(p => p.balance < 0).length;
+  // Resumen del estado financiero proyectado (solo sobre proyección futura)
+  const futureBalances = projection.filter(p => !p.isPast).map(p => p.balance);
+  const minBalance = futureBalances.length > 0 ? Math.min(...futureBalances) : runningBalance;
+  
+  const minBalanceIndex = projection.findIndex(p => !p.isPast && p.balance === minBalance);
+  const minBalanceDate = minBalanceIndex !== -1 ? projection[minBalanceIndex].date : todayStr;
+  const daysInNegative = projection.filter(p => !p.isPast && p.balance < 0).length;
 
   return {
-    todayBalance: parseFloat(currentBalance.toFixed(2)),
+    todayBalance: parseFloat(todayBalance.toFixed(2)),
     minProjectedBalance: parseFloat(minBalance.toFixed(2)),
     minProjectedBalanceDate: minBalanceDate,
     daysInNegative,
     projection,
-    alerts: alerts.filter((alert, index, self) => 
-      // Filtrar alertas duplicadas consecutivas si no cambian mucho, o simplemente devolverlas agrupadas por rachas
-      // Devolveremos todas las alertas pero la UI puede resumirlas
-      true
-    )
+    alerts: alerts.filter(a => !a.isPast)
   };
 }
 

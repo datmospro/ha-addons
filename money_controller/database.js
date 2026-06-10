@@ -49,6 +49,23 @@ function initDb() {
     )
   `);
 
+  // Upgrade migrations for older database schemas (add columns)
+  try {
+    const tableInfo = db.prepare("PRAGMA table_info(transactions)").all();
+    const columns = tableInfo.map(c => c.name);
+    
+    if (!columns.includes('recurring_rule_id')) {
+      console.log("Adding column recurring_rule_id to transactions table");
+      db.exec("ALTER TABLE transactions ADD COLUMN recurring_rule_id INTEGER");
+    }
+    if (!columns.includes('recurrence_date')) {
+      console.log("Adding column recurrence_date to transactions table");
+      db.exec("ALTER TABLE transactions ADD COLUMN recurrence_date TEXT");
+    }
+  } catch (err) {
+    console.error("Error checking or adding columns to transactions table:", err);
+  }
+
   // Recurring rules table (for fixed/scheduled expenses and incomes)
   db.exec(`
     CREATE TABLE IF NOT EXISTS recurring_rules (
@@ -173,9 +190,9 @@ const dbOps = {
     sql += ' ORDER BY t.date DESC, t.id DESC';
     return db.prepare(sql).all(...params);
   },
-  addTransaction: (description, amount, type, category_id, date, notes = '') => {
-    return db.prepare('INSERT INTO transactions (description, amount, type, category_id, date, notes) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(description, Number(amount), type, category_id ? Number(category_id) : null, date, notes);
+  addTransaction: (description, amount, type, category_id, date, notes = '', recurring_rule_id = null, recurrence_date = null) => {
+    return db.prepare('INSERT INTO transactions (description, amount, type, category_id, date, notes, recurring_rule_id, recurrence_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(description, Number(amount), type, category_id ? Number(category_id) : null, date, notes, recurring_rule_id, recurrence_date);
   },
   updateTransaction: (id, description, amount, type, category_id, date, notes = '') => {
     return db.prepare('UPDATE transactions SET description = ?, amount = ?, type = ?, category_id = ?, date = ?, notes = ? WHERE id = ?')
@@ -232,6 +249,10 @@ const dbOps = {
   },
   deleteRecurringRule: (id) => {
     return db.prepare('DELETE FROM recurring_rules WHERE id = ?').run(Number(id));
+  },
+  hasTransactionForRecurrence: (ruleId, dateStr) => {
+    const row = db.prepare('SELECT id FROM transactions WHERE recurring_rule_id = ? AND recurrence_date = ?').get(Number(ruleId), dateStr);
+    return !!row;
   },
 
   // Dangerous but useful: Clear all data (excluding settings/categories)
