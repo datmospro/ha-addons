@@ -2200,21 +2200,21 @@ function showToast(message, type = 'success') {
   }, 4000);
 }
 
-// --- GOCARDLESS BANK SYNC OPERATIONS ---
+// --- ENABLE BANKING SYNC OPERATIONS ---
 
 // Update Bank UI display based on settings
 function updateBankUI() {
-  const isLinked = settings.gocardless_linked === 'true';
-  const secretId = settings.gocardless_secret_id || '';
-  const secretKey = settings.gocardless_secret_key || '';
+  const isLinked = settings.enablebanking_linked === 'true';
+  const appId = settings.enablebanking_app_id || '';
+  const privateKey = settings.enablebanking_private_key || '';
   
   // Update inputs
-  document.getElementById('bank-secret-id').value = secretId;
-  document.getElementById('bank-secret-key').value = secretKey ? '********' : '';
+  document.getElementById('bank-app-id').value = appId;
+  document.getElementById('bank-private-key').value = privateKey;
   
   // Enable/disable Load Banks button if we have keys saved
   const btnLoadBanks = document.getElementById('btn-load-banks');
-  if (secretId && secretKey) {
+  if (appId && privateKey) {
     btnLoadBanks.removeAttribute('disabled');
   } else {
     btnLoadBanks.setAttribute('disabled', 'true');
@@ -2230,16 +2230,16 @@ function updateBankUI() {
     unlinkedSec.style.display = 'none';
     linkedSec.style.display = 'block';
     
-    document.getElementById('lbl-linked-bank-name').textContent = settings.gocardless_bank_name || 'Desconocido';
+    document.getElementById('lbl-linked-bank-name').textContent = settings.enablebanking_bank_name || 'Desconocido';
     
     let linkDate = 'N/D';
-    if (settings.gocardless_linked_date) {
+    if (settings.enablebanking_linked_date) {
       try {
-        linkDate = new Date(settings.gocardless_linked_date).toLocaleDateString('es-ES', {
+        linkDate = new Date(settings.enablebanking_linked_date).toLocaleDateString('es-ES', {
           day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
         });
       } catch (e) {
-        linkDate = settings.gocardless_linked_date;
+        linkDate = settings.enablebanking_linked_date;
       }
     }
     document.getElementById('lbl-linked-bank-date').textContent = linkDate;
@@ -2257,36 +2257,36 @@ function updateBankUI() {
   }
 }
 
-// Save GoCardless API keys
+// Save Enable Banking API keys
 async function saveBankKeys() {
-  const secretId = document.getElementById('bank-secret-id').value.trim();
-  const secretKey = document.getElementById('bank-secret-key').value.trim();
+  const appId = document.getElementById('bank-app-id').value.trim();
+  const privateKey = document.getElementById('bank-private-key').value.trim();
 
-  if (!secretId) {
-    showToast('El Secret ID es obligatorio.', 'warning');
+  if (!appId || !privateKey) {
+    showToast('El Application ID y la Clave Privada (PEM) son obligatorios.', 'warning');
     return;
   }
 
   try {
-    if (secretId !== (settings.gocardless_secret_id || '')) {
+    if (appId !== (settings.enablebanking_app_id || '')) {
       await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'gocardless_secret_id', value: secretId })
+        body: JSON.stringify({ key: 'enablebanking_app_id', value: appId })
       });
-      settings.gocardless_secret_id = secretId;
+      settings.enablebanking_app_id = appId;
     }
 
-    if (secretKey && secretKey !== '********') {
+    if (privateKey !== (settings.enablebanking_private_key || '')) {
       await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'gocardless_secret_key', value: secretKey })
+        body: JSON.stringify({ key: 'enablebanking_private_key', value: privateKey })
       });
-      settings.gocardless_secret_key = secretKey;
+      settings.enablebanking_private_key = privateKey;
     }
 
-    showToast('Claves bancarias guardadas correctamente.', 'success');
+    showToast('Claves de Enable Banking guardadas correctamente.', 'success');
     updateBankUI();
   } catch (err) {
     console.error('Error saving bank keys:', err);
@@ -2326,7 +2326,7 @@ async function loadBanks() {
       document.getElementById('btn-link-bank').removeAttribute('disabled');
     };
     
-    showToast(`Se han cargado ${institutions.length} bancos de ${country}.`, 'success');
+    showToast(`Se han cargado ${institutions.length} conectores de ${country}.`, 'success');
   } catch (err) {
     console.error('Error loading banks:', err);
     showToast(err.message || 'Error al obtener la lista de bancos.', 'danger');
@@ -2338,7 +2338,7 @@ async function loadBanks() {
 
 // Initiate bank linking redirect
 async function linkBank() {
-  const institutionId = document.getElementById('bank-institution').value;
+  const institutionId = document.getElementById('bank-institution').value; // connector name
   const country = document.getElementById('bank-country').value;
   const btnLink = document.getElementById('btn-link-bank');
   
@@ -2365,7 +2365,7 @@ async function linkBank() {
 
     const data = await res.json();
     if (data.link) {
-      showToast('Redirigiendo a la pasarela segura de tu banco...', 'indigo');
+      showToast('Redirigiendo a la pasarela de autenticación de tu banco...', 'indigo');
       setTimeout(() => {
         window.location.href = data.link;
       }, 1200);
@@ -2390,10 +2390,10 @@ async function unlinkBank() {
     const res = await fetch('/api/bank/unlink', { method: 'POST' });
     if (!res.ok) throw new Error('Error al desvincular.');
     
-    settings.gocardless_linked = 'false';
-    settings.gocardless_accounts = '';
-    settings.gocardless_bank_name = '';
-    settings.gocardless_linked_date = '';
+    settings.enablebanking_linked = 'false';
+    settings.enablebanking_accounts = '';
+    settings.enablebanking_bank_name = '';
+    settings.enablebanking_linked_date = '';
     
     showToast('Banco desvinculado correctamente.', 'success');
     updateBankUI();

@@ -555,24 +555,25 @@
           <div class="glass panel-card settings-card">
             <div class="panel-card-header">
               <h3>Sincronización Bancaria Automática</h3>
-              <p class="text-muted">Conecta tus cuentas bancarias de forma segura mediante GoCardless (PSD2 acceso lectura).</p>
+              <p class="text-muted">Conecta tus cuentas bancarias de forma segura mediante Enable Banking (PSD2 acceso lectura).</p>
             </div>
             <div class="settings-card-body">
               <!-- If bank is NOT linked -->
               <div id="bank-unlinked-section">
                 <div class="form-group">
-                  <label for="bank-secret-id">
-                    <span>GoCardless Secret ID</span>
-                    <small class="form-help">Consigue tus credenciales gratuitas de la API de GoCardless Bank Account Data.</small>
+                  <label for="bank-app-id">
+                    <span>Enable Banking Application ID</span>
+                    <small class="form-help">Consigue tu ID de aplicación gratuito desde el Panel de Control de Enable Banking.</small>
                   </label>
-                  <input type="password" id="bank-secret-id" class="form-control" placeholder="Introducir Secret ID">
+                  <input type="text" id="bank-app-id" class="form-control" placeholder="Ej: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee">
                 </div>
                 
                 <div class="form-group">
-                  <label for="bank-secret-key">
-                    <span>GoCardless Secret Key</span>
+                  <label for="bank-private-key">
+                    <span>Clave Privada (Private Key - archivo .pem)</span>
+                    <small class="form-help">Pega el contenido completo del archivo .pem generado por Enable Banking.</small>
                   </label>
-                  <input type="password" id="bank-secret-key" class="form-control" placeholder="Introducir Secret Key">
+                  <textarea id="bank-private-key" class="form-control" rows="5" style="font-family: monospace; font-size: 0.8rem; line-height: 1.25;" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"></textarea>
                 </div>
 
                 <div class="form-row" style="margin-bottom: 16px;">

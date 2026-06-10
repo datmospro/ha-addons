@@ -222,64 +222,70 @@ app.post('/api/reset', (req, res) => {
   }
 });
 
-// --- GOCARDLESS BANK SYNC ENDPOINTS ---
+// --- ENABLE BANKING SYNC ENDPOINTS ---
 
-// Helper to get or refresh GoCardless Access Token
-async function getGoCardlessToken(dbOps) {
+const crypto = require('crypto');
+
+function base64UrlEncode(str) {
+  return Buffer.from(str)
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+
+function base64UrlEncodeBuffer(buffer) {
+  return buffer
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+
+function generateEnableBankingJWT(appId, privateKeyPem) {
+  const header = {
+    alg: 'RS256',
+    typ: 'JWT',
+    kid: appId
+  };
+  
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    iss: 'enablebanking.com',
+    aud: 'api.enablebanking.com',
+    iat: now,
+    exp: now + 3600 // 1 hour validity
+  };
+  
+  const stringToSign = base64UrlEncode(JSON.stringify(header)) + '.' + base64UrlEncode(JSON.stringify(payload));
+  
+  const sign = crypto.createSign('RSA-SHA256');
+  sign.update(stringToSign);
+  const signature = sign.sign(privateKeyPem);
+  
+  return stringToSign + '.' + base64UrlEncodeBuffer(signature);
+}
+
+function getEnableBankingToken(dbOps) {
   const settings = dbOps.getSettings();
-  const secretId = settings.gocardless_secret_id;
-  const secretKey = settings.gocardless_secret_key;
+  const appId = settings.enablebanking_app_id;
+  const privateKey = settings.enablebanking_private_key;
   
-  if (!secretId || !secretKey) {
-    throw new Error('Las credenciales de GoCardless no están configuradas.');
-  }
-
-  // Check cached token
-  const token = settings.gocardless_token;
-  const tokenExpires = settings.gocardless_token_expires;
-  if (token && tokenExpires && new Date(tokenExpires) > new Date()) {
-    return token;
-  }
-
-  console.log('Fetching new GoCardless access token...');
-  const res = await fetch('https://bankaccountdata.gocardless.com/api/v2/token/new/', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    },
-    body: JSON.stringify({
-      secret_id: secretId,
-      secret_key: secretKey
-    })
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error('Error getting GoCardless token:', errText);
-    throw new Error('Error de autenticación con GoCardless: ' + res.statusText);
-  }
-
-  const data = await res.json();
-  const expiresAt = new Date(Date.now() + (data.access_expires || 86400) * 1000).toISOString();
-  
-  dbOps.updateSetting('gocardless_token', data.access);
-  dbOps.updateSetting('gocardless_token_expires', expiresAt);
-  if (data.refresh) {
-    dbOps.updateSetting('gocardless_refresh_token', data.refresh);
+  if (!appId || !privateKey) {
+    throw new Error('Las credenciales de Enable Banking no están configuradas.');
   }
   
-  return data.access;
+  return generateEnableBankingJWT(appId, privateKey);
 }
 
 // Get institutions for country
 app.get('/api/bank/institutions', async (req, res) => {
   try {
     const country = req.query.country || 'ES';
-    const token = await getGoCardlessToken(dbOps);
+    const token = getEnableBankingToken(dbOps);
     
-    console.log(`Fetching institutions for country: ${country}`);
-    const response = await fetch(`https://bankaccountdata.gocardless.com/api/v2/institutions/?country=${country}`, {
+    console.log(`Fetching Enable Banking institutions for country: ${country}`);
+    const response = await fetch(`https://api.enablebanking.com/aspsps?country=${country}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/json'
@@ -287,68 +293,48 @@ app.get('/api/bank/institutions', async (req, res) => {
     });
 
     if (!response.ok) {
-      throw new Error(`GoCardless API returned ${response.status}: ${response.statusText}`);
+      throw new Error(`Enable Banking API returned ${response.status}: ${response.statusText}`);
     }
 
     const institutions = await response.json();
-    res.json(institutions);
+    const list = institutions.aspsps || institutions;
+    const mapped = list.map(inst => ({
+      id: inst.connector,
+      name: inst.name
+    }));
+    res.json(mapped);
   } catch (err) {
     console.error('Error in /api/bank/institutions:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Link Bank: create agreement and requisition, returns redirect link
+// Link Bank: create session auth, returns redirect URL
 app.post('/api/bank/link', async (req, res) => {
   try {
-    const { institutionId, country } = req.body;
+    const { institutionId, country } = req.body; // institutionId is the connector name
     if (!institutionId) {
-      return res.status(400).json({ error: 'Falta institutionId' });
+      return res.status(400).json({ error: 'Falta el conector del banco.' });
     }
 
-    const token = await getGoCardlessToken(dbOps);
+    const token = getEnableBankingToken(dbOps);
     
     // Save institution and country in settings
-    dbOps.updateSetting('gocardless_institution_id', institutionId);
-    dbOps.updateSetting('gocardless_country', country || 'ES');
+    dbOps.updateSetting('enablebanking_institution_id', institutionId);
+    dbOps.updateSetting('enablebanking_country', country || 'ES');
 
-    // Create End User Agreement (explicit for 90 days scope)
-    console.log(`Creating end user agreement for institution: ${institutionId}`);
-    const agreementRes = await fetch('https://bankaccountdata.gocardless.com/api/v2/agreements/enduser/', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        max_historical_days: 90,
-        access_valid_for_days: 90,
-        access_scope: ['balances', 'details', 'transactions'],
-        institution_id: institutionId
-      })
-    });
-
-    if (!agreementRes.ok) {
-      const errText = await agreementRes.text();
-      console.error('Error creating agreement:', errText);
-      throw new Error('Error al crear el acuerdo bancario: ' + agreementRes.statusText);
-    }
-    
-    const agreement = await agreementRes.json();
-    
-    // Create Requisition
-    const reference = 'mc_' + Math.random().toString(36).substring(2, 15);
-    dbOps.updateSetting('gocardless_reference', reference);
+    // Create reference
+    const reference = 'eb_' + Math.random().toString(36).substring(2, 15);
+    dbOps.updateSetting('enablebanking_reference', reference);
 
     // Build the redirect URL
     const protocol = req.headers['x-forwarded-proto'] || req.protocol;
     const host = req.headers.host;
     const redirectUrl = `${protocol}://${host}/api/bank/callback`;
     
-    console.log(`Creating requisition with redirect callback: ${redirectUrl}`);
+    console.log(`Creating Enable Banking auth session with redirect callback: ${redirectUrl}`);
 
-    const requisitionRes = await fetch('https://bankaccountdata.gocardless.com/api/v2/requisitions/', {
+    const response = await fetch('https://api.enablebanking.com/auth', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -356,24 +342,24 @@ app.post('/api/bank/link', async (req, res) => {
         'Accept': 'application/json'
       },
       body: JSON.stringify({
-        redirect: redirectUrl,
-        institution_id: institutionId,
-        agreement: agreement.id,
-        reference: reference,
-        user_language: 'ES'
+        connector: institutionId,
+        redirect_url: redirectUrl,
+        state: reference,
+        access: {
+          balances: {},
+          transactions: {}
+        }
       })
     });
 
-    if (!requisitionRes.ok) {
-      const errText = await requisitionRes.text();
-      console.error('Error creating requisition:', errText);
-      throw new Error('Error al crear la solicitud de conexión: ' + requisitionRes.statusText);
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('Error creating Enable Banking session:', errText);
+      throw new Error('Error al crear la solicitud de conexión: ' + response.statusText);
     }
 
-    const requisition = await requisitionRes.json();
-    dbOps.updateSetting('gocardless_requisition_id', requisition.id);
-
-    res.json({ link: requisition.link });
+    const authData = await response.json();
+    res.json({ link: authData.url });
   } catch (err) {
     console.error('Error in /api/bank/link:', err.message);
     res.status(500).json({ error: err.message });
@@ -383,57 +369,55 @@ app.post('/api/bank/link', async (req, res) => {
 // Bank Consent Callback Handler
 app.get('/api/bank/callback', async (req, res) => {
   try {
-    const reference = req.query.ref;
+    const code = req.query.code;
+    const state = req.query.state;
     const settings = dbOps.getSettings();
     
-    if (reference && settings.gocardless_reference !== reference) {
-      console.warn('Warning: Requisition reference mismatch');
+    if (state && settings.enablebanking_reference !== state) {
+      console.warn('Warning: Auth state mismatch');
     }
     
-    const requisitionId = settings.gocardless_requisition_id;
-    if (!requisitionId) {
-      throw new Error('No se encontró ninguna solicitud de conexión activa.');
+    if (!code) {
+      throw new Error('No se recibió el código de autorización del banco.');
     }
 
-    const token = await getGoCardlessToken(dbOps);
+    const token = getEnableBankingToken(dbOps);
     
-    console.log(`Checking requisition status for ID: ${requisitionId}`);
-    const response = await fetch(`https://bankaccountdata.gocardless.com/api/v2/requisitions/${requisitionId}/`, {
+    console.log(`Exchanging code for Enable Banking session...`);
+    const response = await fetch('https://api.enablebanking.com/sessions', {
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
         'Accept': 'application/json'
-      }
+      },
+      body: JSON.stringify({
+        code: code
+      })
     });
 
     if (!response.ok) {
-      throw new Error('Error al consultar el estado de la conexión bancaria.');
+      const errText = await response.text();
+      console.error('Error exchanging session code:', errText);
+      throw new Error('Error al verificar la sesión con el banco.');
     }
 
-    const requisition = await response.json();
+    const sessionData = await response.json();
     
-    if (requisition.accounts && requisition.accounts.length > 0) {
-      dbOps.updateSetting('gocardless_accounts', JSON.stringify(requisition.accounts));
-      dbOps.updateSetting('gocardless_linked', 'true');
-      dbOps.updateSetting('gocardless_linked_date', new Date().toISOString());
+    if (sessionData.session_id && sessionData.accounts && sessionData.accounts.length > 0) {
+      dbOps.updateSetting('enablebanking_session_id', sessionData.session_id);
+      dbOps.updateSetting('enablebanking_accounts', JSON.stringify(sessionData.accounts));
+      dbOps.updateSetting('enablebanking_linked', 'true');
+      dbOps.updateSetting('enablebanking_linked_date', new Date().toISOString());
       
-      try {
-        const instRes = await fetch(`https://bankaccountdata.gocardless.com/api/v2/institutions/${requisition.institution_id}/`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (instRes.ok) {
-          const instData = await instRes.json();
-          dbOps.updateSetting('gocardless_bank_name', instData.name || requisition.institution_id);
-        } else {
-          dbOps.updateSetting('gocardless_bank_name', requisition.institution_id);
-        }
-      } catch (err) {
-        dbOps.updateSetting('gocardless_bank_name', requisition.institution_id);
-      }
+      const bankName = sessionData.connector || settings.enablebanking_institution_id || 'Banco';
+      const cleanBankName = bankName.split('_')[0].toUpperCase();
+      dbOps.updateSetting('enablebanking_bank_name', cleanBankName);
       
-      console.log(`Successfully linked accounts: ${JSON.stringify(requisition.accounts)}`);
+      console.log(`Successfully linked Enable Banking session: ${sessionData.session_id}`);
       res.redirect('/?bank_status=success');
     } else {
-      console.warn(`No accounts found in requisition. Status: ${requisition.status}`);
+      console.warn(`No accounts found in session`);
       res.redirect('/?bank_status=failed&reason=no_accounts');
     }
   } catch (err) {
@@ -445,13 +429,13 @@ app.get('/api/bank/callback', async (req, res) => {
 // Unlink Bank (clear settings)
 app.post('/api/bank/unlink', (req, res) => {
   try {
-    dbOps.updateSetting('gocardless_linked', 'false');
-    dbOps.updateSetting('gocardless_accounts', '');
-    dbOps.updateSetting('gocardless_requisition_id', '');
-    dbOps.updateSetting('gocardless_reference', '');
-    dbOps.updateSetting('gocardless_bank_name', '');
-    dbOps.updateSetting('gocardless_linked_date', '');
-    console.log('Bank unlinked successfully.');
+    dbOps.updateSetting('enablebanking_linked', 'false');
+    dbOps.updateSetting('enablebanking_accounts', '');
+    dbOps.updateSetting('enablebanking_session_id', '');
+    dbOps.updateSetting('enablebanking_reference', '');
+    dbOps.updateSetting('enablebanking_bank_name', '');
+    dbOps.updateSetting('enablebanking_linked_date', '');
+    console.log('Enable Banking unlinked successfully.');
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -462,55 +446,64 @@ app.post('/api/bank/unlink', (req, res) => {
 app.post('/api/bank/sync', async (req, res) => {
   try {
     const settings = dbOps.getSettings();
-    if (settings.gocardless_linked !== 'true') {
+    if (settings.enablebanking_linked !== 'true') {
       return res.status(400).json({ error: 'No hay ninguna cuenta bancaria vinculada.' });
     }
 
-    const accountsStr = settings.gocardless_accounts;
+    const accountsStr = settings.enablebanking_accounts;
     if (!accountsStr) {
       return res.status(400).json({ error: 'No se encontraron IDs de cuenta bancaria vinculados.' });
     }
 
     const accounts = JSON.parse(accountsStr);
-    const token = await getGoCardlessToken(dbOps);
+    const token = getEnableBankingToken(dbOps);
     const categories = dbOps.getCategories();
     
     let totalImported = 0;
     
-    console.log(`Syncing transactions for ${accounts.length} bank account(s)...`);
+    const psuIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+    const psuUserAgent = req.headers['user-agent'] || 'MoneyController/1.0';
     
-    for (const accountId of accounts) {
-      console.log(`Fetching transactions for account: ${accountId}`);
-      const response = await fetch(`https://bankaccountdata.gocardless.com/api/v2/accounts/${accountId}/transactions/`, {
+    console.log(`Syncing transactions via Enable Banking...`);
+    
+    const dateFrom = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    for (const account of accounts) {
+      const accountId = account.uid;
+      console.log(`Fetching transactions for account UID: ${accountId}`);
+      
+      const response = await fetch(`https://api.enablebanking.com/accounts/${accountId}/transactions?dateFrom=${dateFrom}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'PSU-IP-Address': psuIp,
+          'PSU-User-Agent': psuUserAgent
         }
       });
 
       if (!response.ok) {
-        console.error(`Error fetching transactions for account ${accountId}:`, response.statusText);
+        const errText = await response.text();
+        console.error(`Error fetching transactions for account ${accountId}:`, errText);
         continue;
       }
 
       const data = await response.json();
-      const booked = (data.transactions && data.transactions.booked) || [];
-      console.log(`Found ${booked.length} booked transaction(s) for account ${accountId}`);
+      const txList = data.transactions || [];
+      console.log(`Found ${txList.length} transaction(s) for account ${accountId}`);
       
-      for (const tx of booked) {
-        const txId = tx.transactionId || tx.internalTransactionId;
+      for (const tx of txList) {
+        if (tx.status !== 'booked') continue;
+        
+        const txId = tx.transactionId || tx.entryReference;
         if (!txId) continue;
 
-        const amountNum = parseFloat(tx.transactionAmount.amount);
+        const amountNum = parseFloat(tx.amount);
         const type = amountNum >= 0 ? 'income' : 'expense';
         const absoluteAmount = Math.abs(amountNum);
         
         const date = tx.bookingDate || tx.valueDate || new Date().toISOString().split('T')[0];
         
-        let description = tx.remittanceInformationUnstructured || 
-                          (tx.remittanceInformationUnstructuredArray && tx.remittanceInformationUnstructuredArray[0]) || 
-                          'Transacción Bancaria';
-        
+        let description = tx.description || 'Transacción Bancaria';
         description = description.replace(/\s+/g, ' ').trim();
         if (description.length > 80) {
           description = description.substring(0, 77) + '...';
@@ -564,7 +557,7 @@ app.post('/api/bank/sync', async (req, res) => {
           }
         }
         
-        const notes = `Sincronizado de ${settings.gocardless_bank_name || 'Banco'}`;
+        const notes = `Sincronizado de ${settings.enablebanking_bank_name || 'Banco'}`;
         const result = dbOps.addBankTransaction(description, absoluteAmount, type, categoryId, date, notes, txId);
         if (result.changes > 0) {
           totalImported++;
