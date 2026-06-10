@@ -13,7 +13,7 @@
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="css/style.css?v=1.3.2">
+  <link rel="stylesheet" href="css/style.css?v=1.4.0">
 </head>
 <body>
   <div class="app-container">
@@ -79,6 +79,10 @@
             <span class="dot"></span>
             <span id="forecast-status-text">Analizando flujo de caja...</span>
           </div>
+          <button class="btn btn-secondary" id="btn-sync-bank" style="display: none; align-items: center; gap: 8px;">
+            <i data-lucide="refresh-cw"></i>
+            <span>Sincronizar Banco</span>
+          </button>
           <button class="btn btn-primary" id="btn-quick-add-transaction">
             <i data-lucide="plus"></i>
             <span>Nuevo Movimiento</span>
@@ -221,6 +225,10 @@
               </button>
             </div>
 
+            <button class="btn btn-secondary" id="btn-sync-bank-tx" style="display: none; align-items: center; gap: 8px; margin-right: 8px;">
+              <i data-lucide="refresh-cw"></i>
+              <span>Sincronizar Banco</span>
+            </button>
             <button class="btn btn-primary" id="btn-add-transaction">
               <i data-lucide="plus"></i>
               <span>Añadir</span>
@@ -543,6 +551,105 @@
             </form>
           </div>
 
+          <!-- Bank Connection Card -->
+          <div class="glass panel-card settings-card">
+            <div class="panel-card-header">
+              <h3>Sincronización Bancaria Automática</h3>
+              <p class="text-muted">Conecta tus cuentas bancarias de forma segura mediante GoCardless (PSD2 acceso lectura).</p>
+            </div>
+            <div class="settings-card-body">
+              <!-- If bank is NOT linked -->
+              <div id="bank-unlinked-section">
+                <div class="form-group">
+                  <label for="bank-secret-id">
+                    <span>GoCardless Secret ID</span>
+                    <small class="form-help">Consigue tus credenciales gratuitas de la API de GoCardless Bank Account Data.</small>
+                  </label>
+                  <input type="password" id="bank-secret-id" class="form-control" placeholder="Introducir Secret ID">
+                </div>
+                
+                <div class="form-group">
+                  <label for="bank-secret-key">
+                    <span>GoCardless Secret Key</span>
+                  </label>
+                  <input type="password" id="bank-secret-key" class="form-control" placeholder="Introducir Secret Key">
+                </div>
+
+                <div class="form-row" style="margin-bottom: 16px;">
+                  <div class="form-group col-12">
+                    <button type="button" class="btn btn-secondary btn-block" id="btn-save-bank-keys">
+                      <i data-lucide="save"></i> Guardar Claves
+                    </button>
+                  </div>
+                </div>
+
+                <div class="divider" style="border-top: 1px solid rgba(255,255,255,0.05); margin: 20px 0;"></div>
+
+                <div class="form-row">
+                  <div class="form-group col-6">
+                    <label for="bank-country">País del Banco</label>
+                    <select id="bank-country" class="form-select">
+                      <option value="ES">España (ES)</option>
+                      <option value="PT">Portugal (PT)</option>
+                      <option value="FR">Francia (FR)</option>
+                      <option value="IT">Italia (IT)</option>
+                      <option value="DE">Alemania (DE)</option>
+                    </select>
+                  </div>
+                  <div class="form-group col-6" style="display: flex; align-items: flex-end;">
+                    <button type="button" class="btn btn-secondary btn-block" id="btn-load-banks" disabled>
+                      <i data-lucide="download-cloud"></i> Cargar Bancos
+                    </button>
+                  </div>
+                </div>
+
+                <div class="form-group" id="bank-select-container" style="display: none; margin-top: 16px;">
+                  <label for="bank-institution">Selecciona tu Banco</label>
+                  <select id="bank-institution" class="form-select">
+                    <!-- Populated dynamically -->
+                  </select>
+                </div>
+
+                <div class="form-row" style="margin-top: 20px;">
+                  <div class="form-group col-12">
+                    <button type="button" class="btn btn-indigo btn-block" id="btn-link-bank" disabled>
+                      <i data-lucide="link"></i> Vincular Cuenta Bancaria
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- If bank IS linked -->
+              <div id="bank-linked-section" style="display: none;">
+                <div class="bank-status-container" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                  <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                    <i data-lucide="check-circle" style="color: var(--income); width: 24px; height: 24px;"></i>
+                    <h4 style="margin: 0; color: #fff;">Banco Vinculado con éxito</h4>
+                  </div>
+                  <p style="margin: 0 0 8px 0; font-size: 0.9rem; color: var(--text-muted);">
+                    Tu aplicación está conectada a: <strong id="lbl-linked-bank-name" style="color: #fff;">-</strong>
+                  </p>
+                  <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">
+                    Fecha de conexión: <span id="lbl-linked-bank-date">-</span> (Válido por 90 días)
+                  </p>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group col-6">
+                    <button type="button" class="btn btn-primary btn-block" id="btn-sync-bank-now">
+                      <i data-lucide="refresh-cw"></i> Sincronizar Ahora
+                    </button>
+                  </div>
+                  <div class="form-group col-6">
+                    <button type="button" class="btn btn-danger btn-block" id="btn-unlink-bank">
+                      <i data-lucide="link-2"></i> Desvincular Banco
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Categories Management Card -->
           <div class="glass panel-card settings-card" id="categories-settings-card">
             <div class="panel-card-header">
@@ -812,6 +919,6 @@
   </div>
 
   <!-- Custom script -->
-  <script src="js/app.js?v=1.3.2"></script>
+  <script src="js/app.js?v=1.4.0"></script>
 </body>
 </html>

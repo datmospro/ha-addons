@@ -45,6 +45,7 @@ function initDb() {
       category_id INTEGER,
       date TEXT NOT NULL, -- YYYY-MM-DD
       notes TEXT,
+      bank_transaction_id TEXT,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
     )
   `);
@@ -62,8 +63,19 @@ function initDb() {
       console.log("Adding column recurrence_date to transactions table");
       db.exec("ALTER TABLE transactions ADD COLUMN recurrence_date TEXT");
     }
+    if (!columns.includes('bank_transaction_id')) {
+      console.log("Adding column bank_transaction_id to transactions table");
+      db.exec("ALTER TABLE transactions ADD COLUMN bank_transaction_id TEXT");
+    }
   } catch (err) {
     console.error("Error checking or adding columns to transactions table:", err);
+  }
+
+  // Create unique index for bank transactions after migrations ensure the column exists
+  try {
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_bank_tx ON transactions(bank_transaction_id)");
+  } catch (err) {
+    console.error("Error creating unique index for bank transactions:", err);
   }
 
   // Recurring rules table (for fixed/scheduled expenses and incomes)
@@ -196,6 +208,10 @@ const dbOps = {
     return db.prepare('INSERT INTO transactions (description, amount, type, category_id, date, notes, recurring_rule_id, recurrence_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(description, Number(amount), type, category_id ? Number(category_id) : null, date, notes, recurring_rule_id, recurrence_date);
   },
+  addBankTransaction: (description, amount, type, category_id, date, notes, bank_transaction_id) => {
+    return db.prepare('INSERT OR IGNORE INTO transactions (description, amount, type, category_id, date, notes, bank_transaction_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(description, Number(amount), type, category_id ? Number(category_id) : null, date, notes, bank_transaction_id);
+  },
   updateTransaction: (id, description, amount, type, category_id, date, notes = '') => {
     return db.prepare('UPDATE transactions SET description = ?, amount = ?, type = ?, category_id = ?, date = ?, notes = ? WHERE id = ?')
       .run(description, Number(amount), type, category_id ? Number(category_id) : null, date, notes, Number(id));
@@ -288,8 +304,11 @@ const dbOps = {
       }
       if (data.transactions) {
         db.exec('DELETE FROM transactions');
-        const stmt = db.prepare('INSERT INTO transactions (id, description, amount, type, category_id, date, notes) VALUES (?, ?, ?, ?, ?, ?, ?)');
-        data.transactions.forEach(row => stmt.run(row.id, row.description, row.amount, row.type, row.category_id, row.date, row.notes));
+        const stmt = db.prepare('INSERT INTO transactions (id, description, amount, type, category_id, date, notes, bank_transaction_id, recurring_rule_id, recurrence_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        data.transactions.forEach(row => stmt.run(
+          row.id, row.description, row.amount, row.type, row.category_id, row.date, row.notes, 
+          row.bank_transaction_id || null, row.recurring_rule_id || null, row.recurrence_date || null
+        ));
       }
       if (data.recurring_rules) {
         db.exec('DELETE FROM recurring_rules');

@@ -42,7 +42,31 @@ function formatCurrency(amount, currency = settings.currency || 'EUR') {
 document.addEventListener('DOMContentLoaded', async () => {
   await loadBaseData();
   setupEventListeners();
-  switchTab('dashboard');
+  
+  // Check for bank callback params
+  const urlParams = new URLSearchParams(window.location.search);
+  const bankStatus = urlParams.get('bank_status');
+  if (bankStatus) {
+    // Clear query parameters from URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+    
+    if (bankStatus === 'success') {
+      showToast('¡Banco vinculado con éxito! Ya puedes sincronizar tus movimientos.', 'success');
+      switchTab('settings');
+      // Wait a moment, then auto-trigger first sync
+      setTimeout(() => {
+        if (confirm('¿Deseas realizar la primera sincronización de movimientos bancarios ahora?')) {
+          syncBank();
+        }
+      }, 1000);
+    } else {
+      const reason = urlParams.get('reason') || 'Desconocida';
+      showToast(`Error al vincular el banco: ${reason}`, 'danger');
+      switchTab('settings');
+    }
+  } else {
+    switchTab('dashboard');
+  }
   
   // Initialize Lucide Icons
   lucide.createIcons();
@@ -74,6 +98,9 @@ async function loadBaseData() {
     categories = await categoriesRes.json();
     populateCategorySelects();
     renderCategoryManager();
+    
+    // Update Bank UI state
+    updateBankUI();
 
     // 3. Trigger initial forecast calculation
     await runForecastCalculation();
@@ -1547,6 +1574,41 @@ function setupEventListeners() {
   document.getElementById('btn-close-cat-modal').addEventListener('click', closeCatModal);
   document.getElementById('btn-cancel-cat-modal').addEventListener('click', closeCatModal);
   document.getElementById('cat-form-element').addEventListener('submit', handleCatSubmit);
+
+  // Bank Connection events
+  const btnSaveBankKeys = document.getElementById('btn-save-bank-keys');
+  if (btnSaveBankKeys) {
+    btnSaveBankKeys.addEventListener('click', saveBankKeys);
+  }
+  
+  const btnLoadBanks = document.getElementById('btn-load-banks');
+  if (btnLoadBanks) {
+    btnLoadBanks.addEventListener('click', loadBanks);
+  }
+  
+  const btnLinkBank = document.getElementById('btn-link-bank');
+  if (btnLinkBank) {
+    btnLinkBank.addEventListener('click', linkBank);
+  }
+  
+  const btnUnlinkBank = document.getElementById('btn-unlink-bank');
+  if (btnUnlinkBank) {
+    btnUnlinkBank.addEventListener('click', unlinkBank);
+  }
+
+  const bankCountry = document.getElementById('bank-country');
+  if (bankCountry) {
+    bankCountry.addEventListener('change', () => {
+      document.getElementById('bank-select-container').style.display = 'none';
+      document.getElementById('btn-link-bank').setAttribute('disabled', 'true');
+    });
+  }
+
+  // Sync actions
+  ['btn-sync-bank', 'btn-sync-bank-tx', 'btn-sync-bank-now'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', syncBank);
+  });
 }
 
 // Switch navigation Tabs
@@ -2136,4 +2198,260 @@ function showToast(message, type = 'success') {
     container.classList.remove('show');
     setTimeout(() => container.remove(), 300);
   }, 4000);
+}
+
+// --- GOCARDLESS BANK SYNC OPERATIONS ---
+
+// Update Bank UI display based on settings
+function updateBankUI() {
+  const isLinked = settings.gocardless_linked === 'true';
+  const secretId = settings.gocardless_secret_id || '';
+  const secretKey = settings.gocardless_secret_key || '';
+  
+  // Update inputs
+  document.getElementById('bank-secret-id').value = secretId;
+  document.getElementById('bank-secret-key').value = secretKey ? '********' : '';
+  
+  // Enable/disable Load Banks button if we have keys saved
+  const btnLoadBanks = document.getElementById('btn-load-banks');
+  if (secretId && secretKey) {
+    btnLoadBanks.removeAttribute('disabled');
+  } else {
+    btnLoadBanks.setAttribute('disabled', 'true');
+  }
+
+  // Update panels display
+  const unlinkedSec = document.getElementById('bank-unlinked-section');
+  const linkedSec = document.getElementById('bank-linked-section');
+  const btnSyncBank = document.getElementById('btn-sync-bank');
+  const btnSyncBankTx = document.getElementById('btn-sync-bank-tx');
+
+  if (isLinked) {
+    unlinkedSec.style.display = 'none';
+    linkedSec.style.display = 'block';
+    
+    document.getElementById('lbl-linked-bank-name').textContent = settings.gocardless_bank_name || 'Desconocido';
+    
+    let linkDate = 'N/D';
+    if (settings.gocardless_linked_date) {
+      try {
+        linkDate = new Date(settings.gocardless_linked_date).toLocaleDateString('es-ES', {
+          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+      } catch (e) {
+        linkDate = settings.gocardless_linked_date;
+      }
+    }
+    document.getElementById('lbl-linked-bank-date').textContent = linkDate;
+
+    // Show sync buttons
+    if (btnSyncBank) btnSyncBank.style.display = 'inline-flex';
+    if (btnSyncBankTx) btnSyncBankTx.style.display = 'inline-flex';
+  } else {
+    unlinkedSec.style.display = 'block';
+    linkedSec.style.display = 'none';
+    
+    // Hide sync buttons
+    if (btnSyncBank) btnSyncBank.style.display = 'none';
+    if (btnSyncBankTx) btnSyncBankTx.style.display = 'none';
+  }
+}
+
+// Save GoCardless API keys
+async function saveBankKeys() {
+  const secretId = document.getElementById('bank-secret-id').value.trim();
+  const secretKey = document.getElementById('bank-secret-key').value.trim();
+
+  if (!secretId) {
+    showToast('El Secret ID es obligatorio.', 'warning');
+    return;
+  }
+
+  try {
+    if (secretId !== (settings.gocardless_secret_id || '')) {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'gocardless_secret_id', value: secretId })
+      });
+      settings.gocardless_secret_id = secretId;
+    }
+
+    if (secretKey && secretKey !== '********') {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'gocardless_secret_key', value: secretKey })
+      });
+      settings.gocardless_secret_key = secretKey;
+    }
+
+    showToast('Claves bancarias guardadas correctamente.', 'success');
+    updateBankUI();
+  } catch (err) {
+    console.error('Error saving bank keys:', err);
+    showToast('Error al guardar las claves.', 'danger');
+  }
+}
+
+// Load banks list for selected country
+async function loadBanks() {
+  const country = document.getElementById('bank-country').value;
+  const btnLoad = document.getElementById('btn-load-banks');
+  const originalText = btnLoad.innerHTML;
+  
+  btnLoad.innerHTML = '<span class="spinner-small"></span> Cargando...';
+  btnLoad.setAttribute('disabled', 'true');
+
+  try {
+    const res = await fetch(`/api/bank/institutions?country=${country}`);
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || 'Error al descargar la lista de bancos.');
+    }
+
+    const institutions = await res.json();
+    const select = document.getElementById('bank-institution');
+    select.innerHTML = '<option value="" disabled selected>Selecciona tu banco...</option>';
+    
+    institutions.sort((a, b) => a.name.localeCompare(b.name));
+
+    institutions.forEach(inst => {
+      select.insertAdjacentHTML('beforeend', `<option value="${inst.id}">${inst.name}</option>`);
+    });
+
+    document.getElementById('bank-select-container').style.display = 'block';
+    
+    select.onchange = () => {
+      document.getElementById('btn-link-bank').removeAttribute('disabled');
+    };
+    
+    showToast(`Se han cargado ${institutions.length} bancos de ${country}.`, 'success');
+  } catch (err) {
+    console.error('Error loading banks:', err);
+    showToast(err.message || 'Error al obtener la lista de bancos.', 'danger');
+  } finally {
+    btnLoad.innerHTML = originalText;
+    btnLoad.removeAttribute('disabled');
+  }
+}
+
+// Initiate bank linking redirect
+async function linkBank() {
+  const institutionId = document.getElementById('bank-institution').value;
+  const country = document.getElementById('bank-country').value;
+  const btnLink = document.getElementById('btn-link-bank');
+  
+  if (!institutionId) {
+    showToast('Por favor, selecciona un banco.', 'warning');
+    return;
+  }
+
+  const originalText = btnLink.innerHTML;
+  btnLink.innerHTML = '<span class="spinner-small"></span> Conectando...';
+  btnLink.setAttribute('disabled', 'true');
+
+  try {
+    const res = await fetch('/api/bank/link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ institutionId, country })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || 'Error al iniciar la vinculación.');
+    }
+
+    const data = await res.json();
+    if (data.link) {
+      showToast('Redirigiendo a la pasarela segura de tu banco...', 'indigo');
+      setTimeout(() => {
+        window.location.href = data.link;
+      }, 1200);
+    } else {
+      throw new Error('No se recibió el enlace de redirección.');
+    }
+  } catch (err) {
+    console.error('Error linking bank:', err);
+    showToast(err.message || 'Error al conectar con el banco.', 'danger');
+    btnLink.innerHTML = originalText;
+    btnLink.removeAttribute('disabled');
+  }
+}
+
+// Disconnect/unlink bank
+async function unlinkBank() {
+  if (!confirm('¿Estás seguro de que deseas desvincular tu banco? Se borrarán las credenciales de sincronización y los IDs de cuenta locales. Las transacciones importadas hasta ahora se mantendrán.')) {
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/bank/unlink', { method: 'POST' });
+    if (!res.ok) throw new Error('Error al desvincular.');
+    
+    settings.gocardless_linked = 'false';
+    settings.gocardless_accounts = '';
+    settings.gocardless_bank_name = '';
+    settings.gocardless_linked_date = '';
+    
+    showToast('Banco desvinculado correctamente.', 'success');
+    updateBankUI();
+    
+    await runForecastCalculation();
+  } catch (err) {
+    console.error('Error unlinking bank:', err);
+    showToast('Error al desvincular el banco.', 'danger');
+  }
+}
+
+// Sync bank transactions now
+async function syncBank() {
+  const syncButtons = [
+    document.getElementById('btn-sync-bank'),
+    document.getElementById('btn-sync-bank-tx'),
+    document.getElementById('btn-sync-bank-now')
+  ];
+
+  syncButtons.forEach(btn => {
+    if (btn) {
+      btn.setAttribute('disabled', 'true');
+      const icon = btn.querySelector('i');
+      if (icon) icon.classList.add('spin-animation');
+    }
+  });
+
+  showToast('Conectando con tu banco y descargando movimientos...', 'indigo');
+
+  try {
+    const res = await fetch('/api/bank/sync', { method: 'POST' });
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || 'Error durante la sincronización bancaria.');
+    }
+
+    const data = await res.json();
+    
+    if (data.imported > 0) {
+      showToast(`¡Sincronización exitosa! Se han importado ${data.imported} transacciones nuevas.`, 'success');
+    } else {
+      showToast('Sincronización completada. No hay transacciones nuevas para importar.', 'success');
+    }
+
+    await loadBaseData();
+    if (currentTab === 'transactions') {
+      await renderTransactionsTab();
+    }
+  } catch (err) {
+    console.error('Sync error:', err);
+    showToast(err.message || 'Error de sincronización con el banco.', 'danger');
+  } finally {
+    syncButtons.forEach(btn => {
+      if (btn) {
+        btn.removeAttribute('disabled');
+        const icon = btn.querySelector('i');
+        if (icon) icon.classList.remove('spin-animation');
+      }
+    });
+  }
 }
