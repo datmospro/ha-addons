@@ -1242,6 +1242,38 @@ body {
   color: white !important;
 }
 
+/* Compact day indicators */
+.cal-day-indicators {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  margin: auto 0;
+  min-height: 16px;
+}
+
+.cal-day-indicator {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.cal-day-indicator.income {
+  color: #10b981;
+  background-color: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.cal-day-indicator.expense {
+  color: #f43f5e;
+  background-color: rgba(244, 63, 94, 0.12);
+  border: 1px solid rgba(244, 63, 94, 0.2);
+}
+
 .cal-day-num {
   font-size: 0.85rem;
   font-weight: 600;

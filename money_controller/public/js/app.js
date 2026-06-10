@@ -1084,6 +1084,27 @@ function renderCalendar() {
         dayCell.style.opacity = '0.7';
       }
       
+      // Gather income and expense totals (excluding prorated variable expenses)
+      let totalIncome = 0;
+      let totalExpense = 0;
+      forecastDay.events.forEach(e => {
+        if (e.type === 'income') {
+          totalIncome += e.amount;
+        } else if (e.type === 'expense') {
+          totalExpense += e.amount;
+        }
+      });
+      
+      let indicatorsHTML = '<div class="cal-day-indicators">';
+      if (totalIncome > 0) {
+        indicatorsHTML += `<span class="cal-day-indicator income">+${totalIncome.toFixed(0)}</span>`;
+      }
+      if (totalExpense > 0) {
+        indicatorsHTML += `<span class="cal-day-indicator expense">-${totalExpense.toFixed(0)}</span>`;
+      }
+      indicatorsHTML += '</div>';
+      
+      dayCell.innerHTML += indicatorsHTML;
       dayCell.innerHTML += `<span class="cal-day-bal ${statusClass}">${balance.toFixed(0)}€</span>`;
       
       // Set click event to show transactions
