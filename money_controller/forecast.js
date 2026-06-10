@@ -97,69 +97,7 @@ function doesRuleApply(rule, dateStr) {
  * Ajusta el saldo inicial para que el saldo actual de hoy no varíe.
  */
 function syncPastRecurringOccurrences() {
-  try {
-    const recurringRules = dbOps.getRecurringRules();
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = formatDate(today);
-    
-    // Historial desde el 01/06/2026 (Opción B elegida por el usuario)
-    const startDateLimitStr = todayStr < '2026-06-01' ? todayStr : '2026-06-01';
-
-    let initialBalanceAdjustment = 0;
-
-    recurringRules.forEach(rule => {
-      const ruleStart = rule.start_date;
-      // Empezamos desde el inicio de la regla o del límite del historial, lo que sea más reciente
-      const startCheckStr = ruleStart > startDateLimitStr ? ruleStart : startDateLimitStr;
-      
-      if (startCheckStr > todayStr) return; // Empieza en el futuro
-
-      let current = new Date(startCheckStr + 'T12:00:00');
-      const end = new Date(todayStr + 'T12:00:00'); // Evaluamos hasta hoy inclusive
-
-      while (current <= end) {
-        const dateStr = formatDate(current);
-        // Comprobar si aplica en esta fecha
-        if (doesRuleApply(rule, dateStr)) {
-          // Comprobar si ya existe la transacción para esta ocurrencia
-          if (!dbOps.hasTransactionForRecurrence(rule.id, dateStr)) {
-            // No existe, la insertamos como transacción real
-            console.log(`Auto-posting past recurrence of "${rule.description}" for date ${dateStr}`);
-            dbOps.addTransaction(
-              `${rule.description} (Fijo)`,
-              rule.amount,
-              rule.type,
-              rule.category_id,
-              dateStr,
-              rule.notes || 'Generado automáticamente desde movimiento fijo.',
-              rule.id,
-              dateStr
-            );
-            
-            // Calculamos el ajuste necesario para el saldo inicial
-            if (rule.type === 'expense') {
-              initialBalanceAdjustment += rule.amount;
-            } else {
-              initialBalanceAdjustment -= rule.amount;
-            }
-          }
-        }
-        current.setDate(current.getDate() + 1);
-      }
-    });
-
-    // Si hubo ajustes, actualizamos el saldo inicial
-    if (initialBalanceAdjustment !== 0) {
-      const settings = dbOps.getSettings();
-      const newInitialBalance = parseFloat(settings.initial_balance || 0) + initialBalanceAdjustment;
-      console.log(`Adjusting initial balance from ${settings.initial_balance} to ${newInitialBalance} to preserve current balance`);
-      dbOps.updateSetting('initial_balance', newInitialBalance);
-    }
-  } catch (err) {
-    console.error('Error syncing past recurring occurrences:', err);
-  }
+  // Desactivado: Dejamos los gastos fijos únicamente para el pronóstico de saldo futuro
 }
 
 /**
@@ -307,12 +245,14 @@ function generateForecast(temporaryTransactions = []) {
     currentDate.setDate(currentDate.getDate() + 1);
   }
 
-  // B) Bucle futuro: desde mañana hasta dentro de 365 días
+  // B) Bucle futuro: desde hoy (para fijos) y mañana (para puntuales) hasta dentro de 365 días
   const simulatedFutureTransactions = [...futurePlannedTransactions, ...temporaryTransactions];
   const recurringRules = dbOps.getRecurringRules();
 
-  for (let i = 1; i <= 365; i++) {
-    const dateStr = formatDate(currentDate);
+  let futureCurrentDate = new Date(todayStr + 'T12:00:00');
+
+  for (let i = 0; i <= 365; i++) {
+    const dateStr = formatDate(futureCurrentDate);
     const dayEvents = [];
 
     // Aplicar gasto variable diario prorrateado dinámico
@@ -325,70 +265,92 @@ function generateForecast(temporaryTransactions = []) {
         const daysInThatMonth = new Date(dayDate.getFullYear(), dayDate.getMonth() + 1, 0).getDate();
         dailyVar = monthlyVariableBudget / daysInThatMonth;
       }
-      runningBalance -= dailyVar;
+      
+      // El gasto variable de "hoy" ya se restó en el bucle histórico si corresponde.
+      // Por tanto, en el bucle futuro solo lo restamos a partir de mañana (dateStr > todayStr).
+      if (dateStr > todayStr) {
+        runningBalance -= dailyVar;
+      }
     }
 
-    // Comprobar transacciones puntuales futuras
-    const dayTransactions = simulatedFutureTransactions.filter(t => t.date === dateStr);
-    dayTransactions.forEach(t => {
-      if (t.type === 'income') {
-        runningBalance += t.amount;
-        dayEvents.push({
-          id: t.id,
-          description: t.description + (t.isTemp ? ' (Simulado)' : ''),
-          amount: t.amount,
-          type: 'income',
-          category: t.category_name || (t.category_id ? categoriesMap[t.category_id]?.name : 'Sin categoría'),
-          category_id: t.category_id
-        });
-      } else {
-        runningBalance -= t.amount;
-        dayEvents.push({
-          id: t.id,
-          description: t.description + (t.isTemp ? ' (Simulado)' : ''),
-          amount: t.amount,
-          type: 'expense',
-          category: t.category_name || (t.category_id ? categoriesMap[t.category_id]?.name : 'Sin categoría'),
-          category_id: t.category_id
-        });
-      }
-    });
-
-    // Comprobar reglas recurrentes (gastos fijos)
-    recurringRules.forEach(rule => {
-      if (doesRuleApply(rule, dateStr)) {
-        if (rule.type === 'income') {
-          runningBalance += rule.amount;
+    // Comprobar transacciones puntuales futuras (solo a partir de mañana, hoy ya está en el historial)
+    if (dateStr > todayStr) {
+      const dayTransactions = simulatedFutureTransactions.filter(t => t.date === dateStr);
+      dayTransactions.forEach(t => {
+        if (t.type === 'income') {
+          runningBalance += t.amount;
           dayEvents.push({
-            ruleId: rule.id,
-            description: rule.description + ' (Fijo)',
-            amount: rule.amount,
+            id: t.id,
+            description: t.description + (t.isTemp ? ' (Simulado)' : ''),
+            amount: t.amount,
             type: 'income',
-            category: rule.category_name || 'Ingresos Fijos',
-            category_id: rule.category_id
+            category: t.category_name || (t.category_id ? categoriesMap[t.category_id]?.name : 'Sin categoría'),
+            category_id: t.category_id
           });
         } else {
-          runningBalance -= rule.amount;
+          runningBalance -= t.amount;
           dayEvents.push({
-            ruleId: rule.id,
-            description: rule.description + ' (Fijo)',
-            amount: rule.amount,
+            id: t.id,
+            description: t.description + (t.isTemp ? ' (Simulado)' : ''),
+            amount: t.amount,
             type: 'expense',
-            category: rule.category_name || 'Gastos Fijos',
-            category_id: rule.category_id
+            category: t.category_name || (t.category_id ? categoriesMap[t.category_id]?.name : 'Sin categoría'),
+            category_id: t.category_id
           });
+        }
+      });
+    }
+
+    // Comprobar reglas recurrentes (gastos fijos) para hoy y el futuro
+    recurringRules.forEach(rule => {
+      if (doesRuleApply(rule, dateStr)) {
+        // Comprobar si esta ocurrencia ya existe físicamente en la base de datos (cobrado/sincronizado)
+        const isSatisfied = dbOps.hasTransactionForRecurrence(rule.id, dateStr);
+        
+        if (!isSatisfied) {
+          if (rule.type === 'income') {
+            runningBalance += rule.amount;
+            dayEvents.push({
+              ruleId: rule.id,
+              description: rule.description + ' (Fijo)',
+              amount: rule.amount,
+              type: 'income',
+              category: rule.category_name || 'Ingresos Fijos',
+              category_id: rule.category_id
+            });
+          } else {
+            runningBalance -= rule.amount;
+            dayEvents.push({
+              ruleId: rule.id,
+              description: rule.description + ' (Fijo)',
+              amount: rule.amount,
+              type: 'expense',
+              category: rule.category_name || 'Gastos Fijos',
+              category_id: rule.category_id
+            });
+          }
         }
       }
     });
 
     const finalDayBalance = parseFloat(runningBalance.toFixed(2));
 
-    projection.push({
-      date: dateStr,
-      balance: finalDayBalance,
-      variableExpense: parseFloat(dailyVar.toFixed(2)),
-      events: dayEvents
-    });
+    // Si es hoy, actualizamos el saldo en la proyección (hoy ya se insertó en el bucle histórico)
+    if (dateStr === todayStr) {
+      const todayProj = projection.find(p => p.date === todayStr);
+      if (todayProj) {
+        todayProj.balance = finalDayBalance;
+        // Combinamos los eventos reales de hoy con los eventos fijos proyectados virtualmente
+        todayProj.events = [...todayProj.events, ...dayEvents];
+      }
+    } else {
+      projection.push({
+        date: dateStr,
+        balance: finalDayBalance,
+        variableExpense: parseFloat(dailyVar.toFixed(2)),
+        events: dayEvents
+      });
+    }
 
     // Registrar alertas
     if (finalDayBalance < 0) {
@@ -409,7 +371,7 @@ function generateForecast(temporaryTransactions = []) {
       });
     }
 
-    currentDate.setDate(currentDate.getDate() + 1);
+    futureCurrentDate.setDate(futureCurrentDate.getDate() + 1);
   }
 
   // Resumen del estado financiero proyectado (solo sobre proyección futura)

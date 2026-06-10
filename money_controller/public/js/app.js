@@ -668,9 +668,29 @@ async function renderTransactionsTab() {
 
     transactions.forEach(t => {
       const row = document.createElement('tr');
+      
+      const descriptionHTML = `
+        <strong>${escapeHtml(t.description)}</strong>
+        ${t.recurring_rule_id ? `
+          <span class="tag-fijo" style="font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); margin-left: 6px; font-weight: 500;">
+            Fijo
+          </span>
+        ` : ''}
+      `;
+
+      const linkButtonHTML = t.recurring_rule_id ? `
+        <button class="btn-table-action unlink-rule" onclick="unlinkTransactionFromRule(${t.id})" style="color: #a855f7;" title="Desvincular de Gasto Fijo">
+          <i data-lucide="link-2-off"></i>
+        </button>
+      ` : `
+        <button class="btn-table-action link-rule" onclick="openLinkRecurringModal(${t.id})" title="Vincular a Gasto Fijo">
+          <i data-lucide="link-2"></i>
+        </button>
+      `;
+
       row.innerHTML = `
         <td>${formatDisplayDate(t.date)}</td>
-        <td><strong>${escapeHtml(t.description)}</strong></td>
+        <td>${descriptionHTML}</td>
         <td>
           <span class="category-tag">
             <span class="category-dot" style="background-color: ${t.category_color || '#6b7280'}"></span>
@@ -683,6 +703,7 @@ async function renderTransactionsTab() {
         </td>
         <td class="text-center">
           <div class="action-buttons">
+            ${linkButtonHTML}
             <button class="btn-table-action" onclick="openEditTransaction(${t.id})" title="Editar">
               <i data-lucide="edit-3"></i>
             </button>
@@ -1501,6 +1522,11 @@ function setupEventListeners() {
   document.getElementById('rec-form').addEventListener('submit', handleRecSubmit);
   document.getElementById('settings-form').addEventListener('submit', handleSettingsSubmit);
   document.getElementById('what-if-add-form').addEventListener('submit', handleWhatIfSubmit);
+
+  // Link Modal Event Listeners
+  document.getElementById('btn-close-link-modal').addEventListener('click', closeLinkModal);
+  document.getElementById('btn-cancel-link-modal').addEventListener('click', closeLinkModal);
+  document.getElementById('form-link-recurring').addEventListener('submit', handleLinkSubmit);
 
   // Calendar navigation
   document.getElementById('btn-toggle-heatmap').addEventListener('click', () => {
@@ -2453,5 +2479,112 @@ async function syncBank() {
         if (icon) icon.classList.remove('spin-animation');
       }
     });
+  }
+}
+
+// Modal and Link controls
+async function openLinkRecurringModal(id) {
+  const tx = transactions.find(t => t.id === id);
+  if (!tx) return;
+
+  document.getElementById('link-tx-id').value = tx.id;
+  document.getElementById('link-tx-desc').textContent = tx.description;
+  document.getElementById('link-tx-date').textContent = formatDisplayDate(tx.date);
+  document.getElementById('link-tx-amount').textContent = `${tx.type === 'income' ? '+' : '-'}${formatCurrency(tx.amount)}`;
+  document.getElementById('link-tx-amount').style.color = tx.type === 'income' ? 'var(--income)' : 'var(--expense)';
+  document.getElementById('link-date-select').value = tx.date;
+
+  const ruleSelect = document.getElementById('link-rule-select');
+  ruleSelect.innerHTML = '<option value="">Selecciona un gasto fijo...</option>';
+
+  try {
+    const res = await fetch('/api/recurring');
+    const rules = await res.json();
+    
+    const matchingRules = rules.filter(r => r.type === tx.type);
+    
+    if (matchingRules.length === 0) {
+      ruleSelect.innerHTML = `<option value="">No hay ${tx.type === 'income' ? 'ingresos fijos' : 'gastos fijos'} creados.</option>`;
+    } else {
+      matchingRules.forEach(rule => {
+        const option = document.createElement('option');
+        option.value = rule.id;
+        option.textContent = `${rule.description} (${formatCurrency(rule.amount)})`;
+        ruleSelect.appendChild(option);
+      });
+    }
+  } catch (err) {
+    console.error('Error fetching recurring rules for modal:', err);
+    ruleSelect.innerHTML = '<option value="">Error al cargar los gastos fijos.</option>';
+  }
+
+  document.getElementById('modal-link-recurring').classList.remove('hidden');
+  lucide.createIcons();
+}
+
+function closeLinkModal() {
+  document.getElementById('modal-link-recurring').classList.add('hidden');
+}
+
+async function handleLinkSubmit(e) {
+  e.preventDefault();
+  const txId = document.getElementById('link-tx-id').value;
+  const ruleId = document.getElementById('link-rule-select').value;
+  const recurrenceDate = document.getElementById('link-date-select').value;
+  const learnPattern = document.getElementById('link-learn-pattern').checked;
+
+  const tx = transactions.find(t => t.id === parseInt(txId));
+  const pattern = tx ? tx.description : '';
+
+  try {
+    const res = await fetch(`/api/transactions/${txId}/link-recurring`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        recurringRuleId: parseInt(ruleId),
+        recurrenceDate,
+        learnPattern,
+        pattern
+      })
+    });
+
+    if (!res.ok) throw new Error('Error al vincular el movimiento.');
+
+    showToast('Movimiento vinculado correctamente.', 'success');
+    closeLinkModal();
+    
+    await loadBaseData();
+    if (currentTab === 'transactions') {
+      renderTransactionsTab();
+    }
+  } catch (err) {
+    console.error('Error linking transaction:', err);
+    showToast('Error al vincular el movimiento.', 'danger');
+  }
+}
+
+async function unlinkTransactionFromRule(txId) {
+  if (!confirm('¿Estás seguro de que deseas desvincular este movimiento de su gasto fijo?')) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/transactions/${txId}/unlink-recurring`, {
+      method: 'POST'
+    });
+
+    if (!res.ok) throw new Error('Error al desvincular el movimiento.');
+
+    showToast('Movimiento desvinculado correctamente.', 'success');
+    
+    await loadBaseData();
+    if (currentTab === 'transactions') {
+      renderTransactionsTab();
+    }
+  } catch (err) {
+    console.error('Error unlinking transaction:', err);
+    showToast('Error al desvincular el movimiento.', 'danger');
   }
 }

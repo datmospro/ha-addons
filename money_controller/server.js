@@ -4,6 +4,66 @@ const path = require('path');
 const dbOps = require('./database');
 const { generateForecast } = require('./forecast');
 
+// Helpers for bank synchronization and description cleaning
+function cleanBankDescription(desc) {
+  if (!desc) return '';
+  let clean = desc.trim();
+  
+  // Remove leading /TXT/ or /TXT (case-insensitive)
+  clean = clean.replace(/^\/?TXT\/?/i, '');
+  
+  // Remove WWW. prefix
+  clean = clean.replace(/\bWWW\./i, '');
+  
+  // Replace asterisks with spaces
+  clean = clean.replace(/\*/g, ' ');
+  
+  // Clean up multiple spaces
+  clean = clean.replace(/\s+/g, ' ').trim();
+  
+  // Capitalize to Title Case, preserving dates and common acronyms
+  clean = clean.toLowerCase().split(' ').map(word => {
+    if (/^\d{2}[-\/]\d{2}[-\/]\d{2,4}$/.test(word)) {
+      return word;
+    }
+    if (word === 's.a' || word === 'sa') return 'S.A.';
+    if (word === 's.l' || word === 'sl') return 'S.L.';
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+  
+  return clean || desc;
+}
+
+function calculateRecurrenceDateForTxDate(rule, txDateStr) {
+  const txDate = new Date(txDateStr + 'T12:00:00');
+  const y = txDate.getFullYear();
+  const m = txDate.getMonth();
+  
+  if (rule.frequency === 'weekly') {
+    const start = new Date(rule.start_date + 'T12:00:00');
+    const targetDayOfWeek = start.getDay();
+    const diff = targetDayOfWeek - txDate.getDay();
+    const recurrenceDate = new Date(txDate.getTime() + diff * 24 * 60 * 60 * 1000);
+    return recurrenceDate.toISOString().split('T')[0];
+  }
+  
+  if (rule.frequency === 'annually') {
+    if (rule.specific_date) {
+      return `${y}-${rule.specific_date}`;
+    } else {
+      const start = new Date(rule.start_date + 'T12:00:00');
+      const mStr = String(start.getMonth() + 1).padStart(2, '0');
+      const dStr = String(start.getDate()).padStart(2, '0');
+      return `${y}-${mStr}-${dStr}`;
+    }
+  }
+  
+  const dayNum = rule.day_of_month || new Date(rule.start_date + 'T12:00:00').getDate();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const actualDay = Math.min(dayNum, daysInMonth);
+  return `${y}-${String(m + 1).padStart(2, '0')}-${String(actualDay).padStart(2, '0')}`;
+}
+
 const app = express();
 const port = process.env.PORT || 8080;
 
@@ -117,6 +177,29 @@ app.delete('/api/transactions/:id', (req, res) => {
   try {
     const result = dbOps.deleteTransaction(req.params.id);
     if (result.changes === 0) return res.status(404).json({ error: 'Transaction not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Link transaction to a recurring rule
+app.post('/api/transactions/:id/link-recurring', (req, res) => {
+  try {
+    const { recurringRuleId, recurrenceDate, learnPattern, pattern } = req.body;
+    if (!recurringRuleId) return res.status(400).json({ error: 'recurringRuleId is required' });
+    
+    dbOps.linkTransactionToRule(req.params.id, recurringRuleId, recurrenceDate, learnPattern ? pattern : null);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Unlink transaction from recurring rule
+app.post('/api/transactions/:id/unlink-recurring', (req, res) => {
+  try {
+    dbOps.unlinkTransactionFromRule(req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -498,6 +581,7 @@ app.post('/api/bank/sync', async (req, res) => {
     const accounts = JSON.parse(accountsStr);
     const token = getEnableBankingToken(dbOps);
     const categories = dbOps.getCategories();
+    const recurringRules = dbOps.getRecurringRules();
     
     let totalImported = 0;
     
@@ -567,62 +651,76 @@ app.post('/api/bank/sync', async (req, res) => {
           txId = crypto.createHash('sha256').update(rawString).digest('hex');
         }
         
-        let description = descText || 'Transacción Bancaria';
-        description = description.replace(/\s+/g, ' ').trim();
-        if (description.length > 80) {
-          description = description.substring(0, 77) + '...';
-        }
+        const description = cleanBankDescription(descText) || 'Transacción Bancaria';
         
-        // Auto-categorization
+        // Auto-categorization & Smart Auto-Match
         let categoryId = null;
-        const upperDesc = description.toUpperCase();
+        let matchedRuleId = null;
+        let recurrenceDate = null;
         
-        if (type === 'income') {
-          const nominaCat = categories.find(c => c.name.toUpperCase().includes('NÓMINA') || c.name.toUpperCase().includes('NOMINA'));
-          const inversioCat = categories.find(c => c.name.toUpperCase().includes('INVERSIO'));
-          const otrosIngresosCat = categories.find(c => c.name.toUpperCase().includes('OTROS INGRESOS') || c.type === 'income');
-
-          if (upperDesc.includes('NOMINA') || upperDesc.includes('SALARIO') || upperDesc.includes('SUELDO') || upperDesc.includes('HABERES')) {
-            categoryId = nominaCat ? nominaCat.id : (otrosIngresosCat ? otrosIngresosCat.id : null);
-          } else if (upperDesc.includes('INVER') || upperDesc.includes('DIVIDENDO') || upperDesc.includes('INTERESES')) {
-            categoryId = inversioCat ? inversioCat.id : (otrosIngresosCat ? otrosIngresosCat.id : null);
-          } else {
-            const firstIncome = categories.find(c => c.type === 'income');
-            categoryId = firstIncome ? firstIncome.id : null;
-          }
+        const cleanDescUpper = description.toUpperCase();
+        
+        const matchedRule = recurringRules.find(rule => {
+          if (rule.type !== type || !rule.match_patterns) return false;
+          const patterns = rule.match_patterns.split(',').map(p => p.trim().toUpperCase());
+          return patterns.some(pattern => pattern && cleanDescUpper.includes(pattern));
+        });
+        
+        if (matchedRule) {
+          matchedRuleId = matchedRule.id;
+          categoryId = matchedRule.category_id;
+          recurrenceDate = calculateRecurrenceDateForTxDate(matchedRule, date);
+          console.log(`Auto-matched bank transaction "${description}" to recurring rule "${matchedRule.description}"`);
         } else {
-          const hipotecaCat = categories.find(c => c.name.toUpperCase().includes('HIPOTECA') || c.name.toUpperCase().includes('ALQUILER'));
-          const suministrosCat = categories.find(c => c.name.toUpperCase().includes('SUMINISTROS') || c.name.toUpperCase().includes('LUZ') || c.name.toUpperCase().includes('AGUA'));
-          const alimentacionCat = categories.find(c => c.name.toUpperCase().includes('ALIMENTAC') || c.name.toUpperCase().includes('SUPERMERCADO') || c.name.toUpperCase().includes('COMPRA'));
-          const transporteCat = categories.find(c => c.name.toUpperCase().includes('TRANSPORTE') || c.name.toUpperCase().includes('VEHICULO') || c.name.toUpperCase().includes('COCHE') || c.name.toUpperCase().includes('GASOLINA'));
-          const segurosCat = categories.find(c => c.name.toUpperCase().includes('SEGURO'));
-          const prestamosCat = categories.find(c => c.name.toUpperCase().includes('PRÉSTAMO') || c.name.toUpperCase().includes('PRESTAMO') || c.name.toUpperCase().includes('CREDITO'));
-          const ocioCat = categories.find(c => c.name.toUpperCase().includes('OCIO') || c.name.toUpperCase().includes('RESTAURANTE') || c.name.toUpperCase().includes('COFFEE'));
-          
-          if (upperDesc.includes('HIPOTECA') || upperDesc.includes('ALQUILER') || upperDesc.includes('RENT') || upperDesc.includes('COMUNIDAD')) {
-            categoryId = hipotecaCat ? hipotecaCat.id : null;
-          } else if (upperDesc.includes('LUZ') || upperDesc.includes('AGUA') || upperDesc.includes('GAS') || upperDesc.includes('IBERDROLA') || upperDesc.includes('ENDESA') || upperDesc.includes('NATURGY') || upperDesc.includes('TELEFONO') || upperDesc.includes('MOVISTAR') || upperDesc.includes('VODAFONE') || upperDesc.includes('ORANGE') || upperDesc.includes('DIGI') || upperDesc.includes('INTERNET') || upperDesc.includes('FIBRA')) {
-            categoryId = suministrosCat ? suministrosCat.id : null;
-          } else if (upperDesc.includes('MERCADONA') || upperDesc.includes('CARREFOUR') || upperDesc.includes('DIA %') || upperDesc.includes('LIDL') || upperDesc.includes('ALCAMPO') || upperDesc.includes('SUPERMERCADO') || upperDesc.includes('ALIMENTACION') || upperDesc.includes('EROSKI') || upperDesc.includes('CONDIS') || upperDesc.includes('AUNAS') || upperDesc.includes('ALIMEN')) {
-            categoryId = alimentacionCat ? alimentacionCat.id : null;
-          } else if (upperDesc.includes('GASOLINA') || upperDesc.includes('REPSOL') || upperDesc.includes('CEPSA') || upperDesc.includes('BP') || upperDesc.includes('PEAJE') || upperDesc.includes('TALLER') || upperDesc.includes('COCHE') || upperDesc.includes('AUTO') || upperDesc.includes('PARKING') || upperDesc.includes('ESTACIONAMIENTO')) {
-            categoryId = transporteCat ? transporteCat.id : null;
-          } else if (upperDesc.includes('SEGURO') || upperDesc.includes('MUTUA') || upperDesc.includes('MAPFRE') || upperDesc.includes('AXA') || upperDesc.includes('ALLIANZ') || upperDesc.includes('ADESLAS') || upperDesc.includes('SANITAS')) {
-            categoryId = segurosCat ? segurosCat.id : null;
-          } else if (upperDesc.includes('PRESTAMO') || upperDesc.includes('CREDITO') || upperDesc.includes('FINANCIACION') || upperDesc.includes('AMORTIZACION')) {
-            categoryId = prestamosCat ? prestamosCat.id : null;
-          } else if (upperDesc.includes('RESTAURANTE') || upperDesc.includes('BAR ') || upperDesc.includes('COFFEE') || upperDesc.includes('CAFE') || upperDesc.includes('CINE') || upperDesc.includes('NETFLIX') || upperDesc.includes('SPOTIFY') || upperDesc.includes('HBO') || upperDesc.includes('PRIME VIDEO') || upperDesc.includes('PIZZERIA') || upperDesc.includes('BURGER') || upperDesc.includes('MCDONALD')) {
-            categoryId = ocioCat ? ocioCat.id : null;
-          }
-          
-          if (!categoryId) {
-            const otrosGastosCat = categories.find(c => c.name.toUpperCase().includes('OTROS GASTOS') || c.type === 'expense');
-            categoryId = otrosGastosCat ? otrosGastosCat.id : (categories.find(c => c.type === 'expense')?.id || null);
+          // Fallback to standard auto-categorization
+          const upperDesc = description.toUpperCase();
+          if (type === 'income') {
+            const nominaCat = categories.find(c => c.name.toUpperCase().includes('NÓMINA') || c.name.toUpperCase().includes('NOMINA'));
+            const inversioCat = categories.find(c => c.name.toUpperCase().includes('INVERSIO'));
+            const otrosIngresosCat = categories.find(c => c.name.toUpperCase().includes('OTROS INGRESOS') || c.type === 'income');
+
+            if (upperDesc.includes('NOMINA') || upperDesc.includes('SALARIO') || upperDesc.includes('SUELDO') || upperDesc.includes('HABERES')) {
+              categoryId = nominaCat ? nominaCat.id : (otrosIngresosCat ? otrosIngresosCat.id : null);
+            } else if (upperDesc.includes('INVER') || upperDesc.includes('DIVIDENDO') || upperDesc.includes('INTERESES')) {
+              categoryId = inversioCat ? inversioCat.id : (otrosIngresosCat ? otrosIngresosCat.id : null);
+            } else {
+              const firstIncome = categories.find(c => c.type === 'income');
+              categoryId = firstIncome ? firstIncome.id : null;
+            }
+          } else {
+            const hipotecaCat = categories.find(c => c.name.toUpperCase().includes('HIPOTECA') || c.name.toUpperCase().includes('ALQUILER'));
+            const suministrosCat = categories.find(c => c.name.toUpperCase().includes('SUMINISTROS') || c.name.toUpperCase().includes('LUZ') || c.name.toUpperCase().includes('AGUA'));
+            const alimentacionCat = categories.find(c => c.name.toUpperCase().includes('ALIMENTAC') || c.name.toUpperCase().includes('SUPERMERCADO') || c.name.toUpperCase().includes('COMPRA'));
+            const transporteCat = categories.find(c => c.name.toUpperCase().includes('TRANSPORTE') || c.name.toUpperCase().includes('VEHICULO') || c.name.toUpperCase().includes('COCHE') || c.name.toUpperCase().includes('GASOLINA'));
+            const segurosCat = categories.find(c => c.name.toUpperCase().includes('SEGURO'));
+            const prestamosCat = categories.find(c => c.name.toUpperCase().includes('PRÉSTAMO') || c.name.toUpperCase().includes('PRESTAMO') || c.name.toUpperCase().includes('CREDITO'));
+            const ocioCat = categories.find(c => c.name.toUpperCase().includes('OCIO') || c.name.toUpperCase().includes('RESTAURANTE') || c.name.toUpperCase().includes('COFFEE'));
+            
+            if (upperDesc.includes('HIPOTECA') || upperDesc.includes('ALQUILER') || upperDesc.includes('RENT') || upperDesc.includes('COMUNIDAD')) {
+              categoryId = hipotecaCat ? hipotecaCat.id : null;
+            } else if (upperDesc.includes('LUZ') || upperDesc.includes('AGUA') || upperDesc.includes('GAS') || upperDesc.includes('IBERDROLA') || upperDesc.includes('ENDESA') || upperDesc.includes('NATURGY') || upperDesc.includes('TELEFONO') || upperDesc.includes('MOVISTAR') || upperDesc.includes('VODAFONE') || upperDesc.includes('ORANGE') || upperDesc.includes('DIGI') || upperDesc.includes('INTERNET') || upperDesc.includes('FIBRA')) {
+              categoryId = suministrosCat ? suministrosCat.id : null;
+            } else if (upperDesc.includes('MERCADONA') || upperDesc.includes('CARREFOUR') || upperDesc.includes('DIA %') || upperDesc.includes('LIDL') || upperDesc.includes('ALCAMPO') || upperDesc.includes('SUPERMERCADO') || upperDesc.includes('ALIMENTACION') || upperDesc.includes('EROSKI') || upperDesc.includes('CONDIS') || upperDesc.includes('AUNAS') || upperDesc.includes('ALIMEN')) {
+              categoryId = alimentacionCat ? alimentacionCat.id : null;
+            } else if (upperDesc.includes('GASOLINA') || upperDesc.includes('REPSOL') || upperDesc.includes('CEPSA') || upperDesc.includes('BP') || upperDesc.includes('PEAJE') || upperDesc.includes('TALLER') || upperDesc.includes('COCHE') || upperDesc.includes('AUTO') || upperDesc.includes('PARKING') || upperDesc.includes('ESTACIONAMIENTO')) {
+              categoryId = transporteCat ? transporteCat.id : null;
+            } else if (upperDesc.includes('SEGURO') || upperDesc.includes('MUTUA') || upperDesc.includes('MAPFRE') || upperDesc.includes('AXA') || upperDesc.includes('ALLIANZ') || upperDesc.includes('ADESLAS') || upperDesc.includes('SANITAS')) {
+              categoryId = segurosCat ? segurosCat.id : null;
+            } else if (upperDesc.includes('PRESTAMO') || upperDesc.includes('CREDITO') || upperDesc.includes('FINANCIACION') || upperDesc.includes('AMORTIZACION')) {
+              categoryId = prestamosCat ? prestamosCat.id : null;
+            } else if (upperDesc.includes('RESTAURANTE') || upperDesc.includes('BAR ') || upperDesc.includes('COFFEE') || upperDesc.includes('CAFE') || upperDesc.includes('CINE') || upperDesc.includes('NETFLIX') || upperDesc.includes('SPOTIFY') || upperDesc.includes('HBO') || upperDesc.includes('PRIME VIDEO') || upperDesc.includes('PIZZERIA') || upperDesc.includes('BURGER') || upperDesc.includes('MCDONALD')) {
+              categoryId = ocioCat ? ocioCat.id : null;
+            }
+            
+            if (!categoryId) {
+              const otrosGastosCat = categories.find(c => c.name.toUpperCase().includes('OTROS GASTOS') || c.type === 'expense');
+              categoryId = otrosGastosCat ? otrosGastosCat.id : (categories.find(c => c.type === 'expense')?.id || null);
+            }
           }
         }
         
         const notes = `Sincronizado de ${settings.enablebanking_bank_name || 'Banco'}`;
-        const result = dbOps.addBankTransaction(description, absoluteAmount, type, categoryId, date, notes, txId);
+        const result = dbOps.addBankTransaction(description, absoluteAmount, type, categoryId, date, notes, txId, matchedRuleId, recurrenceDate);
         if (result.changes > 0) {
           totalImported++;
         }
@@ -645,4 +743,12 @@ app.get('*', (req, res) => {
 // Start Server
 app.listen(port, '0.0.0.0', () => {
   console.log(`MoneyController server running at http://0.0.0.0:${port}`);
+  
+  // Clean up auto-generated transactions from past versions
+  try {
+    const cleanResult = dbOps.cleanExistingGeneratedTransactions();
+    console.log(`Cleared ${cleanResult.changes} historical auto-generated transaction(s)`);
+  } catch (err) {
+    console.error('Error cleaning historical auto-generated transactions:', err.message);
+  }
 });

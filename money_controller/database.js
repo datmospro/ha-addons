@@ -92,9 +92,23 @@ function initDb() {
       start_date TEXT NOT NULL, -- YYYY-MM-DD
       end_date TEXT, -- YYYY-MM-DD (optional)
       notes TEXT,
+      match_patterns TEXT, -- Comma-separated merchant description patterns
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
     )
   `);
+
+  // Upgrade migrations for older database schemas (add columns to recurring_rules)
+  try {
+    const tableInfo = db.prepare("PRAGMA table_info(recurring_rules)").all();
+    const columns = tableInfo.map(c => c.name);
+    
+    if (!columns.includes('match_patterns')) {
+      console.log("Adding column match_patterns to recurring_rules table");
+      db.exec("ALTER TABLE recurring_rules ADD COLUMN match_patterns TEXT");
+    }
+  } catch (err) {
+    console.error("Error checking or adding columns to recurring_rules table:", err);
+  }
 
   // Insert default settings if not exists
   const getSetting = db.prepare('SELECT value FROM settings WHERE key = ?');
@@ -208,9 +222,9 @@ const dbOps = {
     return db.prepare('INSERT INTO transactions (description, amount, type, category_id, date, notes, recurring_rule_id, recurrence_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(description, Number(amount), type, category_id ? Number(category_id) : null, date, notes, recurring_rule_id, recurrence_date);
   },
-  addBankTransaction: (description, amount, type, category_id, date, notes, bank_transaction_id) => {
-    return db.prepare('INSERT OR IGNORE INTO transactions (description, amount, type, category_id, date, notes, bank_transaction_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(description, Number(amount), type, category_id ? Number(category_id) : null, date, notes, bank_transaction_id);
+  addBankTransaction: (description, amount, type, category_id, date, notes, bank_transaction_id, recurring_rule_id = null, recurrence_date = null) => {
+    return db.prepare('INSERT OR IGNORE INTO transactions (description, amount, type, category_id, date, notes, bank_transaction_id, recurring_rule_id, recurrence_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(description, Number(amount), type, category_id ? Number(category_id) : null, date, notes, bank_transaction_id, recurring_rule_id, recurrence_date);
   },
   updateTransaction: (id, description, amount, type, category_id, date, notes = '') => {
     return db.prepare('UPDATE transactions SET description = ?, amount = ?, type = ?, category_id = ?, date = ?, notes = ? WHERE id = ?')
@@ -271,6 +285,40 @@ const dbOps = {
   hasTransactionForRecurrence: (ruleId, dateStr) => {
     const row = db.prepare('SELECT id FROM transactions WHERE recurring_rule_id = ? AND recurrence_date = ?').get(Number(ruleId), dateStr);
     return !!row;
+  },
+  linkTransactionToRule: (transactionId, ruleId, recurrenceDate, pattern = null) => {
+    db.prepare(`
+      UPDATE transactions 
+      SET recurring_rule_id = ?, recurrence_date = ? 
+      WHERE id = ?
+    `).run(Number(ruleId), recurrenceDate, Number(transactionId));
+
+    if (pattern) {
+      const cleanPattern = pattern.trim().toUpperCase();
+      if (cleanPattern) {
+        const rule = db.prepare('SELECT match_patterns FROM recurring_rules WHERE id = ?').get(Number(ruleId));
+        if (rule) {
+          let currentPatterns = rule.match_patterns ? rule.match_patterns.split(',').map(p => p.trim()) : [];
+          if (!currentPatterns.includes(cleanPattern)) {
+            currentPatterns.push(cleanPattern);
+            const newPatternsStr = currentPatterns.filter(Boolean).join(',');
+            db.prepare('UPDATE recurring_rules SET match_patterns = ? WHERE id = ?').run(newPatternsStr, Number(ruleId));
+            console.log(`Added match pattern "${cleanPattern}" to recurring rule ID ${ruleId}`);
+          }
+        }
+      }
+    }
+    return { success: true };
+  },
+  unlinkTransactionFromRule: (transactionId) => {
+    return db.prepare(`
+      UPDATE transactions 
+      SET recurring_rule_id = NULL, recurrence_date = NULL 
+      WHERE id = ?
+    `).run(Number(transactionId));
+  },
+  cleanExistingGeneratedTransactions: () => {
+    return db.prepare("DELETE FROM transactions WHERE recurring_rule_id IS NOT NULL AND bank_transaction_id IS NULL").run();
   },
 
   // Dangerous but useful: Clear all data (excluding settings/categories)

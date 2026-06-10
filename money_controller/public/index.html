@@ -919,6 +919,56 @@
     </div>
   </div>
 
+  <!-- 4. LINK TRANSACTION TO RECURRING RULE MODAL -->
+  <div class="modal-backdrop hidden" id="modal-link-recurring">
+    <div class="modal glass" style="max-width: 450px;">
+      <div class="modal-header">
+        <h3>Vincular Movimiento a Gasto Fijo</h3>
+        <button class="btn-close" id="btn-close-link-modal"><i data-lucide="x"></i></button>
+      </div>
+      <form id="form-link-recurring">
+        <input type="hidden" id="link-tx-id">
+        <div class="modal-body" style="display: flex; flex-direction: column; gap: 15px; padding: 20px;">
+          <div>
+            <label class="form-label" style="font-weight: 500; font-size: 0.85rem; color: var(--text-muted);">Movimiento Seleccionado:</label>
+            <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); margin-top: 5px;">
+              <div id="link-tx-desc" style="font-weight: 600;"></div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-top: 5px; color: var(--text-muted);">
+                <span id="link-tx-date"></span>
+                <span id="link-tx-amount" style="font-weight: 600;"></span>
+              </div>
+            </div>
+          </div>
+          
+          <div>
+            <label for="link-rule-select" class="form-label">Selecciona el Gasto Fijo correspondiente:</label>
+            <select id="link-rule-select" class="form-control" required style="width: 100%; margin-top: 5px;">
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+
+          <div>
+            <label for="link-date-select" class="form-label">Fecha de Ocurrencia Estimada (Cuota):</label>
+            <input type="date" id="link-date-select" class="form-control" required style="width: 100%; margin-top: 5px;">
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Indica la fecha programada de este mes para la cual se liquida esta cuota.</p>
+          </div>
+
+          <div style="display: flex; align-items: flex-start; gap: 8px; margin-top: 5px;">
+            <input type="checkbox" id="link-learn-pattern" style="margin-top: 3px;" checked>
+            <div>
+              <label for="link-learn-pattern" style="font-size: 0.85rem; font-weight: 500; cursor: pointer;">Recordar coincidencia para el futuro</label>
+              <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Añade la descripción del banco a las palabras clave del gasto fijo para asociarlo automáticamente los próximos meses.</p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="padding: 15px 20px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border-color);">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-link-modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Vincular Movimiento</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Custom script -->
   <script src="js/app.js?v=1.4.0"></script>
 </body>
