@@ -104,7 +104,7 @@ function syncPastRecurringOccurrences() {
  * Calcula la proyección de flujo de caja diaria para un año entero (365 días)
  * @param {Array} temporaryTransactions - Transacciones ficticias para simulaciones "What-If"
  */
-function generateForecast(temporaryTransactions = []) {
+function generateForecast(temporaryTransactions = [], daysToProject = 365) {
   // Sincronizar ocurrencias pasadas antes de cargar datos
   syncPastRecurringOccurrences();
 
@@ -251,7 +251,7 @@ function generateForecast(temporaryTransactions = []) {
 
   let futureCurrentDate = new Date(todayStr + 'T12:00:00');
 
-  for (let i = 0; i <= 365; i++) {
+  for (let i = 0; i <= daysToProject; i++) {
     const dateStr = formatDate(futureCurrentDate);
     const dayEvents = [];
 

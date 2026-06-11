@@ -144,14 +144,22 @@
           
           <!-- Forecast Line Chart -->
           <div class="grid-item col-2 glass card-chart-container">
-            <div class="grid-item-header">
+            <div class="grid-item-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
               <div>
-                <h3>Previsión de Saldo Bancario (Próximos 12 Meses)</h3>
+                <h3>Previsión de Saldo Bancario</h3>
                 <p class="text-muted">Simulación día a día basada en gastos fijos, variables y nóminas.</p>
               </div>
-              <div class="legend-badge">
-                <span class="legend-color safety-line"></span>
-                <span>Límite de Seguridad</span>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="font-size: 0.8rem; color: var(--text-muted);">Periodo:</span>
+                <input type="number" id="forecast-period-value" value="12" min="1" max="240" class="form-control" style="width: 65px; padding: 4px 8px; font-size: 0.8rem; height: auto; text-align: center; border-radius: var(--border-radius-sm); background-color: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);">
+                <select id="forecast-period-unit" class="form-select" style="width: auto; padding: 4px 32px 4px 8px; font-size: 0.8rem; height: auto; border-radius: var(--border-radius-sm); background-color: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);">
+                  <option value="months" selected>Meses</option>
+                  <option value="years">Años</option>
+                </select>
+                <div class="legend-badge" style="margin-left: 8px;">
+                  <span class="legend-color safety-line"></span>
+                  <span>Límite de Seguridad</span>
+                </div>
               </div>
             </div>
             <div class="chart-wrapper">

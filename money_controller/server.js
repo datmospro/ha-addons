@@ -283,7 +283,8 @@ app.delete('/api/recurring/:id', (req, res) => {
 // Forecast (standard & What-If)
 app.get('/api/forecast', (req, res) => {
   try {
-    const result = generateForecast();
+    const days = parseInt(req.query.days) || 365;
+    const result = generateForecast([], days);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -292,9 +293,10 @@ app.get('/api/forecast', (req, res) => {
 
 app.post('/api/forecast/simulate', (req, res) => {
   try {
+    const days = parseInt(req.query.days) || 365;
     const { temporaryTransactions } = req.body;
     // temporaryTransactions must be an array of: { description, amount, type, date, isTemp: true }
-    const result = generateForecast(temporaryTransactions || []);
+    const result = generateForecast(temporaryTransactions || [], days);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });

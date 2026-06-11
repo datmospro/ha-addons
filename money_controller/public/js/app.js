@@ -151,16 +151,31 @@ function populateCategorySelects() {
 async function runForecastCalculation() {
   try {
     let res;
+    // Calculate forecast days dynamically based on period input
+    let days = 365;
+    const periodValueEl = document.getElementById('forecast-period-value');
+    const periodUnitEl = document.getElementById('forecast-period-unit');
+    if (periodValueEl && periodUnitEl) {
+      let val = parseInt(periodValueEl.value) || 1;
+      if (val < 1) val = 1;
+      const unit = periodUnitEl.value;
+      if (unit === 'months') {
+        days = Math.ceil(val * 30.417);
+      } else if (unit === 'years') {
+        days = val * 365;
+      }
+    }
+
     if (simulatedScenarios.length > 0) {
       // Run simulation
-      res = await fetch('/api/forecast/simulate', {
+      res = await fetch(`/api/forecast/simulate?days=${days}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ temporaryTransactions: simulatedScenarios })
       });
     } else {
       // Standard run
-      res = await fetch('/api/forecast');
+      res = await fetch(`/api/forecast?days=${days}`);
     }
     
     forecastData = await res.json();
@@ -375,20 +390,24 @@ function renderForecastLineChart() {
     forecastChart.destroy();
   }
   
-  // Thin out data for line chart (select one point every 3 days to keep chart snappy, but include all negative peaks)
   const projection = forecastData.projection;
   const labels = [];
   const balanceData = [];
   const safetyLine = [];
+  const thinnedProjection = [];
   
   const safetyLimit = parseFloat(settings.safety_threshold || 100);
   
+  // Dynamically calculate thinning step to keep about 120 points on the chart for best performance
+  const step = Math.max(1, Math.floor(projection.length / 120));
+  
   projection.forEach((p, idx) => {
-    // Show label every 30 days
-    if (idx % 3 === 0 || p.balance < safetyLimit || idx === 0 || idx === projection.length - 1) {
+    // Select point if it aligns with the step, dips below safety, or is the first/last point
+    if (idx % step === 0 || p.balance < safetyLimit || idx === 0 || idx === projection.length - 1) {
       labels.push(formatDisplayDate(p.date));
       balanceData.push(p.balance);
       safetyLine.push(safetyLimit);
+      thinnedProjection.push(p);
     }
   });
 
@@ -433,7 +452,35 @@ function renderForecastLineChart() {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false }
+        legend: { display: false },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            title: function(context) {
+              const index = context[0].dataIndex;
+              const p = thinnedProjection[index];
+              return p ? `${formatDisplayDate(p.date)} (${getDayName(p.date)})` : '';
+            },
+            label: function(context) {
+              const index = context.dataIndex;
+              const p = thinnedProjection[index];
+              return p ? `Saldo: ${formatCurrency(p.balance)}` : '';
+            },
+            afterBody: function(context) {
+              const index = context[0].dataIndex;
+              const p = thinnedProjection[index];
+              if (p && p.events && p.events.length > 0) {
+                const eventStrings = p.events.map(e => {
+                  const prefix = e.type === 'income' ? '+' : '-';
+                  return `• ${e.description}: ${prefix}${formatCurrency(e.amount)}`;
+                });
+                return '\nDetalles del día:\n' + eventStrings.join('\n');
+              }
+              return '';
+            }
+          }
+        }
       },
       scales: {
         y: {
@@ -620,11 +667,21 @@ function renderDashboardAlertsList() {
   const container = document.getElementById('dashboard-alerts-list');
   container.innerHTML = '';
   
+  // Calculate dynamic period label text
+  let periodText = 'los próximos 12 meses';
+  const periodValueEl = document.getElementById('forecast-period-value');
+  const periodUnitEl = document.getElementById('forecast-period-unit');
+  if (periodValueEl && periodUnitEl) {
+    const val = parseInt(periodValueEl.value) || 1;
+    const unitText = periodUnitEl.value === 'months' ? (val === 1 ? 'mes' : 'meses') : (val === 1 ? 'año' : 'años');
+    periodText = `los próximos ${val} ${unitText}`;
+  }
+  
   if (!forecastData || forecastData.alerts.length === 0) {
     container.innerHTML = `
       <div class="table-empty-state" style="padding: 20px 0;">
         <i data-lucide="check-circle" style="color: var(--income); width: 32px; height: 32px;"></i>
-        <p style="font-size: 0.85rem;">¡Todo correcto! No se prevén descubiertos bancarios ni saldo por debajo de tu límite en los próximos 12 meses.</p>
+        <p style="font-size: 0.85rem;">¡Todo correcto! No se prevén descubiertos bancarios ni saldo por debajo de tu límite en ${periodText}.</p>
       </div>
     `;
     lucide.createIcons();
@@ -1430,13 +1487,23 @@ function selectCalendarDay(dateStr, forecastDay) {
 function renderForecastAlertsFullList() {
   const container = document.getElementById('forecast-alerts-full-list');
   container.innerHTML = '';
+  
+  // Calculate dynamic period label text
+  let periodText = 'los próximos 12 meses';
+  const periodValueEl = document.getElementById('forecast-period-value');
+  const periodUnitEl = document.getElementById('forecast-period-unit');
+  if (periodValueEl && periodUnitEl) {
+    const val = parseInt(periodValueEl.value) || 1;
+    const unitText = periodUnitEl.value === 'months' ? (val === 1 ? 'mes' : 'meses') : (val === 1 ? 'año' : 'años');
+    periodText = `los próximos ${val} ${unitText}`;
+  }
 
   if (!forecastData || forecastData.alerts.length === 0) {
     container.innerHTML = `
       <div class="table-empty-state">
         <i data-lucide="shield-check" style="color: var(--income); width: 40px; height: 40px;"></i>
         <h3>¡Tu caja está sana!</h3>
-        <p>No se prevé ningún día de descubierto bancario o por debajo del umbral de seguridad en los próximos 12 meses.</p>
+        <p>No se prevé ningún día de descubierto bancario o por debajo del umbral de seguridad en ${periodText}.</p>
       </div>
     `;
     lucide.createIcons();
@@ -1530,6 +1597,20 @@ document.getElementById('btn-clear-simulations').addEventListener('click', () =>
 
 // Setup Event Listeners
 function setupEventListeners() {
+  // Dynamic forecast period change listeners
+  const periodValEl = document.getElementById('forecast-period-value');
+  const periodUnitEl = document.getElementById('forecast-period-unit');
+  if (periodValEl && periodUnitEl) {
+    const triggerRecalc = debounce(async () => {
+      await runForecastCalculation();
+    }, 450);
+
+    periodValEl.addEventListener('input', triggerRecalc);
+    periodUnitEl.addEventListener('change', async () => {
+      await runForecastCalculation();
+    });
+  }
+
   // Set initial view mode button states from localStorage
   if (recViewMode === 'list') {
     document.getElementById('btn-rec-view-grid').classList.remove('active');
