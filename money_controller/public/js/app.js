@@ -1014,6 +1014,38 @@ function formatDate(date) {
   return `${y}-${m}-${d}`;
 }
 
+// Calculate recurrence date for a transaction date based on rule parameters
+function calculateRecurrenceDateForTxDate(rule, txDateStr) {
+  const txDate = new Date(txDateStr + 'T12:00:00');
+  const y = txDate.getFullYear();
+  const m = txDate.getMonth();
+  
+  if (rule.frequency === 'weekly') {
+    const start = new Date(rule.start_date + 'T12:00:00');
+    const targetDayOfWeek = start.getDay();
+    const diff = targetDayOfWeek - txDate.getDay();
+    const recurrenceDate = new Date(txDate.getTime() + diff * 24 * 60 * 60 * 1000);
+    return recurrenceDate.toISOString().split('T')[0];
+  }
+  
+  if (rule.frequency === 'annually') {
+    if (rule.specific_date) {
+      return `${y}-${rule.specific_date}`;
+    } else {
+      const start = new Date(rule.start_date + 'T12:00:00');
+      const mStr = String(start.getMonth() + 1).padStart(2, '0');
+      const dStr = String(start.getDate()).padStart(2, '0');
+      return `${y}-${mStr}-${dStr}`;
+    }
+  }
+  
+  const dayNum = rule.day_of_month || new Date(rule.start_date + 'T12:00:00').getDate();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const actualDay = Math.min(dayNum, daysInMonth);
+  return `${y}-${String(m + 1).padStart(2, '0')}-${String(actualDay).padStart(2, '0')}`;
+}
+
+
 // Check if a recurring rule applies on a specific date (local implementation matching backend)
 function doesRuleApplyLocally(rule, dateObj) {
   const d = new Date(dateObj);
@@ -1888,6 +1920,20 @@ function setupEventListeners() {
   document.getElementById('btn-close-link-modal').addEventListener('click', closeLinkModal);
   document.getElementById('btn-cancel-link-modal').addEventListener('click', closeLinkModal);
   document.getElementById('form-link-recurring').addEventListener('submit', handleLinkSubmit);
+
+  // Auto-calculate expected recurrence date when selecting a recurring rule in manual link
+  document.getElementById('link-rule-select').addEventListener('change', (e) => {
+    const ruleId = parseInt(e.target.value);
+    const txId = parseInt(document.getElementById('link-tx-id').value);
+    const tx = transactions.find(t => t.id === txId);
+    const rule = recurringRules.find(r => r.id === ruleId);
+    if (rule && tx) {
+      document.getElementById('link-date-select').value = calculateRecurrenceDateForTxDate(rule, tx.date);
+    } else if (tx) {
+      document.getElementById('link-date-select').value = tx.date;
+    }
+  });
+
 
   // Calendar navigation
   document.getElementById('btn-toggle-heatmap').addEventListener('click', () => {
