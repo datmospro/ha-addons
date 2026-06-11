@@ -1573,7 +1573,7 @@ function renderWhatIfScenarios() {
 }
 
 // Add Scenario to What-If list
-function addSimulationScenario(description, amount, type, date) {
+function addSimulationScenario(description, amount, type, date, skipRecalc = false) {
   simulatedScenarios.push({
     description,
     amount: parseFloat(amount),
@@ -1582,8 +1582,10 @@ function addSimulationScenario(description, amount, type, date) {
     isTemp: true // Flag to identify it in calculations
   });
   
-  runForecastCalculation();
-  showToast('Escenario simulado con éxito. Gráficos y alertas actualizados.', 'indigo');
+  if (!skipRecalc) {
+    runForecastCalculation();
+    showToast('Escenario simulado con éxito. Gráficos y alertas actualizados.', 'indigo');
+  }
 }
 
 // Remove simulation scenario
@@ -1613,6 +1615,19 @@ function setupEventListeners() {
     periodValEl.addEventListener('input', triggerRecalc);
     periodUnitEl.addEventListener('change', async () => {
       await runForecastCalculation();
+    });
+  }
+
+  // What-If Financing options toggle
+  const simPaymentMode = document.getElementById('sim-payment-mode');
+  const simFinancingOptions = document.getElementById('sim-financing-options');
+  if (simPaymentMode && simFinancingOptions) {
+    simPaymentMode.addEventListener('change', () => {
+      if (simPaymentMode.value === 'financed') {
+        simFinancingOptions.classList.remove('hidden');
+      } else {
+        simFinancingOptions.classList.add('hidden');
+      }
     });
   }
 
@@ -2288,16 +2303,50 @@ function handleWhatIfSubmit(e) {
   e.preventDefault();
   
   const desc = document.getElementById('sim-desc').value;
-  const amount = document.getElementById('sim-amount').value;
+  const amount = parseFloat(document.getElementById('sim-amount').value);
   const type = document.getElementById('sim-type').value;
-  const date = document.getElementById('sim-date').value;
+  const startDateStr = document.getElementById('sim-date').value;
+  const paymentMode = document.getElementById('sim-payment-mode').value;
 
-  addSimulationScenario(desc, amount, type, date);
+  if (paymentMode === 'single') {
+    addSimulationScenario(desc, amount, type, startDateStr);
+  } else {
+    // Financed
+    const installments = parseInt(document.getElementById('sim-installments').value) || 12;
+    const amountType = document.getElementById('sim-amount-type').value;
+    
+    // Calculate monthly installment amount
+    const monthlyAmount = amountType === 'total' ? (amount / installments) : amount;
+    
+    // Create multiple monthly simulated transactions
+    const startYear = parseInt(startDateStr.substring(0, 4));
+    const startMonth = parseInt(startDateStr.substring(5, 7)) - 1; // 0-indexed
+    const startDay = parseInt(startDateStr.substring(8, 10));
+    
+    for (let i = 0; i < installments; i++) {
+      // Calculate date for installment i (adding i months)
+      const tempDate = new Date(startYear, startMonth + i, 1);
+      const daysInMonth = new Date(startYear, startMonth + i + 1, 0).getDate();
+      const targetDay = Math.min(startDay, daysInMonth);
+      const dateStr = `${tempDate.getFullYear()}-${String(tempDate.getMonth() + 1).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
+      
+      const installmentDesc = `${desc} (Cuota ${i + 1}/${installments})`;
+      addSimulationScenario(installmentDesc, monthlyAmount, type, dateStr, true); // true to skip recalc inside loop
+    }
+    
+    runForecastCalculation();
+    showToast(`Simuladas ${installments} cuotas mensuales de ${formatCurrency(monthlyAmount)} con éxito.`, 'indigo');
+  }
 
   // Clear inputs
   document.getElementById('sim-desc').value = '';
   document.getElementById('sim-amount').value = '';
   document.getElementById('sim-date').value = '';
+  document.getElementById('sim-payment-mode').value = 'single';
+  const simFinancingOptions = document.getElementById('sim-financing-options');
+  if (simFinancingOptions) {
+    simFinancingOptions.classList.add('hidden');
+  }
 }
 
 // --- BACKUP & RESTORE ACTIONS ---

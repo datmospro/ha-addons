@@ -486,6 +486,31 @@
                   <label for="sim-date">Fecha prevista</label>
                   <input type="date" id="sim-date" class="form-control" required>
                 </div>
+                
+                <div class="form-group">
+                  <label for="sim-payment-mode">Modalidad de Pago</label>
+                  <select id="sim-payment-mode" class="form-select">
+                    <option value="single" selected>Pago Único</option>
+                    <option value="financed">Financiado (Cuotas Mensuales)</option>
+                  </select>
+                </div>
+                
+                <div id="sim-financing-options" class="hidden" style="margin-top: 12px; border-left: 2px solid var(--primary); padding-left: 12px; margin-bottom: 12px;">
+                  <div class="form-row">
+                    <div class="form-group col-6">
+                      <label for="sim-installments">Nº de Meses (Cuotas)</label>
+                      <input type="number" id="sim-installments" class="form-control" value="12" min="2" max="120" step="1">
+                    </div>
+                    <div class="form-group col-6">
+                      <label for="sim-amount-type">Tipo de Importe</label>
+                      <select id="sim-amount-type" class="form-select">
+                        <option value="total" selected>Importe Total</option>
+                        <option value="monthly">Cuota Mensual</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
                 <button type="submit" class="btn btn-indigo btn-block" id="btn-add-simulation">
                   <i data-lucide="play"></i>
                   <span>Simular Escenario</span>
