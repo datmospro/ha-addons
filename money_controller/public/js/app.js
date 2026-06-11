@@ -465,7 +465,12 @@ function renderForecastLineChart() {
             label: function(context) {
               const index = context.dataIndex;
               const p = thinnedProjection[index];
-              return p ? `Saldo: ${formatCurrency(p.balance)}` : '';
+              if (!p) return '';
+              if (context.datasetIndex === 0) {
+                return `Saldo: ${formatCurrency(p.balance)}`;
+              } else {
+                return `Umbral de Seguridad: ${formatCurrency(safetyLimit)}`;
+              }
             },
             afterBody: function(context) {
               const index = context[0].dataIndex;
