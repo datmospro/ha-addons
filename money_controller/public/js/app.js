@@ -665,26 +665,61 @@ async function renderCompareMonthlyBarChart() {
       label: d.toLocaleString('es-ES', { month: 'short' }).toUpperCase(),
       start,
       end,
+      year: y,
+      month: d.getMonth() + 1, // 1-indexed
       income: 0,
       expense: 0
     });
   }
 
   try {
-    // Fetch all transactions inside the range
-    const startRange = monthData[0].start;
+    // Fetch all transactions inside the range (plus one month prior for shifting)
+    const firstMonthDate = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const prevFirstMonthDate = new Date(firstMonthDate.getFullYear(), firstMonthDate.getMonth() - 1, 1);
+    const startRange = formatDate(prevFirstMonthDate);
     const endRange = monthData[5].end;
     const res = await fetch(`/api/transactions?start_date=${startRange}&end_date=${endRange}`);
     const txs = await res.json();
     
-    // Group transactions by month
+    const shiftCatId = settings.shift_income_category ? parseInt(settings.shift_income_category) : null;
+    const shiftDay = settings.shift_income_day ? parseInt(settings.shift_income_day) : 25;
+
+    // Group transactions by month applying shifted income rules
     txs.forEach(t => {
-      monthData.forEach(m => {
-        if (t.date >= m.start && t.date <= m.end) {
-          if (t.type === 'income') m.income += t.amount;
-          else m.expense += t.amount;
+      const tDate = new Date(t.date + 'T00:00:00');
+      const tYear = tDate.getFullYear();
+      const tMonth = tDate.getMonth() + 1; // 1-indexed
+      const tDay = tDate.getDate();
+
+      if (t.type === 'expense') {
+        // Expenses are simply grouped by calendar month
+        monthData.forEach(m => {
+          if (t.date >= m.start && t.date <= m.end) {
+            m.expense += t.amount;
+          }
+        });
+      } else { // income
+        // Apply shifting logic
+        const isShiftedToNext = (shiftCatId && t.category_id === shiftCatId && tDay >= shiftDay);
+        
+        let targetYear = tYear;
+        let targetMonth = tMonth;
+        
+        if (isShiftedToNext) {
+          targetMonth += 1;
+          if (targetMonth > 12) {
+            targetMonth = 1;
+            targetYear += 1;
+          }
         }
-      });
+        
+        // Find which month in monthData this belongs to
+        monthData.forEach(m => {
+          if (m.year === targetYear && m.month === targetMonth) {
+            m.income += t.amount;
+          }
+        });
+      }
     });
 
     const labels = monthData.map(m => m.label);
