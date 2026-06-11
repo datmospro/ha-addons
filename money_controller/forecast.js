@@ -411,5 +411,6 @@ function generateForecast(temporaryTransactions = [], startDateParam = null, end
 }
 
 module.exports = {
-  generateForecast
+  generateForecast,
+  doesRuleApply
 };

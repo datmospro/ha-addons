@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const dbOps = require('./database');
-const { generateForecast } = require('./forecast');
+const { generateForecast, doesRuleApply } = require('./forecast');
 const ai = require('./ai');
 
 // Helpers for bank synchronization and description cleaning
@@ -234,10 +234,59 @@ app.post('/api/transactions/:id/unlink-recurring', (req, res) => {
 });
 
 // Recurring Rules
+function getNextUnsatisfiedDate(rule) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const formatDateLocal = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const start = new Date(rule.start_date + 'T00:00:00');
+  let d = new Date(today);
+  if (start > today) {
+    d = new Date(start);
+  }
+
+  if (rule.end_date) {
+    const end = new Date(rule.end_date + 'T00:00:00');
+    if (end < today) {
+      return null;
+    }
+  }
+
+  const maxFuture = new Date(today);
+  maxFuture.setFullYear(maxFuture.getFullYear() + 2);
+
+  while (d <= maxFuture) {
+    const dateStr = formatDateLocal(d);
+    if (doesRuleApply(rule, dateStr)) {
+      if (rule.end_date && d > new Date(rule.end_date + 'T00:00:00')) {
+        break;
+      }
+      const isSatisfied = dbOps.hasTransactionForRecurrence(rule.id, dateStr);
+      if (!isSatisfied) {
+        return dateStr;
+      }
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return null;
+}
+
 app.get('/api/recurring', (req, res) => {
   try {
     const rules = dbOps.getRecurringRules();
-    res.json(rules);
+    const rulesWithUnsatisfied = rules.map(rule => {
+      return {
+        ...rule,
+        next_unsatisfied_date: getNextUnsatisfiedDate(rule)
+      };
+    });
+    res.json(rulesWithUnsatisfied);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

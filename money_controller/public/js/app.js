@@ -1209,7 +1209,7 @@ async function renderRecurringTab() {
       const dates = getRecurringDates(rule);
       return {
         ...rule,
-        nextChargeDate: dates.next,
+        nextChargeDate: rule.next_unsatisfied_date ? new Date(rule.next_unsatisfied_date + 'T00:00:00') : dates.next,
         lastChargeDate: dates.last
       };
     });
