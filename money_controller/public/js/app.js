@@ -217,6 +217,7 @@ async function renderDashboard() {
     // Compute current month stats (applying shifted income rules)
     let incomesSum = 0;
     let expensesSum = 0;
+    let variableExpensesSum = 0;
     
     const shiftCatId = settings.shift_income_category ? parseInt(settings.shift_income_category) : null;
     const shiftDay = settings.shift_income_day ? parseInt(settings.shift_income_day) : 25;
@@ -236,6 +237,9 @@ async function renderDashboard() {
       if (isCurrentMonth) {
         if (t.type === 'expense') {
           expensesSum += t.amount;
+          if (!t.recurring_rule_id) {
+            variableExpensesSum += t.amount;
+          }
         } else { // income
           // Check if shifted to next month
           const isShiftedToNext = (shiftCatId && t.category_id === shiftCatId && tDay >= shiftDay);
@@ -267,6 +271,31 @@ async function renderDashboard() {
     document.getElementById('card-balance').textContent = formatCurrency(forecastData.todayBalance);
     document.getElementById('card-incomes').textContent = formatCurrency(incomesSum);
     document.getElementById('card-expenses').textContent = formatCurrency(expensesSum);
+    
+    // Render monthly variable budget card
+    const budget = parseFloat(settings.variable_monthly_budget || 0);
+    const varStatusEl = document.getElementById('card-variable-status');
+    const varSubEl = document.getElementById('card-variable-sub');
+    if (varStatusEl && varSubEl) {
+      if (budget > 0) {
+        varStatusEl.textContent = `${formatCurrency(variableExpensesSum)} / ${formatCurrency(budget)}`;
+        const diff = budget - variableExpensesSum;
+        if (diff >= 0) {
+          varStatusEl.className = 'amount';
+          varSubEl.textContent = `Quedan ${formatCurrency(diff)}`;
+          varSubEl.className = 'trend positive';
+        } else {
+          varStatusEl.className = 'amount red';
+          varSubEl.textContent = `Superado en ${formatCurrency(Math.abs(diff))}`;
+          varSubEl.className = 'trend negative';
+        }
+      } else {
+        varStatusEl.textContent = formatCurrency(variableExpensesSum);
+        varStatusEl.className = 'amount';
+        varSubEl.textContent = 'Sin límite configurado';
+        varSubEl.className = 'trend neutral';
+      }
+    }
     
     const netSavings = incomesSum - expensesSum;
     const netEl = document.getElementById('card-net');

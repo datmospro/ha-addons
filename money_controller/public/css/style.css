@@ -384,7 +384,7 @@ body {
 /* Dashboard Summary Cards */
 .summary-cards {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }
@@ -426,6 +426,11 @@ body {
 .card-icon.expense {
   color: var(--expense);
   background-color: var(--expense-bg);
+}
+
+.card-icon.warning {
+  color: var(--warning);
+  background-color: var(--warning-bg);
 }
 
 .card-data h3 {
@@ -1627,7 +1632,7 @@ body {
   }
   
   .summary-cards {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
