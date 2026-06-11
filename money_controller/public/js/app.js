@@ -185,12 +185,14 @@ async function runForecastCalculation() {
       if (val < 1) val = 1;
       const unit = periodUnitEl.value;
       if (unit === 'months') {
+        // Start from January 1st of the current year (same as years mode),
+        // so the historical portion of the chart is always shown from the same origin.
         const startYear = today.getFullYear();
-        const startMonth = today.getMonth();
-        const startDate = new Date(startYear, startMonth, 1);
+        const startDate = new Date(startYear, 0, 1);
         startDateStr = formatDate(startDate);
-        
-        const endDate = new Date(startYear, startMonth + val, 0);
+
+        // End: N months from the beginning of the current month
+        const endDate = new Date(startYear, today.getMonth() + val, 0);
         endDateStr = formatDate(endDate);
       } else if (unit === 'years') {
         const startYear = today.getFullYear();
@@ -201,13 +203,12 @@ async function runForecastCalculation() {
         endDateStr = formatDate(endDate);
       }
     } else {
-      // Fallback to 12 calendar months from the beginning of this month
+      // Fallback to current calendar year
       const startYear = today.getFullYear();
-      const startMonth = today.getMonth();
-      const startDate = new Date(startYear, startMonth, 1);
+      const startDate = new Date(startYear, 0, 1);
       startDateStr = formatDate(startDate);
       
-      const endDate = new Date(startYear, startMonth + 12, 0);
+      const endDate = new Date(startYear, today.getMonth() + 12, 0);
       endDateStr = formatDate(endDate);
     }
 
