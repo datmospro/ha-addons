@@ -1279,6 +1279,12 @@ body {
   border: 1px solid rgba(244, 63, 94, 0.2);
 }
 
+.cal-day-indicator.end-rule {
+  color: var(--warning);
+  background-color: var(--warning-bg);
+  border: 1px solid hsla(38, 92%, 50%, 0.35);
+}
+
 .cal-day-num {
   font-size: 0.85rem;
   font-weight: 600;

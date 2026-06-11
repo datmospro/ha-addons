@@ -22,6 +22,7 @@ let recFilterCategory = '';
 let recSort = 'day';
 let recViewMode = localStorage.getItem('recViewMode') || 'grid';
 let useHeatmap = localStorage.getItem('use_heatmap') === 'true';
+let showEndDates = localStorage.getItem('forecast_show_end_dates') === 'true';
 
 // Chart instances
 let forecastChart = null;
@@ -150,6 +151,14 @@ function populateCategorySelects() {
 // Run Cash Flow Forecast Engine (Handles standard and simulated runs)
 async function runForecastCalculation() {
   try {
+    // Load fresh recurring rules to obtain current ending dates for chart/calendar indicators
+    try {
+      const rulesRes = await fetch('/api/recurring');
+      recurringRules = await rulesRes.json();
+    } catch (err) {
+      console.error('Error fetching fresh recurring rules for forecast:', err);
+    }
+    
     let res;
     // Calculate forecast days dynamically based on period input
     let days = 365;
@@ -402,8 +411,10 @@ function renderForecastLineChart() {
   const step = Math.max(1, Math.floor(projection.length / 120));
   
   projection.forEach((p, idx) => {
-    // Select point if it aligns with the step, dips below safety, or is the first/last point
-    if (idx % step === 0 || p.balance < safetyLimit || idx === 0 || idx === projection.length - 1) {
+    // Force inclusion of the point if a recurring rule ends on this day
+    const hasEndingRule = showEndDates && recurringRules.some(r => r.end_date === p.date);
+    // Select point if it aligns with the step, dips below safety, has an ending rule, or is the first/last point
+    if (idx % step === 0 || p.balance < safetyLimit || hasEndingRule || idx === 0 || idx === projection.length - 1) {
       labels.push(formatDisplayDate(p.date));
       balanceData.push(p.balance);
       safetyLine.push(safetyLimit);
@@ -411,42 +422,68 @@ function renderForecastLineChart() {
     }
   });
 
+  const datasets = [
+    {
+      label: 'Saldo Bancario Simulado',
+      data: balanceData,
+      borderColor: '#a855f7', // Purple/indigo
+      borderWidth: 2.5,
+      pointRadius: 0,
+      pointHoverRadius: 5,
+      fill: true,
+      backgroundColor: function(context) {
+        const chart = context.chart;
+        const {ctx, chartArea} = chart;
+        if (!chartArea) return null;
+        
+        const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+        gradient.addColorStop(0, 'rgba(168, 85, 247, 0.2)');
+        gradient.addColorStop(1, 'rgba(168, 85, 247, 0.0)');
+        return gradient;
+      },
+      tension: 0.25
+    },
+    {
+      label: 'Umbral de Seguridad',
+      data: safetyLine,
+      borderColor: '#ef4444',
+      borderWidth: 1.5,
+      borderDash: [5, 5],
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      fill: false
+    }
+  ];
+
+  if (showEndDates) {
+    const endDatesData = [];
+    thinnedProjection.forEach(p => {
+      const endingRules = recurringRules.filter(r => r.end_date === p.date);
+      if (endingRules.length > 0) {
+        endDatesData.push(p.balance);
+      } else {
+        endDatesData.push(null);
+      }
+    });
+
+    datasets.push({
+      label: 'Fin de Gastos Fijos',
+      data: endDatesData,
+      borderColor: '#f97316', // Orange warning color
+      backgroundColor: '#f97316',
+      pointRadius: 6,
+      pointHoverRadius: 8,
+      pointStyle: 'rectRot', // Rotated square / diamond marker
+      showLine: false,
+      fill: false
+    });
+  }
+
   forecastChart = new Chart(ctx, {
     type: 'line',
     data: {
       labels: labels,
-      datasets: [
-        {
-          label: 'Saldo Bancario Simulado',
-          data: balanceData,
-          borderColor: '#a855f7', // Purple/indigo
-          borderWidth: 2.5,
-          pointRadius: 0,
-          pointHoverRadius: 5,
-          fill: true,
-          backgroundColor: function(context) {
-            const chart = context.chart;
-            const {ctx, chartArea} = chart;
-            if (!chartArea) return null;
-            
-            const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-            gradient.addColorStop(0, 'rgba(168, 85, 247, 0.2)');
-            gradient.addColorStop(1, 'rgba(168, 85, 247, 0.0)');
-            return gradient;
-          },
-          tension: 0.25
-        },
-        {
-          label: 'Umbral de Seguridad',
-          data: safetyLine,
-          borderColor: '#ef4444',
-          borderWidth: 1.5,
-          borderDash: [5, 5],
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          fill: false
-        }
-      ]
+      datasets: datasets
     },
     options: {
       responsive: true,
@@ -468,9 +505,15 @@ function renderForecastLineChart() {
               if (!p) return '';
               if (context.datasetIndex === 0) {
                 return `Saldo: ${formatCurrency(p.balance)}`;
-              } else {
+              } else if (context.datasetIndex === 1) {
                 return `Umbral de Seguridad: ${formatCurrency(safetyLimit)}`;
+              } else if (context.datasetIndex === 2) {
+                const endingRules = recurringRules.filter(r => r.end_date === p.date);
+                if (endingRules.length > 0) {
+                  return `Fin de: ${endingRules.map(r => r.description).join(', ')}`;
+                }
               }
+              return '';
             },
             afterBody: function(context) {
               const index = context[0].dataIndex;
@@ -1408,6 +1451,13 @@ function renderCalendar() {
       if (totalExpense > 0) {
         indicatorsHTML += `<span class="cal-day-indicator expense">-${totalExpense.toFixed(0)}</span>`;
       }
+      if (showEndDates) {
+        const endingRules = recurringRules.filter(r => r.end_date === dayDateStr);
+        if (endingRules.length > 0) {
+          const titleText = endingRules.map(r => `Fin de: ${r.description}`).join('\n');
+          indicatorsHTML += `<span class="cal-day-indicator end-rule" title="${titleText}">🛑 Fin</span>`;
+        }
+      }
       indicatorsHTML += '</div>';
       
       dayCell.innerHTML += indicatorsHTML;
@@ -1615,6 +1665,19 @@ function setupEventListeners() {
     periodValEl.addEventListener('input', triggerRecalc);
     periodUnitEl.addEventListener('change', async () => {
       await runForecastCalculation();
+    });
+  }
+
+  // Show end dates checkbox listener
+  const chkShowEndDates = document.getElementById('chk-show-end-dates');
+  if (chkShowEndDates) {
+    chkShowEndDates.checked = showEndDates;
+    chkShowEndDates.addEventListener('change', (e) => {
+      showEndDates = e.target.checked;
+      localStorage.setItem('forecast_show_end_dates', showEndDates);
+      // Redraw immediately
+      renderForecastLineChart();
+      renderCalendar();
     });
   }
 
