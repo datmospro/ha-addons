@@ -160,8 +160,12 @@ async function runForecastCalculation() {
     }
     
     let res;
-    // Calculate forecast days dynamically based on period input
-    let days = 365;
+    // Calculate calendar-aligned dates based on period input
+    let startDateStr = '';
+    let endDateStr = '';
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const periodValueEl = document.getElementById('forecast-period-value');
     const periodUnitEl = document.getElementById('forecast-period-unit');
     if (periodValueEl && periodUnitEl) {
@@ -169,22 +173,42 @@ async function runForecastCalculation() {
       if (val < 1) val = 1;
       const unit = periodUnitEl.value;
       if (unit === 'months') {
-        days = Math.ceil(val * 30.417);
+        const startYear = today.getFullYear();
+        const startMonth = today.getMonth();
+        const startDate = new Date(startYear, startMonth, 1);
+        startDateStr = formatDate(startDate);
+        
+        const endDate = new Date(startYear, startMonth + val, 0);
+        endDateStr = formatDate(endDate);
       } else if (unit === 'years') {
-        days = val * 365;
+        const startYear = today.getFullYear();
+        const startDate = new Date(startYear, 0, 1);
+        startDateStr = formatDate(startDate);
+        
+        const endDate = new Date(startYear + val, 0, 0);
+        endDateStr = formatDate(endDate);
       }
+    } else {
+      // Fallback to 12 calendar months from the beginning of this month
+      const startYear = today.getFullYear();
+      const startMonth = today.getMonth();
+      const startDate = new Date(startYear, startMonth, 1);
+      startDateStr = formatDate(startDate);
+      
+      const endDate = new Date(startYear, startMonth + 12, 0);
+      endDateStr = formatDate(endDate);
     }
 
     if (simulatedScenarios.length > 0) {
       // Run simulation
-      res = await fetch(`/api/forecast/simulate?days=${days}`, {
+      res = await fetch(`/api/forecast/simulate?start_date=${startDateStr}&end_date=${endDateStr}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ temporaryTransactions: simulatedScenarios })
       });
     } else {
       // Standard run
-      res = await fetch(`/api/forecast?days=${days}`);
+      res = await fetch(`/api/forecast?start_date=${startDateStr}&end_date=${endDateStr}`);
     }
     
     forecastData = await res.json();

@@ -103,8 +103,10 @@ function syncPastRecurringOccurrences() {
 /**
  * Calcula la proyección de flujo de caja diaria para un año entero (365 días)
  * @param {Array} temporaryTransactions - Transacciones ficticias para simulaciones "What-If"
+ * @param {string|number} startDateParam - Fecha de inicio o número de días (firma antigua)
+ * @param {string} endDateParam - Fecha de fin de la previsión
  */
-function generateForecast(temporaryTransactions = [], daysToProject = 365) {
+function generateForecast(temporaryTransactions = [], startDateParam = null, endDateParam = null) {
   // Sincronizar ocurrencias pasadas antes de cargar datos
   syncPastRecurringOccurrences();
 
@@ -147,7 +149,23 @@ function generateForecast(temporaryTransactions = [], daysToProject = 365) {
   });
 
   // 2. Determinar saldo inicial al comienzo del historial (2026-06-01)
-  const historyStartStr = todayStr < '2026-06-01' ? todayStr : '2026-06-01';
+  let historyStartStr = todayStr < '2026-06-01' ? todayStr : '2026-06-01';
+  let daysToProject = 365;
+
+  if (startDateParam !== null && startDateParam !== undefined) {
+    if (!isNaN(startDateParam) && typeof startDateParam !== 'object' && String(startDateParam).trim() !== '') {
+      daysToProject = parseInt(startDateParam);
+    } else {
+      historyStartStr = startDateParam;
+      if (endDateParam) {
+        const todayObj = new Date(todayStr + 'T12:00:00');
+        const endDateObj = new Date(endDateParam + 'T12:00:00');
+        const diffTime = endDateObj - todayObj;
+        daysToProject = Math.max(0, Math.round(diffTime / (1000 * 60 * 60 * 24)));
+      }
+    }
+  }
+
   let runningBalance = initialBalance;
   
   // Sumamos/restamos todas las transacciones previas al inicio del historial

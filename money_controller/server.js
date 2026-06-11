@@ -283,8 +283,14 @@ app.delete('/api/recurring/:id', (req, res) => {
 // Forecast (standard & What-If)
 app.get('/api/forecast', (req, res) => {
   try {
-    const days = parseInt(req.query.days) || 365;
-    const result = generateForecast([], days);
+    const { start_date, end_date, days } = req.query;
+    let result;
+    if (start_date && end_date) {
+      result = generateForecast([], start_date, end_date);
+    } else {
+      const daysNum = parseInt(days) || 365;
+      result = generateForecast([], daysNum);
+    }
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -293,10 +299,16 @@ app.get('/api/forecast', (req, res) => {
 
 app.post('/api/forecast/simulate', (req, res) => {
   try {
-    const days = parseInt(req.query.days) || 365;
+    const { start_date, end_date, days } = req.query;
     const { temporaryTransactions } = req.body;
     // temporaryTransactions must be an array of: { description, amount, type, date, isTemp: true }
-    const result = generateForecast(temporaryTransactions || [], days);
+    let result;
+    if (start_date && end_date) {
+      result = generateForecast(temporaryTransactions || [], start_date, end_date);
+    } else {
+      const daysNum = parseInt(days) || 365;
+      result = generateForecast(temporaryTransactions || [], daysNum);
+    }
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
