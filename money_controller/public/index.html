@@ -702,15 +702,13 @@
               <div class="form-group" style="margin-bottom: 20px;">
                 <label for="set-gemini-model">
                   <span>Modelo de Google Gemini</span>
-                  <small class="form-help">Si el modelo seleccionado da error por alta demanda (High Demand), puedes alternar a otro modelo de la lista.</small>
+                  <small class="form-help">Usa <strong>Gemini 2.5 Flash</strong> (recomendado, gratuito). Si da error de cuota, cambia a <strong>Gemini 2.0 Flash</strong> o <strong>Gemini 1.5 Flash</strong>. El modelo <em>Pro</em> requiere cuenta de pago.</small>
                 </label>
                 <select id="set-gemini-model" class="form-control" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px; color: var(--text); outline: none; width: 100%; cursor: pointer;">
-                  <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash (Por defecto)</option>
-                  <option value="gemini-2.0-flash">Gemini 2.0 Flash (Alternativa rápida)</option>
-                  <option value="gemini-3.5-flash">Gemini 3.5 Flash (Más avanzado)</option>
-                  <option value="gemini-flash-latest">Gemini Flash Latest</option>
-                  <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
-                  <option value="gemini-2.5-pro">Gemini 2.5 Pro (Avanzado)</option>
+                  <option value="gemini-2.5-flash">⭐ Gemini 2.5 Flash (Recomendado, gratuito)</option>
+                  <option value="gemini-2.0-flash">Gemini 2.0 Flash (Alternativa gratuita)</option>
+                  <option value="gemini-1.5-flash">Gemini 1.5 Flash (Alternativa gratuita)</option>
+                  <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (Más ligero)</option>
                 </select>
               </div>
 

@@ -3237,6 +3237,23 @@ async function handleSendChatMessage() {
     console.error('Error in chat:', err);
     thinkingMsgEl.remove();
     
+    const isQuotaError = err.message && (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED') || err.message.includes('free_tier'));
+    const isModelError = err.message && (err.message.includes('model') && (err.message.includes('not found') || err.message.includes('does not exist')));
+    
+    let friendlyMessage;
+    if (isQuotaError) {
+      friendlyMessage = `⚠️ <strong>Límite de cuota alcanzado</strong> para el modelo seleccionado.<br><br>
+        El modelo de IA actual ha excedido el límite gratuito de solicitudes. Para solucionarlo:<br>
+        1. Ve a <a href="#" onclick="showTab('settings')" style="color: #fb923c; font-weight: 600;">⚙️ Ajustes</a><br>
+        2. En "Modelo de Google Gemini", selecciona <strong>Gemini 2.0 Flash</strong> o <strong>Gemini 1.5 Flash</strong><br>
+        3. Guarda y vuelve a intentarlo`;
+    } else if (isModelError) {
+      friendlyMessage = `❌ <strong>Modelo no disponible</strong>: "${err.message}".<br><br>
+        Ve a <a href="#" onclick="showTab('settings')" style="color: #fb923c; font-weight: 600;">⚙️ Ajustes</a> y selecciona un modelo válido como <strong>Gemini 2.5 Flash</strong>.`;
+    } else {
+      friendlyMessage = `Perdona, he tenido un problema al procesar tu solicitud: ${escapeHTML(err.message)}`;
+    }
+
     const errMsgEl = document.createElement('div');
     errMsgEl.className = 'chat-message bot';
     errMsgEl.style.display = 'flex';
@@ -3246,8 +3263,8 @@ async function handleSendChatMessage() {
       <div class="message-avatar" style="width: 32px; height: 32px; border-radius: 50%; background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.2); color: #f43f5e; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
         <i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i>
       </div>
-      <div class="message-bubble" style="background: rgba(244, 63, 94, 0.05); border: 1px solid rgba(244, 63, 94, 0.15); border-radius: 0 16px 16px 16px; padding: 14px 18px; font-size: 0.95rem; line-height: 1.5; color: #fb7185;">
-        Perdona, he tenido un problema al procesar tu solicitud: ${err.message}
+      <div class="message-bubble" style="background: rgba(244, 63, 94, 0.05); border: 1px solid rgba(244, 63, 94, 0.15); border-radius: 0 16px 16px 16px; padding: 14px 18px; font-size: 0.95rem; line-height: 1.6; color: #fb7185;">
+        ${friendlyMessage}
       </div>
     `;
     chatMessages.appendChild(errMsgEl);

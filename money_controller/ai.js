@@ -134,7 +134,27 @@ function buildFinancialContext(todayStr) {
  */
 async function callGeminiAPI(apiKey, modelName, systemInstruction, userPrompt) {
   const model = modelName || 'gemini-2.5-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  
+  try {
+    return await callGeminiAPIWithModel(apiKey, model, systemInstruction, userPrompt);
+  } catch (err) {
+    // If quota exceeded, automatically try fallback models
+    const isQuotaError = err.message && (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED') || err.message.includes('free_tier'));
+    if (isQuotaError && model !== 'gemini-2.0-flash' && model !== 'gemini-1.5-flash') {
+      console.warn(`Quota exceeded for model "${model}", falling back to gemini-2.0-flash...`);
+      try {
+        return await callGeminiAPIWithModel(apiKey, 'gemini-2.0-flash', systemInstruction, userPrompt);
+      } catch (fallbackErr) {
+        // If fallback also fails, throw original error
+        throw err;
+      }
+    }
+    throw err;
+  }
+}
+
+async function callGeminiAPIWithModel(apiKey, modelName, systemInstruction, userPrompt) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
   
   const body = {
     contents: [
