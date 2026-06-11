@@ -142,7 +142,7 @@ async function callGeminiAPI(apiKey, systemInstruction, userPrompt) {
         parts: [{ text: userPrompt }]
       }
     ],
-    systemInstruction: {
+    system_instruction: {
       parts: [{ text: systemInstruction }]
     },
     generationConfig: {
