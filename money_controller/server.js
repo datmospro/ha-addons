@@ -330,6 +330,23 @@ app.post('/api/ai/chat', async (req, res) => {
   }
 });
 
+app.get('/api/ai/test-models', async (req, res) => {
+  try {
+    const settings = dbOps.getSettings();
+    const apiKey = settings.gemini_api_key;
+    if (!apiKey) {
+      return res.status(400).json({ error: 'Clave API de Gemini no configurada.' });
+    }
+    const v1Response = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`);
+    const v1Data = await v1Response.json();
+    const v1betaResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    const v1betaData = await v1betaResponse.json();
+    res.json({ v1: v1Data, v1beta: v1betaData });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/telegram/test', async (req, res) => {
   try {
     const { token, chatId } = req.body;
