@@ -130,10 +130,11 @@ function buildFinancialContext(todayStr) {
 }
 
 /**
- * Consulta a Google Gemini utilizando el modelo gratuito gemini-2.5-flash
+ * Consulta a Google Gemini utilizando el modelo configurado (soporta gemini-2.5-flash, gemini-2.0-flash, etc.)
  */
-async function callGeminiAPI(apiKey, systemInstruction, userPrompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+async function callGeminiAPI(apiKey, modelName, systemInstruction, userPrompt) {
+  const model = modelName || 'gemini-2.5-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   
   const body = {
     contents: [
@@ -203,7 +204,7 @@ ${JSON.stringify(context, null, 2)}
 PREGUNTA DEL USUARIO:
 "${userMessage}"`;
 
-  return await callGeminiAPI(apiKey, systemInstruction, userPrompt);
+  return await callGeminiAPI(apiKey, settings.gemini_model, systemInstruction, userPrompt);
 }
 
 /**
@@ -235,7 +236,7 @@ REGLAS DE SALIDA:
   const userPrompt = `ESTADO FINANCIERO DEL USUARIO EN FORMATO JSON:
 ${JSON.stringify(context, null, 2)}`;
 
-  return await callGeminiAPI(apiKey, systemInstruction, userPrompt);
+  return await callGeminiAPI(apiKey, settings.gemini_model, systemInstruction, userPrompt);
 }
 
 /**

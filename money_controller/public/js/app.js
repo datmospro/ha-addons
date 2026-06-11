@@ -98,6 +98,7 @@ async function loadBaseData() {
 
     // Fill AI & Telegram Settings Form
     document.getElementById('set-gemini-api-key').value = settings.gemini_api_key || '';
+    document.getElementById('set-gemini-model').value = settings.gemini_model || 'gemini-2.5-flash';
     const telegramEnabled = settings.telegram_notifications_enabled === 'true';
     document.getElementById('set-telegram-enabled').checked = telegramEnabled;
     document.getElementById('set-telegram-bot-token').value = settings.telegram_bot_token || '';
@@ -3049,6 +3050,7 @@ function renderAIAssistantTab() {
 
 async function saveAISettings() {
   const gemini_api_key = document.getElementById('set-gemini-api-key').value.trim();
+  const gemini_model = document.getElementById('set-gemini-model').value;
   const telegram_notifications_enabled = document.getElementById('set-telegram-enabled').checked ? 'true' : 'false';
   const telegram_bot_token = document.getElementById('set-telegram-bot-token').value.trim();
   const telegram_chat_id = document.getElementById('set-telegram-chat-id').value.trim();
@@ -3058,6 +3060,11 @@ async function saveAISettings() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: 'gemini_api_key', value: gemini_api_key })
+    });
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'gemini_model', value: gemini_model })
     });
     await fetch('/api/settings', {
       method: 'POST',
@@ -3086,12 +3093,18 @@ async function saveAISettings() {
 
 async function saveGeminiKeyOnly() {
   const gemini_api_key = document.getElementById('set-gemini-api-key').value.trim();
+  const gemini_model = document.getElementById('set-gemini-model').value;
 
   try {
     await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: 'gemini_api_key', value: gemini_api_key })
+    });
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'gemini_model', value: gemini_model })
     });
     await fetch('/api/settings', {
       method: 'POST',
