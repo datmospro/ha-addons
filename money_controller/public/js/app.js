@@ -96,6 +96,17 @@ async function loadBaseData() {
     document.getElementById('set-shift-income-category').value = settings.shift_income_category || '';
     document.getElementById('set-shift-income-day').value = settings.shift_income_day || '25';
 
+    // Fill AI & Telegram Settings Form
+    document.getElementById('set-gemini-api-key').value = settings.gemini_api_key || '';
+    const telegramEnabled = settings.telegram_notifications_enabled === 'true';
+    document.getElementById('set-telegram-enabled').checked = telegramEnabled;
+    document.getElementById('set-telegram-bot-token').value = settings.telegram_bot_token || '';
+    document.getElementById('set-telegram-chat-id').value = settings.telegram_chat_id || '';
+    
+    // Toggle fields visibility
+    document.getElementById('telegram-config-fields').style.display = telegramEnabled ? 'flex' : 'none';
+    document.getElementById('telegram-save-only-fields').style.display = telegramEnabled ? 'none' : 'block';
+
     // 2. Load Categories
     const categoriesRes = await fetch('/api/categories');
     categories = await categoriesRes.json();
@@ -1984,6 +1995,57 @@ function setupEventListeners() {
     const el = document.getElementById(id);
     if (el) el.addEventListener('click', syncBank);
   });
+
+  // AI & Telegram settings and buttons
+  const setTelegramEnabled = document.getElementById('set-telegram-enabled');
+  if (setTelegramEnabled) {
+    setTelegramEnabled.addEventListener('change', (e) => {
+      const enabled = e.target.checked;
+      document.getElementById('telegram-config-fields').style.display = enabled ? 'flex' : 'none';
+      document.getElementById('telegram-save-only-fields').style.display = enabled ? 'none' : 'block';
+    });
+  }
+
+  const btnSaveAISettings = document.getElementById('btn-save-ai-settings');
+  if (btnSaveAISettings) {
+    btnSaveAISettings.addEventListener('click', saveAISettings);
+  }
+
+  const btnSaveGeminiOnly = document.getElementById('btn-save-gemini-only');
+  if (btnSaveGeminiOnly) {
+    btnSaveGeminiOnly.addEventListener('click', saveGeminiKeyOnly);
+  }
+
+  const btnTestTelegram = document.getElementById('btn-test-telegram');
+  if (btnTestTelegram) {
+    btnTestTelegram.addEventListener('click', testTelegramConnection);
+  }
+
+  // Chat input buttons and enter key
+  const btnSendChat = document.getElementById('btn-send-chat');
+  if (btnSendChat) {
+    btnSendChat.addEventListener('click', handleSendChatMessage);
+  }
+
+  const chatInput = document.getElementById('chat-input');
+  if (chatInput) {
+    chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        handleSendChatMessage();
+      }
+    });
+  }
+
+  // Suggested prompts
+  document.querySelectorAll('.btn-prompt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const promptText = btn.dataset.prompt;
+      if (promptText) {
+        document.getElementById('chat-input').value = promptText;
+        handleSendChatMessage();
+      }
+    });
+  });
 }
 
 // Switch navigation Tabs
@@ -2003,6 +2065,7 @@ window.switchTab = function(tabName) {
     transactions: { t: 'Historial de Movimientos', s: 'Listado completo, filtros y gestión de tus gastos e ingresos.' },
     recurring: { t: 'Gastos e Ingresos Fijos', s: 'Gestiona tus hipotecas, préstamos, nóminas y recibos recurrentes.' },
     forecast: { t: 'Previsión de Flujo de Caja', s: 'Calendario predictivo diario y alertas de números rojos para el año.' },
+    'ai-assistant': { t: 'Asistente IA Financiero', s: 'Consulta a tu asesor personal sobre tus finanzas y proyecciones.' },
     settings: { t: 'Configuración del Sistema', s: 'Modifica saldos iniciales, umbral de alertas y gestiona copias de seguridad.' }
   };
 
@@ -2024,6 +2087,8 @@ window.switchTab = function(tabName) {
     renderRecurringTab();
   } else if (tabName === 'forecast') {
     renderForecastTab();
+  } else if (tabName === 'ai-assistant') {
+    renderAIAssistantTab();
   }
 };
 
@@ -2970,4 +3035,240 @@ async function unlinkTransactionFromRule(txId) {
     console.error('Error unlinking transaction:', err);
     showToast('Error al desvincular el movimiento.', 'danger');
   }
+}
+
+// --- AI ASSISTANT FUNCTIONS ---
+
+function renderAIAssistantTab() {
+  const hasApiKey = settings.gemini_api_key && settings.gemini_api_key.trim() !== '';
+  const warningEl = document.getElementById('ai-key-warning');
+  if (warningEl) {
+    warningEl.style.display = hasApiKey ? 'none' : 'flex';
+  }
+}
+
+async function saveAISettings() {
+  const gemini_api_key = document.getElementById('set-gemini-api-key').value.trim();
+  const telegram_notifications_enabled = document.getElementById('set-telegram-enabled').checked ? 'true' : 'false';
+  const telegram_bot_token = document.getElementById('set-telegram-bot-token').value.trim();
+  const telegram_chat_id = document.getElementById('set-telegram-chat-id').value.trim();
+
+  try {
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'gemini_api_key', value: gemini_api_key })
+    });
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'telegram_notifications_enabled', value: telegram_notifications_enabled })
+    });
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'telegram_bot_token', value: telegram_bot_token })
+    });
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'telegram_chat_id', value: telegram_chat_id })
+    });
+
+    showToast('Ajustes de IA y Telegram guardados correctamente.', 'success');
+    await loadBaseData(); // reload
+    renderAIAssistantTab();
+  } catch (err) {
+    console.error('Error saving AI settings:', err);
+    showToast('Error al guardar los ajustes de IA.', 'danger');
+  }
+}
+
+async function saveGeminiKeyOnly() {
+  const gemini_api_key = document.getElementById('set-gemini-api-key').value.trim();
+
+  try {
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'gemini_api_key', value: gemini_api_key })
+    });
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'telegram_notifications_enabled', value: 'false' })
+    });
+
+    showToast('Clave de Gemini guardada correctamente.', 'success');
+    await loadBaseData(); // reload
+    renderAIAssistantTab();
+  } catch (err) {
+    console.error('Error saving Gemini key:', err);
+    showToast('Error al guardar la clave de Gemini.', 'danger');
+  }
+}
+
+async function testTelegramConnection() {
+  const token = document.getElementById('set-telegram-bot-token').value.trim();
+  const chatId = document.getElementById('set-telegram-chat-id').value.trim();
+
+  if (!token || !chatId) {
+    showToast('Por favor, rellena el Token del bot y el Chat ID para probar.', 'warning');
+    return;
+  }
+
+  showToast('Enviando mensaje de prueba...', 'neutral');
+
+  try {
+    const res = await fetch('/api/telegram/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, chatId })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error desconocido.');
+
+    showToast('¡Mensaje de prueba enviado con éxito! Revisa tu Telegram.', 'success');
+  } catch (err) {
+    console.error('Error testing Telegram:', err);
+    showToast(`Error de conexión: ${err.message}`, 'danger');
+  }
+}
+
+async function handleSendChatMessage() {
+  const inputEl = document.getElementById('chat-input');
+  const message = inputEl.value.trim();
+  if (!message) return;
+
+  // Clear input
+  inputEl.value = '';
+
+  const chatMessages = document.getElementById('chat-messages');
+
+  // Append User message
+  const userMsgEl = document.createElement('div');
+  userMsgEl.className = 'chat-message user';
+  userMsgEl.style.display = 'flex';
+  userMsgEl.style.gap = '12px';
+  userMsgEl.style.maxWidth = '80%';
+  userMsgEl.style.alignSelf = 'flex-end';
+  userMsgEl.innerHTML = `
+    <div class="message-avatar" style="width: 32px; height: 32px; border-radius: 50%; background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.2); color: var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+      <i data-lucide="user" style="width: 16px; height: 16px;"></i>
+    </div>
+    <div class="message-bubble" style="background: var(--primary); color: #fff; border-radius: 16px 0 16px 16px; padding: 14px 18px; font-size: 0.95rem; line-height: 1.5; border: none;">
+      ${escapeHTML(message)}
+    </div>
+  `;
+  chatMessages.appendChild(userMsgEl);
+  lucide.createIcons();
+
+  // Scroll to bottom
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  // Append Thinking bubble
+  const thinkingMsgEl = document.createElement('div');
+  thinkingMsgEl.className = 'chat-message bot thinking';
+  thinkingMsgEl.style.display = 'flex';
+  thinkingMsgEl.style.gap = '12px';
+  thinkingMsgEl.style.maxWidth = '80%';
+  thinkingMsgEl.innerHTML = `
+    <div class="message-avatar" style="width: 32px; height: 32px; border-radius: 50%; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+      <i data-lucide="bot" style="width: 16px; height: 16px;"></i>
+    </div>
+    <div class="message-bubble" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 0 16px 16px 16px; padding: 14px 18px; font-size: 0.95rem; line-height: 1.5; color: var(--text);">
+      <div class="typing-indicator">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+  `;
+  chatMessages.appendChild(thinkingMsgEl);
+  lucide.createIcons();
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  try {
+    const res = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    });
+
+    const data = await res.json();
+    
+    // Remove thinking indicator
+    thinkingMsgEl.remove();
+
+    if (!res.ok) throw new Error(data.error || 'Error al procesar la respuesta.');
+
+    // Append Bot message
+    const botMsgEl = document.createElement('div');
+    botMsgEl.className = 'chat-message bot';
+    botMsgEl.style.display = 'flex';
+    botMsgEl.style.gap = '12px';
+    botMsgEl.style.maxWidth = '80%';
+    botMsgEl.innerHTML = `
+      <div class="message-avatar" style="width: 32px; height: 32px; border-radius: 50%; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <i data-lucide="bot" style="width: 16px; height: 16px;"></i>
+      </div>
+      <div class="message-bubble" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 0 16px 16px 16px; padding: 14px 18px; font-size: 0.95rem; line-height: 1.5; color: var(--text);">
+        ${formatMarkdownToHTML(data.response)}
+      </div>
+    `;
+    chatMessages.appendChild(botMsgEl);
+    lucide.createIcons();
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  } catch (err) {
+    console.error('Error in chat:', err);
+    thinkingMsgEl.remove();
+    
+    const errMsgEl = document.createElement('div');
+    errMsgEl.className = 'chat-message bot';
+    errMsgEl.style.display = 'flex';
+    errMsgEl.style.gap = '12px';
+    errMsgEl.style.maxWidth = '80%';
+    errMsgEl.innerHTML = `
+      <div class="message-avatar" style="width: 32px; height: 32px; border-radius: 50%; background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.2); color: #f43f5e; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i>
+      </div>
+      <div class="message-bubble" style="background: rgba(244, 63, 94, 0.05); border: 1px solid rgba(244, 63, 94, 0.15); border-radius: 0 16px 16px 16px; padding: 14px 18px; font-size: 0.95rem; line-height: 1.5; color: #fb7185;">
+        Perdona, he tenido un problema al procesar tu solicitud: ${err.message}
+      </div>
+    `;
+    chatMessages.appendChild(errMsgEl);
+    lucide.createIcons();
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+}
+
+function escapeHTML(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function formatMarkdownToHTML(text) {
+  if (!text) return '';
+  let html = text;
+  
+  // Escape HTML to prevent XSS
+  html = escapeHTML(html);
+
+  // Bold text: **text**
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  
+  // Bullet points: * or - at the start of a line
+  html = html.replace(/^\s*[\*\-]\s+(.*?)$/gm, '<li>$1</li>');
+  
+  // Wrap list items in <ul>. Look for consecutive <li> and wrap them
+  html = html.replace(/(<li>.*?<\/li>)/gs, '<ul>$1</ul>');
+  html = html.replace(/<\/ul>\s*<ul>/g, '');
+
+  // Newlines to <br>
+  html = html.replace(/\n/g, '<br>');
+  
+  return html;
 }

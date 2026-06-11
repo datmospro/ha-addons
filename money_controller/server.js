@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const dbOps = require('./database');
 const { generateForecast } = require('./forecast');
+const ai = require('./ai');
 
 // Helpers for bank synchronization and description cleaning
 function cleanBankDescription(desc) {
@@ -310,6 +311,33 @@ app.post('/api/forecast/simulate', (req, res) => {
       result = generateForecast(temporaryTransactions || [], daysNum);
     }
     res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+// AI Assistant & Telegram Chat API
+app.post('/api/ai/chat', async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message) {
+      return res.status(400).json({ error: 'Falta el mensaje del usuario.' });
+    }
+    const settings = dbOps.getSettings();
+    const responseText = await ai.askAI(message, settings);
+    res.json({ response: responseText });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/telegram/test', async (req, res) => {
+  try {
+    const { token, chatId } = req.body;
+    if (!token || !chatId) {
+      return res.status(400).json({ error: 'Falta el Token o el Chat ID.' });
+    }
+    await ai.sendTelegramTestMessage(token, chatId);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -806,6 +834,9 @@ app.get('*', (req, res) => {
 // Start Server
 app.listen(port, '0.0.0.0', () => {
   console.log(`MoneyController server running at http://0.0.0.0:${port}`);
+  
+  // Iniciar planificador proactivo de IA (Telegram)
+  ai.startProactiveScheduler();
   
   // Clean up auto-generated transactions from past versions
   try {
