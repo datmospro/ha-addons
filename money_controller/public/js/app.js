@@ -185,14 +185,22 @@ async function runForecastCalculation() {
       if (val < 1) val = 1;
       const unit = periodUnitEl.value;
       if (unit === 'months') {
-        // Start from January 1st of the current year (same as years mode)
-        const startYear = today.getFullYear();
-        const startDate = new Date(startYear, 0, 1);
-        startDateStr = formatDate(startDate);
+        if (val % 12 === 0) {
+          // Calendar years alignment (e.g. 12 months, 24 months...)
+          const startYear = today.getFullYear();
+          const startDate = new Date(startYear, 0, 1);
+          startDateStr = formatDate(startDate);
 
-        // End: N months from Jan 1st → so 12 months = Dec 31 (same as 1 year)
-        const endDate = new Date(startYear, val, 0);
-        endDateStr = formatDate(endDate);
+          const endDate = new Date(startYear, val, 0);
+          endDateStr = formatDate(endDate);
+        } else {
+          // Relative months starting from the 1st of the current month
+          const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+          startDateStr = formatDate(startDate);
+
+          const endDate = new Date(today.getFullYear(), today.getMonth() + val, 0);
+          endDateStr = formatDate(endDate);
+        }
       } else if (unit === 'years') {
         const startYear = today.getFullYear();
         const startDate = new Date(startYear, 0, 1);
