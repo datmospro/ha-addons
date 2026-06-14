@@ -470,7 +470,7 @@ function renderForecastLineChart() {
     {
       label: 'Saldo Bancario Simulado',
       data: balanceData,
-      borderColor: '#a855f7', // Purple/indigo
+      borderColor: '#7c6ce5', // Soft purple/indigo
       borderWidth: 2.5,
       pointRadius: 0,
       pointHoverRadius: 5,
@@ -481,8 +481,8 @@ function renderForecastLineChart() {
         if (!chartArea) return null;
         
         const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-        gradient.addColorStop(0, 'rgba(168, 85, 247, 0.2)');
-        gradient.addColorStop(1, 'rgba(168, 85, 247, 0.0)');
+        gradient.addColorStop(0, 'rgba(124, 108, 229, 0.18)');
+        gradient.addColorStop(1, 'rgba(124, 108, 229, 0.0)');
         return gradient;
       },
       tension: 0.25
@@ -490,7 +490,7 @@ function renderForecastLineChart() {
     {
       label: 'Umbral de Seguridad',
       data: safetyLine,
-      borderColor: '#ef4444',
+      borderColor: '#e54e60', // Soft rose-red
       borderWidth: 1.5,
       borderDash: [5, 5],
       pointRadius: 0,
@@ -513,8 +513,8 @@ function renderForecastLineChart() {
     datasets.push({
       label: 'Fin de Gastos Fijos',
       data: endDatesData,
-      borderColor: '#f97316', // Orange warning color
-      backgroundColor: '#f97316',
+      borderColor: '#f59e0b', // Soft amber/orange
+      backgroundColor: '#f59e0b',
       pointRadius: 6,
       pointHoverRadius: 8,
       pointStyle: 'rectRot', // Rotated square / diamond marker
@@ -754,13 +754,13 @@ async function renderCompareMonthlyBarChart() {
           {
             label: 'Ingresos',
             data: incomes,
-            backgroundColor: '#10b981', // green
+            backgroundColor: '#46b87e', // Soft mint green
             borderRadius: 4
           },
           {
             label: 'Gastos',
             data: expenses,
-            backgroundColor: '#f43f5e', // rose
+            backgroundColor: '#e54e60', // Soft rose-red
             borderRadius: 4
           }
         ]
