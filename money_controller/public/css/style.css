@@ -28,8 +28,8 @@
   --warning: hsl(38, 75%, 55%);          /* Soft amber */
   --warning-bg: hsla(38, 75%, 55%, 0.12);
   
-  --text-main: hsl(215, 20%, 88%);       /* Soft slate white (much more comfortable) */
-  --text-muted: hsl(215, 12%, 62%);      /* Soft muted slate */
+  --text-main: hsl(215, 14%, 76%);       /* Comfortable light gray */
+  --text-muted: hsl(215, 10%, 58%);      /* Soft muted gray */
   --text-dark: hsl(220, 18%, 8%);
   
   /* Layout */
@@ -1987,7 +1987,7 @@ body {
 }
 
 .message-bubble strong {
-  color: #fff;
+  color: hsl(215, 20%, 90%);
   font-weight: 700;
 }
 
