@@ -481,6 +481,26 @@ app.get('/api/crops/:id/climate', (req, res) => {
   }
 });
 
+// Helper to calculate Leaf VPD
+function calculateLeafVPD(temp, rh) {
+  if (temp === null || temp === undefined || rh === null || rh === undefined) return null;
+  const tRoom = parseFloat(temp);
+  const hum = parseFloat(rh);
+  if (isNaN(tRoom) || isNaN(hum)) return null;
+
+  // SVP room in kPa
+  const svpRoom = 0.61078 * Math.exp((17.27 * tRoom) / (tRoom + 237.3));
+  // AVP air in kPa
+  const avpAir = svpRoom * (hum / 100);
+  // Leaf Temp (2.8°C cooler than room)
+  const tLeaf = tRoom - 2.8;
+  // SVP leaf in kPa
+  const svpLeaf = 0.61078 * Math.exp((17.27 * tLeaf) / (tLeaf + 237.3));
+
+  const vpd = svpLeaf - avpAir;
+  return Math.max(0, Number(vpd.toFixed(2)));
+}
+
 // Record climate measurement
 app.post('/api/crops/:id/climate', (req, res) => {
   const { id } = req.params;
@@ -492,6 +512,11 @@ app.post('/api/crops/:id/climate', (req, res) => {
 
   if (!date) {
     return res.status(400).json({ error: "Date is required" });
+  }
+
+  let finalVpd = vpd;
+  if ((finalVpd === null || finalVpd === undefined || finalVpd === '') && temp_day !== null && humidity !== null) {
+    finalVpd = calculateLeafVPD(temp_day, humidity);
   }
 
   try {
@@ -509,7 +534,7 @@ app.post('/api/crops/:id/climate', (req, res) => {
     const result = stmt.run(
       id, date, riego_num || null, plant_height || null, led_power || null,
       light_distance || null, temp_day || null, temp_night || null, humidity || null,
-      vpd || null, extractor || null, poda_done || 0, notes || ''
+      finalVpd, extractor || null, poda_done || 0, notes || ''
     );
     res.status(201).json({ id: result.lastInsertRowid, message: "Climate log saved." });
   } catch (err) {

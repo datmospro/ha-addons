@@ -39,6 +39,26 @@ const roundVal = (v, decimals = 2) => {
     return Number(Number(v).toFixed(decimals));
 };
 
+// Helper: Calculate Leaf VPD from Room Temp and RH
+function calculateLeafVPD(roomTemp, relativeHumidity) {
+    if (roomTemp === null || roomTemp === undefined || relativeHumidity === null || relativeHumidity === undefined) return null;
+    const tRoom = parseFloat(roomTemp);
+    const hum = parseFloat(relativeHumidity);
+    if (isNaN(tRoom) || isNaN(hum)) return null;
+
+    // SVP room in kPa
+    const svpRoom = 0.61078 * Math.exp((17.27 * tRoom) / (tRoom + 237.3));
+    // AVP air in kPa
+    const avpAir = svpRoom * (hum / 100);
+    // Leaf Temp (2.8°C cooler than room)
+    const tLeaf = tRoom - 2.8;
+    // SVP leaf in kPa
+    const svpLeaf = 0.61078 * Math.exp((17.27 * tLeaf) / (tLeaf + 237.3));
+
+    const vpd = svpLeaf - avpAir;
+    return Math.max(0, Number(vpd.toFixed(2)));
+}
+
 // Initialize Application
 document.addEventListener("DOMContentLoaded", () => {
     setupNavigation();
@@ -430,9 +450,16 @@ function updateDashboard() {
     
     const targetVPD = nextWatering && nextWatering.climate_targets ? nextWatering.climate_targets.vpd : null;
     
-    // Find latest climate log with VPD
-    const latestClimateLogWithVPD = climateLogs.find(log => log.vpd !== null);
-    const currentVPD = latestClimateLogWithVPD ? latestClimateLogWithVPD.vpd : null;
+    // Find latest climate log with VPD or enough data to calculate it
+    const latestClimateLog = climateLogs.find(log => log.vpd !== null || (log.temp_day !== null && log.humidity !== null));
+    let currentVPD = null;
+    if (latestClimateLog) {
+        if (latestClimateLog.vpd !== null) {
+            currentVPD = latestClimateLog.vpd;
+        } else {
+            currentVPD = calculateLeafVPD(latestClimateLog.temp_day, latestClimateLog.humidity);
+        }
+    }
     
     const vpdValEl = document.getElementById("vpd-current-val");
     const vpdTgtEl = document.getElementById("vpd-target-val");
@@ -788,6 +815,25 @@ function setupClimateSection() {
         }
     });
 
+    // Auto-calculate VPD on input
+    const tempInput = document.getElementById("clim-in-temp-d");
+    const humInput = document.getElementById("clim-in-hum");
+    const vpdInput = document.getElementById("clim-in-vpd");
+    
+    function autoCalcVpd() {
+        const t = parseFloat(tempInput.value);
+        const h = parseFloat(humInput.value);
+        if (!isNaN(t) && !isNaN(h)) {
+            const calculated = calculateLeafVPD(t, h);
+            if (calculated !== null) {
+                vpdInput.value = calculated;
+            }
+        }
+    }
+    
+    tempInput.addEventListener("input", autoCalcVpd);
+    humInput.addEventListener("input", autoCalcVpd);
+
     document.getElementById("btn-quick-log-climate").addEventListener("click", () => {
         // Switch view to climate
         const climBtn = document.querySelector('[data-target="sec-climate"]');
@@ -823,7 +869,11 @@ function renderClimateLogsTable() {
         const tNight = log.temp_night ? `${log.temp_night}°C` : '-';
         const temp = `${tDay} / ${tNight}`;
         const hum = log.humidity ? `${log.humidity}%` : '-';
-        const vpd = log.vpd ? `${log.vpd} kPa` : '-';
+        let vpdVal = log.vpd;
+        if (vpdVal === null && log.temp_day !== null && log.humidity !== null) {
+            vpdVal = calculateLeafVPD(log.temp_day, log.humidity);
+        }
+        const vpd = vpdVal !== null ? `${vpdVal.toFixed(2)} kPa` : '-';
 
         tr.innerHTML = `
             <td>${formatDateShort(log.date)}</td>
