@@ -1,3 +1,12 @@
+// Override fetch to support Home Assistant Ingress path routing
+const originalFetch = window.fetch;
+window.fetch = function(url, options) {
+    if (typeof url === 'string' && url.startsWith('/api/')) {
+        url = url.slice(1);
+    }
+    return originalFetch(url, options);
+};
+
 // Global App State
 let currentCropId = null;
 let currentCrop = null;
