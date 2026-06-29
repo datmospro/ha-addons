@@ -626,6 +626,29 @@ function setupWateringSection() {
             console.error(err);
         }
     });
+
+    // Listen to changes on nutrient inputs to update highlights
+    document.querySelectorAll('.nut-input-group input[type="number"]').forEach(input => {
+        input.addEventListener('input', () => {
+            updateNutrientHighlight(input);
+        });
+    });
+
+    // Handle check button clicks for pouring fertilizers
+    document.querySelectorAll('.btn-check-pour').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const group = btn.closest('.nut-input-group');
+            if (group) {
+                group.classList.toggle('added-to-mix');
+                const isChecked = group.classList.contains('added-to-mix');
+                const icon = btn.querySelector('i');
+                if (icon) {
+                    icon.className = isChecked ? 'fa-solid fa-square-check' : 'fa-regular fa-square';
+                }
+            }
+        });
+    });
 }
 
 function renderWateringsList() {
@@ -683,11 +706,32 @@ function renderWateringsList() {
     }
 }
 
+function updateNutrientHighlight(inputEl) {
+    const group = inputEl.closest('.nut-input-group');
+    if (!group) return;
+    const val = parseFloat(inputEl.value) || 0;
+    if (val > 0) {
+        group.classList.add('has-value');
+    } else {
+        group.classList.remove('has-value');
+    }
+}
+
 function openLogWateringModal(riegoNum) {
     if (!currentCrop) return;
     
     const item = fullSchedule.find(s => s.riego_num === riegoNum);
     if (!item) return;
+
+    // Reset check states and highlights
+    document.querySelectorAll('.nut-input-group').forEach(group => {
+        group.classList.remove('added-to-mix');
+        group.classList.remove('has-value');
+        const icon = group.querySelector('.btn-check-pour i');
+        if (icon) {
+            icon.className = 'fa-regular fa-square';
+        }
+    });
 
     document.getElementById("log-water-title-num").textContent = riegoNum.toFixed(1);
     document.getElementById("log-water-riego-num").value = riegoNum;
@@ -751,6 +795,11 @@ function openLogWateringModal(riegoNum) {
         document.getElementById("log-nut-enzymes").value = item.target_products.enzymes;
         document.getElementById("log-nut-flawless").value = item.target_products.flawless_finish;
     }
+
+    // Set highlights for non-zero fields
+    document.querySelectorAll('.nut-input-group input[type="number"]').forEach(input => {
+        updateNutrientHighlight(input);
+    });
 
     openModal("modal-log-watering");
 }

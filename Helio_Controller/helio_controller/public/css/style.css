@@ -1006,6 +1006,78 @@ body {
     color: var(--text-muted);
 }
 
+.nut-input-group {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.nut-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 0.2rem;
+}
+
+.btn-check-pour {
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    transition: all 0.15s ease;
+    outline: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+}
+
+.btn-check-pour:hover {
+    color: var(--text-primary);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Stand out when has value */
+.nut-input-group.has-value {
+    background: rgba(16, 185, 129, 0.04);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.nut-input-group.has-value label {
+    color: var(--text-primary);
+}
+
+.nut-input-group.has-value input {
+    border-color: rgba(16, 185, 129, 0.4);
+    box-shadow: 0 0 4px rgba(16, 185, 129, 0.1);
+}
+
+.nut-input-group.has-value .target-val {
+    color: #10b981;
+    font-weight: 600;
+}
+
+/* Dimm and show check icon when added to mix */
+.nut-input-group.added-to-mix {
+    background: rgba(255, 255, 255, 0.015) !important;
+    border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.nut-input-group.added-to-mix label,
+.nut-input-group.added-to-mix input,
+.nut-input-group.added-to-mix .target-val {
+    opacity: 0.45;
+}
+
+.nut-input-group.added-to-mix .btn-check-pour {
+    color: #10b981 !important;
+    opacity: 1 !important;
+}
+
 /* --- Tables --- */
 .table-container {
     overflow-x: auto;
