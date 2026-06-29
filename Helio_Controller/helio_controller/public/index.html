@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Helio Controller - Control de Cultivo Indoor</title>
+    <!-- Fonts: Inter for premium typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <!-- FontAwesome Icons (loaded via cdn for simple clean UI) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-logo">
+                <i class="fa-solid fa-leaf text-accent"></i>
+                <h1>Helio<span>Controller</span></h1>
+            </div>
+            
+            <div class="header-actions">
+                <div class="crop-select-wrapper">
+                    <i class="fa-solid fa-seedling"></i>
+                    <select id="crop-selector" class="crop-select">
+                        <!-- Dynamically populated -->
+                    </select>
+                </div>
+                <button id="btn-new-crop" class="btn btn-primary btn-sm">
+                    <i class="fa-solid fa-plus"></i> <span class="hide-mobile">Nuevo Ciclo</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="app-main">
+            
+            <!-- SECTION: DASHBOARD -->
+            <section id="sec-dashboard" class="app-section active">
+                <div class="dashboard-grid">
+                    
+                    <!-- Crop Status Overview Card -->
+                    <div class="card card-hero">
+                        <div class="card-hero-header">
+                            <div>
+                                <span class="badge" id="crop-badge">Cargando...</span>
+                                <h2 id="dash-crop-name" class="card-title">Cargando cultivo...</h2>
+                                <p id="dash-crop-dates" class="card-subtitle">Iniciado el --/--/----</p>
+                            </div>
+                            <button id="btn-edit-crop" class="btn-icon" title="Editar Cultivo">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="crop-stats-row">
+                            <div class="stat-item">
+                                <div class="stat-icon"><i class="fa-solid fa-cubes"></i></div>
+                                <div class="stat-info">
+                                    <span class="stat-label">Plantas Activas</span>
+                                    <div class="stat-value-editable">
+                                        <span id="dash-plants-count">--</span>
+                                        <button id="btn-quick-adjust-plants" class="btn-micro" title="Ajustar número de plantas por bajas">
+                                            <i class="fa-solid fa-arrows-up-down"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-icon"><i class="fa-solid fa-bucket"></i></div>
+                                <div class="stat-info">
+                                    <span class="stat-label">Tamaño Maceta</span>
+                                    <span id="dash-pot-size" class="stat-value">-- L</span>
+                                </div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-icon"><i class="fa-solid fa-calendar-day"></i></div>
+                                <div class="stat-info">
+                                    <span class="stat-label">Día de Ciclo</span>
+                                    <span id="dash-crop-days" class="stat-value">Día --</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div class="crop-progress-container">
+                            <div class="progress-labels">
+                                <span>Crecimiento (2 Sem)</span>
+                                <span>Floración (8 Sem)</span>
+                            </div>
+                            <div class="progress-bar-outer">
+                                <div id="dash-progress-bar" class="progress-bar-inner" style="width: 0%"></div>
+                            </div>
+                            <div class="progress-percentage" id="dash-progress-pct">Progreso: 0%</div>
+                        </div>
+                    </div>
+
+                    <!-- Next Watering Card -->
+                    <div class="card card-action" id="card-next-watering">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fa-solid fa-droplet text-blue"></i> Próximo Riego Sugerido</h3>
+                            <span class="badge badge-outline" id="next-riego-badge">Riego --</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="riego-overview-main">
+                                <div class="water-needed-large">
+                                    <span class="num" id="next-water-qty">--</span>
+                                    <span class="unit">Litros Agua</span>
+                                </div>
+                                <div class="water-info-pills">
+                                    <span class="pill" id="next-riego-type"><i class="fa-solid fa-circle-nodes"></i> Abono</span>
+                                    <span class="pill" id="next-riego-phase"><i class="fa-solid fa-clock"></i> Sem. --</span>
+                                </div>
+                            </div>
+                            
+                            <h4 class="recipe-title">Ingredientes a mezclar:</h4>
+                            <ul class="recipe-list" id="next-watering-recipe">
+                                <!-- Dynamically populated list of nutrients and ml -->
+                            </ul>
+                            
+                            <div class="card-actions">
+                                <button id="btn-quick-log-watering" class="btn btn-accent btn-block">
+                                    <i class="fa-solid fa-check"></i> Registrar Riego Realizado
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Real-Time Climate Targets Card -->
+                    <div class="card card-climate-widget">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fa-solid fa-temperature-half text-orange"></i> Clima Ideal Actual</h3>
+                            <button id="btn-quick-log-climate" class="btn btn-outline btn-sm">
+                                <i class="fa-solid fa-plus"></i> <span class="hide-mobile">Medir Clima</span>
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="climate-targets-grid">
+                                <div class="climate-widget-item">
+                                    <span class="lbl"><i class="fa-solid fa-lightbulb"></i> Potencia LED</span>
+                                    <span class="val" id="clim-target-led">--%</span>
+                                    <span class="sub" id="clim-target-dist">-- cm</span>
+                                </div>
+                                <div class="climate-widget-item">
+                                    <span class="lbl"><i class="fa-solid fa-temperature-arrow-up"></i> Temp. Día / Noche</span>
+                                    <span class="val" id="clim-target-temp">-- / -- °C</span>
+                                    <span class="sub">Objetivo</span>
+                                </div>
+                                <div class="climate-widget-item">
+                                    <span class="lbl"><i class="fa-solid fa-droplet"></i> Humedad Rel.</span>
+                                    <span class="val" id="clim-target-hum">--%</span>
+                                    <span class="sub">Objetivo</span>
+                                </div>
+                                <div class="climate-widget-item">
+                                    <span class="lbl"><i class="fa-solid fa-wind"></i> Extractor</span>
+                                    <span class="val" id="clim-target-ext">--%</span>
+                                    <span class="sub" id="clim-target-vpd">VPD: -- kPa</span>
+                                </div>
+                            </div>
+                            <div class="poda-alert-banner" id="poda-banner">
+                                <div class="icon"><i class="fa-solid fa-scissors"></i></div>
+                                <div class="text">
+                                    <strong>Poda / Mantenimiento:</strong>
+                                    <span id="clim-target-poda">Cargando...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Budget / Stock Summary Card -->
+                    <div class="card card-inventory-widget">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fa-solid fa-coins text-yellow"></i> Gasto e Inventario</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="budget-row">
+                                <div class="budget-item">
+                                    <span class="lbl">Gasto Acumulado</span>
+                                    <span class="val text-accent" id="dash-cost-spent">-- €</span>
+                                    <span class="sub">Basado en ml usados</span>
+                                </div>
+                                <div class="budget-item">
+                                    <span class="lbl">Valor Cesta Eurogrow</span>
+                                    <span class="val" id="dash-cost-budget">-- €</span>
+                                    <span class="sub">Formatos completos</span>
+                                </div>
+                            </div>
+                            
+                            <h4 class="recipe-title">Alertas de Stock Bajo:</h4>
+                            <div class="stock-alerts-list" id="dash-stock-alerts">
+                                <!-- Low stock warnings go here -->
+                                <p class="muted-text">Todos los productos en stock adecuado.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+            </section>
+
+            <!-- SECTION: RIEGOS (WATERINGS SCHEDULE) -->
+            <section id="sec-waterings" class="app-section">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-droplet text-blue"></i> Plan de Riegos</h2>
+                    <p class="section-desc">Selecciona un riego para ver su receta o registrar su aplicación real.</p>
+                </div>
+                
+                <div class="watering-filter-tabs">
+                    <button class="filter-tab active" data-filter="all">Todos</button>
+                    <button class="filter-tab" data-filter="Crecimiento">Crecimiento</button>
+                    <button class="filter-tab" data-filter="Floración">Floración</button>
+                    <button class="filter-tab" data-filter="pending">Pendientes</button>
+                </div>
+
+                <div class="watering-timeline" id="watering-list">
+                    <!-- Dynamic List of 36 waterings -->
+                </div>
+            </section>
+
+            <!-- SECTION: CLIMA (CLIMATE LOGS) -->
+            <section id="sec-climate" class="app-section">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-temperature-half text-orange"></i> Registro de Clima</h2>
+                    <p class="section-desc">Registra las mediciones de tu invernadero y compáralas con las dianas climáticas.</p>
+                </div>
+
+                <div class="grid-two-columns">
+                    <!-- Climate Entry Form -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Nueva Medición</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="form-climate" class="form">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="clim-in-date">Fecha y Hora</label>
+                                        <input type="datetime-local" id="clim-in-date" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="clim-in-riego">Riego Cercano</label>
+                                        <select id="clim-in-riego">
+                                            <!-- Dynamically filled with riego indexes -->
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="clim-in-height">Altura Planta (cm)</label>
+                                        <input type="number" step="0.1" id="clim-in-height" placeholder="Ej: 32">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="clim-in-led">Potencia LED (%)</label>
+                                        <input type="number" id="clim-in-led" placeholder="Ej: 60" min="0" max="100">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="clim-in-distance">Distancia Foco (cm)</label>
+                                        <input type="number" id="clim-in-distance" placeholder="Ej: 50">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="clim-in-temp-d">Temp. Día (°C)</label>
+                                        <input type="number" step="0.1" id="clim-in-temp-d" placeholder="Ej: 24.5">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="clim-in-temp-n">Temp. Noche (°C)</label>
+                                        <input type="number" step="0.1" id="clim-in-temp-n" placeholder="Ej: 21.0">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="clim-in-hum">Humedad (%)</label>
+                                        <input type="number" id="clim-in-hum" placeholder="Ej: 55" min="0" max="100">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="clim-in-vpd">VPD (kPa)</label>
+                                        <input type="number" step="0.01" id="clim-in-vpd" placeholder="Ej: 1.1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="clim-in-ext">Extractor (%)</label>
+                                        <input type="number" id="clim-in-ext" placeholder="Ej: 60" min="0" max="100">
+                                    </div>
+                                </div>
+                                <div class="form-group checkbox-group">
+                                    <input type="checkbox" id="clim-in-poda">
+                                    <label for="clim-in-poda">¿Se realizó la poda/defoliación recomendada?</label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="clim-in-notes">Notas / Observaciones</label>
+                                    <textarea id="clim-in-notes" rows="2" placeholder="Comentarios sobre el estado del cultivo, clima..."></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-accent btn-block">Guardar Medición</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Recent Climate Logs List -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Mediciones Recientes</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-container">
+                                <table class="table" id="table-climate-logs">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Riego</th>
+                                            <th>Tº D/N</th>
+                                            <th>Hum.</th>
+                                            <th>VPD</th>
+                                            <th>Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Dynamically populated -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: INVENTARIO (INVENTORY & SHOPPING) -->
+            <section id="sec-inventory" class="app-section">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-coins text-yellow"></i> Inventario de Fertilizantes</h2>
+                    <p class="section-desc">Controla los precios comprados, formatos y el stock restante estimado.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Mis Fertilizantes</h3>
+                        <button id="btn-add-product" class="btn btn-outline btn-sm">
+                            <i class="fa-solid fa-plus"></i> Añadir Producto
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th>Formato</th>
+                                        <th>Precio Compra</th>
+                                        <th>Stock Restante</th>
+                                        <th>Cant. Comprada</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inventory-list">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: HISTORIAL (GRAPHS AND LOGS) -->
+            <section id="sec-history" class="app-section">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-chart-line text-accent"></i> Historial y Gráficos</h2>
+                    <p class="section-desc">Evolución de los parámetros reales del cultivo.</p>
+                </div>
+
+                <!-- Graphs Row -->
+                <div class="graphs-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fa-solid fa-chart-line text-blue"></i> Control de pH y EC</h3>
+                        </div>
+                        <div class="card-body card-graph-body">
+                            <!-- Custom HTML5 Canvas for Graph -->
+                            <canvas id="chart-ph-ec" class="chart-canvas"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fa-solid fa-chart-line text-orange"></i> Temperatura y Humedad</h3>
+                        </div>
+                        <div class="card-body card-graph-body">
+                            <canvas id="chart-temp-hum" class="chart-canvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Completed Waterings Table -->
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div class="card-header">
+                        <h3 class="card-title"><i class="fa-solid fa-droplet text-blue"></i> Histórico de Riegos Aplicados</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table" id="table-completed-waterings">
+                                <thead>
+                                    <tr>
+                                        <th>Riego</th>
+                                        <th>Fecha</th>
+                                        <th>Agua Real (L)</th>
+                                        <th>Plantas</th>
+                                        <th>pH</th>
+                                        <th>EC</th>
+                                        <th>Notas</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Dynamically filled -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Persistent Bottom Navigation for Mobile / Mobile Footer -->
+        <nav class="mobile-nav">
+            <button class="nav-btn active" data-target="sec-dashboard">
+                <i class="fa-solid fa-house"></i>
+                <span>Dashboard</span>
+            </button>
+            <button class="nav-btn" data-target="sec-waterings">
+                <i class="fa-solid fa-droplet"></i>
+                <span>Riegos</span>
+            </button>
+            <button class="nav-btn" data-target="sec-climate">
+                <i class="fa-solid fa-temperature-half"></i>
+                <span>Clima</span>
+            </button>
+            <button class="nav-btn" data-target="sec-inventory">
+                <i class="fa-solid fa-coins"></i>
+                <span>Inventario</span>
+            </button>
+            <button class="nav-btn" data-target="sec-history">
+                <i class="fa-solid fa-chart-line"></i>
+                <span>Gráficos</span>
+            </button>
+        </nav>
+
+        <!-- Sidebar / Navigation for Desktop -->
+        <aside class="desktop-sidebar">
+            <div class="sidebar-logo">
+                <i class="fa-solid fa-leaf text-accent"></i>
+                <h2>Helio<span>Controller</span></h2>
+            </div>
+            <nav class="sidebar-nav">
+                <button class="sidebar-btn active" data-target="sec-dashboard">
+                    <i class="fa-solid fa-house"></i> Dashboard
+                </button>
+                <button class="sidebar-btn" data-target="sec-waterings">
+                    <i class="fa-solid fa-droplet"></i> Plan de Riegos
+                </button>
+                <button class="sidebar-btn" data-target="sec-climate">
+                    <i class="fa-solid fa-temperature-half"></i> Control de Clima
+                </button>
+                <button class="sidebar-btn" data-target="sec-inventory">
+                    <i class="fa-solid fa-coins"></i> Inventario
+                </button>
+                <button class="sidebar-btn" data-target="sec-history">
+                    <i class="fa-solid fa-chart-line"></i> Historial y Gráficos
+                </button>
+            </nav>
+        </aside>
+
+    </div>
+
+    <!-- ==========================================
+    MODALS (VENTANAS MODALES)
+    ========================================== -->
+
+    <!-- Modal: Nuevo Cultivo / Ciclo -->
+    <div id="modal-new-crop" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Nuevo Ciclo de Cultivo</h3>
+                <button class="modal-close btn-close-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="form-new-crop" class="form">
+                    <div class="form-group">
+                        <label for="crop-name">Nombre del Lote / Variedad</label>
+                        <input type="text" id="crop-name" placeholder="Ej: Lote 2 - Blue Zushi" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="crop-start-date">Fecha de Inicio (Día 1)</label>
+                            <input type="date" id="crop-start-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="crop-plants">Nº de Plantas</label>
+                            <input type="number" id="crop-plants" value="84" required min="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="crop-pot-size">Maceta (Litros)</label>
+                            <input type="number" step="0.1" id="crop-pot-size" value="11" required min="0.1">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="crop-notes">Notas del Ciclo</label>
+                        <textarea id="crop-notes" rows="3" placeholder="Detalles de sustrato, esquejes, etc..."></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline btn-close-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-accent">Comenzar Ciclo</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Registrar Riego Realizado -->
+    <div id="modal-log-watering" class="modal-overlay">
+        <div class="modal-card modal-large">
+            <div class="modal-header">
+                <h3>Registrar Riego <span id="log-water-title-num">--</span></h3>
+                <button class="modal-close btn-close-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="form-log-watering" class="form">
+                    <input type="hidden" id="log-water-riego-num">
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="log-water-date">Fecha y Hora de Aplicación</label>
+                            <input type="datetime-local" id="log-water-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="log-water-plants">Plantas al Momento del Riego</label>
+                            <input type="number" id="log-water-plants" required min="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="log-water-liters">Agua Total Preparada (L)</label>
+                            <input type="number" step="0.1" id="log-water-liters" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="log-water-ph">pH Final Medido</label>
+                            <input type="number" step="0.01" id="log-water-ph" placeholder="Ej: 6.2">
+                        </div>
+                        <div class="form-group">
+                            <label for="log-water-ec">EC Final Medida (mS/cm)</label>
+                            <input type="number" step="0.01" id="log-water-ec" placeholder="Ej: 1.4">
+                        </div>
+                    </div>
+
+                    <h4 class="modal-section-title">Fertilizantes Aplicados (Dosis totales en ml o g)</h4>
+                    <div class="nutrients-input-grid">
+                        <div class="nut-input-group">
+                            <label for="log-nut-silica">Silica Power (ml)</label>
+                            <input type="number" step="0.01" id="log-nut-silica" value="0">
+                            <span class="target-val" id="target-nut-silica">Objetivo: -- ml</span>
+                        </div>
+                        <div class="nut-input-group">
+                            <label for="log-nut-calmag">Calmag Atami (ml)</label>
+                            <input type="number" step="0.01" id="log-nut-calmag" value="0">
+                            <span class="target-val" id="target-nut-calmag">Objetivo: -- ml</span>
+                        </div>
+                        <div class="nut-input-group">
+                            <label for="log-nut-micro">Jungle Juice Micro (ml)</label>
+                            <input type="number" step="0.01" id="log-nut-micro" value="0">
+                            <span class="target-val" id="target-nut-micro">Objetivo: -- ml</span>
+                        </div>
+                        <div class="nut-input-group">
+                            <label for="log-nut-grow">Jungle Juice Grow (ml)</label>
+                            <input type="number" step="0.01" id="log-nut-grow" value="0">
+                            <span class="target-val" id="target-nut-grow">Objetivo: -- ml</span>
+                        </div>
+                        <div class="nut-input-group">
+                            <label for="log-nut-bloom">Jungle Juice Bloom (ml)</label>
+                            <input type="number" step="0.01" id="log-nut-bloom" value="0">
+                            <span class="target-val" id="target-nut-bloom">Objetivo: -- ml</span>
+                        </div>
+                        <div class="nut-input-group">
+                            <label for="log-nut-voodoo">Voodoo Juice (ml)</label>
+                            <input type="number" step="0.01" id="log-nut-voodoo" value="0">
+                            <span class="target-val" id="target-nut-voodoo">Objetivo: -- ml</span>
+                        </div>
+                        <div class="nut-input-group">
+                            <label for="log-nut-candy">Bud Candy (ml)</label>
+                            <input type="number" step="0.01" id="log-nut-candy" value="0">
+                            <span class="target-val" id="target-nut-candy">Objetivo: -- ml</span>
+                        </div>
+                        <div class="nut-input-group">
+                            <label for="log-nut-bigbud">Big Bud Liquid (ml)</label>
+                            <input type="number" step="0.01" id="log-nut-bigbud" value="0">
+                            <span class="target-val" id="target-nut-bigbud">Objetivo: -- ml</span>
+                        </div>
+                        <div class="nut-input-group">
+                            <label for="log-nut-monster">Monster Bloom (g)</label>
+                            <input type="number" step="0.01" id="log-nut-monster" value="0">
+                            <span class="target-val" id="target-nut-monster">Objetivo: -- g</span>
+                        </div>
+                        <div class="nut-input-group">
+                            <label for="log-nut-bac">BAC F1 Booster (g)</label>
+                            <input type="number" step="0.01" id="log-nut-bac" value="0">
+                            <span class="target-val" id="target-nut-bac">Objetivo: -- g</span>
+                        </div>
+                        <div class="nut-input-group">
+                            <label for="log-nut-enzymes">Enzimas (ml)</label>
+                            <input type="number" step="0.01" id="log-nut-enzymes" value="0">
+                            <span class="target-val" id="target-nut-enzymes">Objetivo: -- ml</span>
+                        </div>
+                        <div class="nut-input-group">
+                            <label for="log-nut-flawless">Flawless Finish (ml)</label>
+                            <input type="number" step="0.01" id="log-nut-flawless" value="0">
+                            <span class="target-val" id="target-nut-flawless">Objetivo: -- ml</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label for="log-water-notes">Notas / Observaciones del Riego</label>
+                        <textarea id="log-water-notes" rows="2" placeholder="Comentarios sobre la reacción de las plantas, color, drenaje..."></textarea>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline btn-close-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-accent">Guardar Riego</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Cultivo -->
+    <div id="modal-edit-crop" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Editar Cultivo Activo</h3>
+                <button class="modal-close btn-close-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="form-edit-crop" class="form">
+                    <div class="form-group">
+                        <label for="edit-crop-name">Nombre del Lote / Variedad</label>
+                        <input type="text" id="edit-crop-name" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-crop-start-date">Fecha de Inicio (Día 1)</label>
+                            <input type="date" id="edit-crop-start-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-crop-plants">Nº de Plantas</label>
+                            <input type="number" id="edit-crop-plants" required min="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-crop-pot-size">Maceta (Litros)</label>
+                            <input type="number" step="0.1" id="edit-crop-pot-size" required min="0.1">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-crop-notes">Notas del Ciclo</label>
+                        <textarea id="edit-crop-notes" rows="3"></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline btn-close-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-accent">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Producto Inventario -->
+    <div id="modal-edit-inventory" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Editar Producto: <span id="edit-inv-title">--</span></h3>
+                <button class="modal-close btn-close-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="form-edit-inventory" class="form">
+                    <input type="hidden" id="edit-inv-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-inv-price">Precio Compra (€)</label>
+                            <input type="number" step="0.01" id="edit-inv-price" required min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-inv-format">Formato de Envase (ml o g)</label>
+                            <input type="number" id="edit-inv-format" required min="1">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-inv-qty">Cantidad Comprada</label>
+                            <input type="number" step="0.1" id="edit-inv-qty" required min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-inv-stock">Stock Actual en Mililitros/Gramos</label>
+                            <input type="number" step="0.1" id="edit-inv-stock" required min="0">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline btn-close-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-accent">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "helio-controller",
+  "version": "1.0.0",
+  "description": "Control de cultivo interior de cannabis para Home Assistant",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  },
+  "author": "Antigravity",
+  "license": "MIT"
+}
