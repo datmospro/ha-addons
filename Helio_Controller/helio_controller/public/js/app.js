@@ -70,6 +70,71 @@ function calculateLeafVPD(roomTemp, relativeHumidity) {
     return Math.max(0, Number(vpd.toFixed(2)));
 }
 
+function setupBackupControls() {
+    const btnExport = document.getElementById("btn-export-backup");
+    const btnImport = document.getElementById("btn-import-backup");
+
+    if (btnExport) {
+        btnExport.addEventListener("click", async () => {
+            try {
+                const res = await fetch("api/backup/export");
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "heliocontroller_backup.db";
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    alert("Error al exportar la base de datos.");
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Error de conexión al exportar.");
+            }
+        });
+    }
+
+    if (btnImport) {
+        btnImport.addEventListener("click", () => {
+            const fileInput = document.createElement("input");
+            fileInput.type = "file";
+            fileInput.accept = ".db";
+            fileInput.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const confirmImport = confirm("¿Estás seguro de que deseas importar esta base de datos?\nSe sobrescribirán todos los datos de cultivos, riegos e inventario actuales, y el complemento se reiniciará automáticamente.");
+                if (!confirmImport) return;
+
+                try {
+                    const res = await fetch("api/backup/import", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/octet-stream" },
+                        body: file
+                    });
+                    if (res.ok) {
+                        alert("Copia de seguridad importada con éxito. El complemento se está reiniciando, la aplicación se recargará en 5 segundos...");
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 5000);
+                    } else {
+                        const data = await res.json();
+                        alert("Error al importar: " + data.error);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert("Error de conexión al importar la base de datos.");
+                }
+            };
+            fileInput.click();
+        });
+    }
+}
+
 // Initialize Application
 document.addEventListener("DOMContentLoaded", () => {
     setupNavigation();
@@ -79,6 +144,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setupInventorySection();
     setupModals();
     setupVpdWidget();
+    setupBackupControls();
     
     // Initial fetch
     fetchCrops();

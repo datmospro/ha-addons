@@ -669,6 +669,43 @@ app.delete('/api/inventory/:id', (req, res) => {
   }
 });
 
+// Export database backup
+app.get('/api/backup/export', (req, res) => {
+  const dbPath = process.env.DB_PATH || (fs.existsSync('/data') ? '/data/heliocontroller.db' : path.join(__dirname, 'heliocontroller.db'));
+  if (fs.existsSync(dbPath)) {
+    res.download(dbPath, 'heliocontroller_backup.db');
+  } else {
+    res.status(404).json({ error: "Database file not found" });
+  }
+});
+
+// Import database backup
+app.post('/api/backup/import', express.raw({ type: 'application/octet-stream', limit: '50mb' }), (req, res) => {
+  try {
+    const dbPath = process.env.DB_PATH || (fs.existsSync('/data') ? '/data/heliocontroller.db' : path.join(__dirname, 'heliocontroller.db'));
+    
+    if (!req.body || req.body.length === 0) {
+      return res.status(400).json({ error: "Empty database file" });
+    }
+    
+    // Close current connection
+    db.close();
+    
+    // Overwrite database file
+    fs.writeFileSync(dbPath, req.body);
+    
+    res.json({ success: true, message: "Backup importado correctamente. El addon se reiniciará en unos segundos." });
+    
+    // Restart the process to re-open the database
+    setTimeout(() => {
+      console.log("Restarting server after backup import...");
+      process.exit(0);
+    }, 1000);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Start Express Server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`==================================================`);

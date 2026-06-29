@@ -522,6 +522,26 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Card: Copia de Seguridad -->
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div class="card-header">
+                        <h3 class="card-title"><i class="fa-solid fa-database text-accent"></i> Copias de Seguridad (Backup)</h3>
+                    </div>
+                    <div class="card-body" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+                        <p style="font-size: 0.875rem; color: var(--text-secondary); margin: 0; flex: 1 1 300px;">
+                            Descarga una copia completa de tu base de datos SQLite para resguardar tus datos de cultivos, riegos, clima e inventario. También puedes restaurar una copia previa en caso de reinstalación.
+                        </p>
+                        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                            <button type="button" id="btn-export-backup" class="btn btn-accent" style="display: flex; align-items: center; gap: 0.5rem;">
+                                <i class="fa-solid fa-download"></i> Exportar / Descargar Base de Datos
+                            </button>
+                            <button type="button" id="btn-import-backup" class="btn btn-outline" style="display: flex; align-items: center; gap: 0.5rem;">
+                                <i class="fa-solid fa-upload"></i> Importar / Restaurar Base de Datos
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </section>
 
         </main>
