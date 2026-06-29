@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const { db, initDb } = require('./database');
+const { db, initDb, seedTemplatesForCrop } = require('./database');
 
 const app = express();
 app.use(cors());
@@ -40,14 +40,15 @@ app.get('/api/crops', (req, res) => {
 
 // Create new crop (archives current active ones)
 app.post('/api/crops', (req, res) => {
-  const { name, start_date, num_plants, pot_size_l, notes } = req.body;
+  const { name, start_date, num_plants, pot_size_l, notes, template_crop_id } = req.body;
   if (!name || !start_date) {
     return res.status(400).json({ error: "Name and start date are required" });
   }
 
   try {
-    // 1. Archive active crops
-    db.exec("UPDATE crops SET status = 'archived' WHERE status = 'active'");
+    // 1. Archive active crops and set end_date if null
+    const todayStr = new Date().toISOString().split('T')[0];
+    db.prepare("UPDATE crops SET status = 'archived', end_date = COALESCE(end_date, ?) WHERE status = 'active'").run(todayStr);
 
     // 2. Create new active crop
     const stmt = db.prepare(`
@@ -55,8 +56,43 @@ app.post('/api/crops', (req, res) => {
       VALUES (?, ?, 'active', ?, ?, ?)
     `);
     const result = stmt.run(name, start_date, num_plants || 84, pot_size_l || 11.0, notes || '');
+    const newCropId = result.lastInsertRowid;
+
+    // 3. Clone templates or seed defaults
+    if (template_crop_id) {
+      // Copy watering templates from previous crop
+      db.prepare(`
+        INSERT INTO watering_templates (
+          crop_id, riego_num, phase, week, type, water_per_plant,
+          silica_power, calmag, jj_micro, jj_grow, jj_bloom,
+          voodoo_juice, bud_candy, big_bud, monster_bloom, bac_f1,
+          enzymes, flawless_finish
+        )
+        SELECT ?, riego_num, phase, week, type, water_per_plant,
+               silica_power, calmag, jj_micro, jj_grow, jj_bloom,
+               voodoo_juice, bud_candy, big_bud, monster_bloom, bac_f1,
+               enzymes, flawless_finish
+        FROM watering_templates
+        WHERE crop_id = ?
+      `).run(newCropId, template_crop_id);
+
+      // Copy climate templates from previous crop
+      db.prepare(`
+        INSERT INTO climate_templates (
+          crop_id, riego_num, height_min, height_max, led_power, light_distance,
+          temp_day, temp_night, humidity, vpd, extractor, poda_info
+        )
+        SELECT ?, riego_num, height_min, height_max, led_power, light_distance,
+               temp_day, temp_night, humidity, vpd, extractor, poda_info
+        FROM climate_templates
+        WHERE crop_id = ?
+      `).run(newCropId, template_crop_id);
+    } else {
+      // Seed default templates
+      seedTemplatesForCrop(newCropId);
+    }
     
-    res.status(201).json({ id: result.lastInsertRowid, name, start_date, status: 'active' });
+    res.status(201).json({ id: newCropId, name, start_date, status: 'active' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -122,9 +158,9 @@ app.get('/api/crops/:id/schedule', (req, res) => {
     const crop = db.prepare("SELECT * FROM crops WHERE id = ?").get(id);
     if (!crop) return res.status(404).json({ error: "Crop not found" });
 
-    const templates = db.prepare("SELECT * FROM watering_templates ORDER BY riego_num ASC").all();
+    const templates = db.prepare("SELECT * FROM watering_templates WHERE crop_id = ? ORDER BY riego_num ASC").all(id);
     const completed = db.prepare("SELECT * FROM completed_waterings WHERE crop_id = ?").all(id);
-    const climates = db.prepare("SELECT * FROM climate_templates").all();
+    const climates = db.prepare("SELECT * FROM climate_templates WHERE crop_id = ?").all(id);
 
     const completedMap = {};
     completed.forEach(cw => {

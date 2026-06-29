@@ -4,6 +4,7 @@ let currentCrop = null;
 let fullSchedule = [];
 let inventory = [];
 let climateLogs = [];
+let cropsList = [];
 let activeSection = "sec-dashboard";
 let vpdMode = 'auto';
 
@@ -131,16 +132,37 @@ function setupCropManagement() {
         }
     });
 
+    // Auto-fill template values
+    const templateSelector = document.getElementById("crop-template");
+    templateSelector.addEventListener("change", () => {
+        const val = templateSelector.value;
+        if (val) {
+            const templateCrop = cropsList.find(c => c.id == val);
+            if (templateCrop) {
+                document.getElementById("crop-plants").value = templateCrop.num_plants;
+                document.getElementById("crop-pot-size").value = templateCrop.pot_size_l;
+                document.getElementById("crop-notes").value = `Copiado de la plantilla "${templateCrop.name}".`;
+            }
+        } else {
+            // Reset to defaults
+            document.getElementById("crop-plants").value = 84;
+            document.getElementById("crop-pot-size").value = 11;
+            document.getElementById("crop-notes").value = "";
+        }
+    });
+
     // New crop form submit
     const formNewCrop = document.getElementById("form-new-crop");
     formNewCrop.addEventListener("submit", async (e) => {
         e.preventDefault();
+        const templateId = document.getElementById("crop-template").value;
         const body = {
             name: document.getElementById("crop-name").value,
             start_date: document.getElementById("crop-start-date").value,
             num_plants: parseInt(document.getElementById("crop-plants").value),
             pot_size_l: parseFloat(document.getElementById("crop-pot-size").value),
-            notes: document.getElementById("crop-notes").value
+            notes: document.getElementById("crop-notes").value,
+            template_crop_id: templateId ? parseInt(templateId) : null
         };
 
         try {
@@ -223,6 +245,7 @@ async function fetchCrops() {
     try {
         const res = await fetch('/api/crops');
         const data = await res.json();
+        cropsList = data;
         populateCropsDropdown(data);
         
         // Find active crop or select first one
@@ -241,6 +264,7 @@ async function fetchCropsDropdownOnly() {
     try {
         const res = await fetch('/api/crops');
         const data = await res.json();
+        cropsList = data;
         populateCropsDropdown(data);
         document.getElementById("crop-selector").value = currentCropId;
     } catch (err) {
@@ -1373,6 +1397,19 @@ function setupModals() {
         const inputStart = document.getElementById("crop-start-date");
         // default start date to today's date
         inputStart.value = new Date().toISOString().split('T')[0];
+        
+        // Populate templates dropdown in modal
+        const templateSelector = document.getElementById("crop-template");
+        if (templateSelector) {
+            templateSelector.innerHTML = '<option value="">-- Empezar de Cero (Plantilla Predeterminada) --</option>';
+            cropsList.forEach(c => {
+                const opt = document.createElement("option");
+                opt.value = c.id;
+                opt.textContent = `${c.name} (${c.status === 'active' ? 'Activo' : 'Archivado'})`;
+                templateSelector.appendChild(opt);
+            });
+        }
+        
         openModal("modal-new-crop");
     });
 }

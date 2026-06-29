@@ -15,6 +15,28 @@ console.log(`Initializing database at: ${dbPath}`);
 const db = new DatabaseSync(dbPath);
 
 function initDb() {
+  // 1. Run migrations if necessary to convert watering/climate templates to per-crop
+  let runMigration = false;
+  try {
+    const info = db.prepare("PRAGMA table_info(watering_templates)").all();
+    const hasCropId = info.some(col => col.name === 'crop_id');
+    if (!hasCropId) {
+      runMigration = true;
+    }
+  } catch (err) {
+    // Table doesn't exist, no migration needed
+  }
+
+  if (runMigration) {
+    console.log("Migrating database tables to support per-crop templates...");
+    try {
+      db.exec("DROP TABLE IF EXISTS watering_templates");
+      db.exec("DROP TABLE IF EXISTS climate_templates");
+    } catch (e) {
+      console.error("Migration drop tables error:", e);
+    }
+  }
+
   // 1. Crops table
   db.exec(`
     CREATE TABLE IF NOT EXISTS crops (
@@ -29,10 +51,11 @@ function initDb() {
     )
   `);
 
-  // 2. Watering templates (ratios and per-plant amounts)
+  // 2. Watering templates (ratios and per-plant amounts, per crop)
   db.exec(`
     CREATE TABLE IF NOT EXISTS watering_templates (
-      riego_num REAL PRIMARY KEY,
+      crop_id INTEGER,
+      riego_num REAL,
       phase TEXT NOT NULL CHECK(phase IN ('Crecimiento', 'Floración')),
       week INTEGER NOT NULL,
       type TEXT NOT NULL CHECK(type IN ('Abono', 'Mant.', 'Lavado 1', 'Lavado 2', 'Secado')),
@@ -48,14 +71,17 @@ function initDb() {
       monster_bloom REAL NOT NULL DEFAULT 0.0, -- g or ml per Liter
       bac_f1 REAL NOT NULL DEFAULT 0.0, -- g or ml per Liter
       enzymes REAL NOT NULL DEFAULT 0.0,
-      flawless_finish REAL NOT NULL DEFAULT 0.0
+      flawless_finish REAL NOT NULL DEFAULT 0.0,
+      PRIMARY KEY (crop_id, riego_num),
+      FOREIGN KEY (crop_id) REFERENCES crops(id) ON DELETE CASCADE
     )
   `);
 
-  // 3. Climate templates
+  // 3. Climate templates (per crop)
   db.exec(`
     CREATE TABLE IF NOT EXISTS climate_templates (
-      riego_num REAL PRIMARY KEY,
+      crop_id INTEGER,
+      riego_num REAL,
       height_min REAL,
       height_max REAL,
       led_power REAL NOT NULL, -- 0.0 to 1.0 (e.g. 0.3 for 30%)
@@ -65,7 +91,9 @@ function initDb() {
       humidity INTEGER NOT NULL, -- %
       vpd REAL NOT NULL, -- kPa
       extractor REAL NOT NULL, -- 0.0 to 1.0
-      poda_info TEXT
+      poda_info TEXT,
+      PRIMARY KEY (crop_id, riego_num),
+      FOREIGN KEY (crop_id) REFERENCES crops(id) ON DELETE CASCADE
     )
   `);
 
@@ -130,26 +158,37 @@ function initDb() {
     )
   `);
 
-  // Seed default templates if empty
-  seedTemplates();
+  // Seed default inventory and initial crops
   seedInventory();
   seedInitialCrop();
+
+  // If we just migrated, we need to populate templates for existing crops
+  if (runMigration) {
+    try {
+      const crops = db.prepare("SELECT id FROM crops").all();
+      crops.forEach(c => {
+        const count = db.prepare("SELECT COUNT(*) as count FROM watering_templates WHERE crop_id = ?").get(c.id);
+        if (count.count === 0) {
+          seedTemplatesForCrop(c.id);
+        }
+      });
+    } catch (err) {
+      console.error("Migration seeding error:", err);
+    }
+  }
 }
 
-function seedTemplates() {
-  const rowCount = db.prepare("SELECT COUNT(*) as count FROM watering_templates").get();
-  if (rowCount.count > 0) return;
-
-  console.log("Seeding default watering and climate templates from Excel...");
+function seedTemplatesForCrop(cropId) {
+  console.log(`Seeding default watering and climate templates from Excel for crop ID ${cropId}...`);
 
   const insertWatering = db.prepare(`
     INSERT INTO watering_templates (
-      riego_num, phase, week, type, water_per_plant,
+      crop_id, riego_num, phase, week, type, water_per_plant,
       silica_power, calmag, jj_micro, jj_grow, jj_bloom,
       voodoo_juice, bud_candy, big_bud, monster_bloom, bac_f1,
       enzymes, flawless_finish
     ) VALUES (
-      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?, ?
@@ -158,10 +197,10 @@ function seedTemplates() {
 
   const insertClimate = db.prepare(`
     INSERT INTO climate_templates (
-      riego_num, height_min, height_max, led_power, light_distance,
+      crop_id, riego_num, height_min, height_max, led_power, light_distance,
       temp_day, temp_night, humidity, vpd, extractor, poda_info
     ) VALUES (
-      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?
     )
@@ -239,7 +278,7 @@ function seedTemplates() {
 
   for (const r of schedule) {
     insertWatering.run(
-      r.r, r.ph, r.w, r.type, r.water,
+      cropId, r.r, r.ph, r.w, r.type, r.water,
       r.silica, r.cal, r.micro, r.grow, r.bloom,
       r.voodoo, r.candy, r.big, r.monster, r.bac,
       r.enz, r.flawless
@@ -298,7 +337,7 @@ function seedTemplates() {
 
   for (const c of climate) {
     insertClimate.run(
-      c.r, c.h_min, c.h_max, c.led, c.dist,
+      cropId, c.r, c.h_min, c.h_max, c.led, c.dist,
       c.temp_d, c.temp_n, c.hum, c.vpd, c.ext,
       c.podas
     );
@@ -351,7 +390,7 @@ function seedInitialCrop() {
   // Format today as YYYY-MM-DD
   const today = new Date().toISOString().split('T')[0];
   
-  insertCrop.run(
+  const result = insertCrop.run(
     "Lote Inicial Helio V3 - Blue Zushi",
     today,
     "active",
@@ -359,9 +398,13 @@ function seedInitialCrop() {
     11.0,
     "Primer ciclo importado del Excel de cultivo indoor. Macetas de 11L con tierra Light-Mix y agua desmineralizada de aire acondicionado."
   );
+
+  // Seed templates for this initial crop
+  seedTemplatesForCrop(result.lastInsertRowid);
 }
 
 module.exports = {
   db,
-  initDb
+  initDb,
+  seedTemplatesForCrop
 };
