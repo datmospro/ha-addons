@@ -597,7 +597,7 @@ app.post('/api/inventory', (req, res) => {
 });
 
 // Start Express Server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`==================================================`);
   console.log(` HelioController Server running on port ${PORT}`);
   console.log(`==================================================`);
