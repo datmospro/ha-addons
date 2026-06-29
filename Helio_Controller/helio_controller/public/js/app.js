@@ -124,13 +124,20 @@ function setupNavigation() {
 // ==========================================
 function setupCropManagement() {
     const selector = document.getElementById("crop-selector");
+    const selectorDesktop = document.getElementById("crop-selector-desktop");
     
-    selector.addEventListener("change", (e) => {
-        currentCropId = selector.value;
+    const handleCropChange = (e) => {
+        const val = e.target.value;
+        currentCropId = val;
+        if (selector) selector.value = val;
+        if (selectorDesktop) selectorDesktop.value = val;
         if (currentCropId) {
             loadCropData(currentCropId);
         }
-    });
+    };
+
+    if (selector) selector.addEventListener("change", handleCropChange);
+    if (selectorDesktop) selectorDesktop.addEventListener("change", handleCropChange);
 
     // Auto-fill template values
     const templateSelector = document.getElementById("crop-template");
@@ -252,7 +259,10 @@ async function fetchCrops() {
         if (data.length > 0) {
             const active = data.find(c => c.status === 'active') || data[0];
             currentCropId = active.id;
-            document.getElementById("crop-selector").value = currentCropId;
+            const sel = document.getElementById("crop-selector");
+            const selD = document.getElementById("crop-selector-desktop");
+            if (sel) sel.value = currentCropId;
+            if (selD) selD.value = currentCropId;
             await loadCropData(currentCropId);
         }
     } catch (err) {
@@ -266,7 +276,10 @@ async function fetchCropsDropdownOnly() {
         const data = await res.json();
         cropsList = data;
         populateCropsDropdown(data);
-        document.getElementById("crop-selector").value = currentCropId;
+        const sel = document.getElementById("crop-selector");
+        const selD = document.getElementById("crop-selector-desktop");
+        if (sel) sel.value = currentCropId;
+        if (selD) selD.value = currentCropId;
     } catch (err) {
         console.error("Error updating crops dropdown:", err);
     }
@@ -274,13 +287,27 @@ async function fetchCropsDropdownOnly() {
 
 function populateCropsDropdown(crops) {
     const selector = document.getElementById("crop-selector");
-    selector.innerHTML = "";
-    crops.forEach(c => {
-        const opt = document.createElement("option");
-        opt.value = c.id;
-        opt.textContent = `${c.name} (${c.status === 'active' ? 'Activo' : 'Archivado'})`;
-        selector.appendChild(opt);
-    });
+    const selectorDesktop = document.getElementById("crop-selector-desktop");
+    
+    if (selector) {
+        selector.innerHTML = "";
+        crops.forEach(c => {
+            const opt = document.createElement("option");
+            opt.value = c.id;
+            opt.textContent = `${c.name} (${c.status === 'active' ? 'Activo' : 'Archivado'})`;
+            selector.appendChild(opt);
+        });
+    }
+
+    if (selectorDesktop) {
+        selectorDesktop.innerHTML = "";
+        crops.forEach(c => {
+            const opt = document.createElement("option");
+            opt.value = c.id;
+            opt.textContent = `${c.name} (${c.status === 'active' ? 'Activo' : 'Archivado'})`;
+            selectorDesktop.appendChild(opt);
+        });
+    }
 }
 
 async function loadCropData(id) {
@@ -1393,7 +1420,7 @@ function setupModals() {
     });
 
     // Open new crop modal
-    document.getElementById("btn-new-crop").addEventListener("click", () => {
+    const handleNewCropOpen = () => {
         const inputStart = document.getElementById("crop-start-date");
         // default start date to today's date
         inputStart.value = new Date().toISOString().split('T')[0];
@@ -1411,7 +1438,12 @@ function setupModals() {
         }
         
         openModal("modal-new-crop");
-    });
+    };
+
+    const btnNew = document.getElementById("btn-new-crop");
+    const btnNewD = document.getElementById("btn-new-crop-desktop");
+    if (btnNew) btnNew.addEventListener("click", handleNewCropOpen);
+    if (btnNewD) btnNewD.addEventListener("click", handleNewCropOpen);
 }
 
 function openModal(modalId) {

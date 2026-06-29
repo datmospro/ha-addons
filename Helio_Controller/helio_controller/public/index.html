@@ -556,6 +556,21 @@
                 <i class="fa-solid fa-leaf text-accent"></i>
                 <h2>Helio<span>Controller</span></h2>
             </div>
+            
+            <!-- Desktop Crop Selector & New Crop Action -->
+            <div class="desktop-crop-actions" style="margin-top: 1rem; margin-bottom: 2rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                <label style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600;">Ciclo Activo</label>
+                <div class="crop-select-wrapper" style="width: 100%; box-sizing: border-box; display: flex; align-items: center; padding: 0.5rem 0.75rem; background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px;">
+                    <i class="fa-solid fa-seedling" style="color: var(--accent); margin-right: 0.5rem;"></i>
+                    <select id="crop-selector-desktop" class="crop-select" style="width: 100%; background: transparent; border: none; color: var(--text-primary); cursor: pointer; outline: none; font-family: var(--font-sans); font-size: 0.875rem;">
+                        <!-- Dynamically populated -->
+                    </select>
+                </div>
+                <button id="btn-new-crop-desktop" class="btn btn-primary btn-sm" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; height: 36px; border-radius: 8px;">
+                    <i class="fa-solid fa-plus"></i> <span>Nuevo Ciclo</span>
+                </button>
+            </div>
+
             <nav class="sidebar-nav">
                 <button class="sidebar-btn active" data-target="sec-dashboard">
                     <i class="fa-solid fa-house"></i> Dashboard
