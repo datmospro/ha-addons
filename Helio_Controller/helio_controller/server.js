@@ -123,7 +123,7 @@ app.get('/api/crops/:id/schedule', (req, res) => {
     if (!crop) return res.status(404).json({ error: "Crop not found" });
 
     const templates = db.prepare("SELECT * FROM watering_templates ORDER BY riego_num ASC").all();
-    const completed = db.prepare("SELECT * FROM completed_waterings WHERE crop_id = ?").all();
+    const completed = db.prepare("SELECT * FROM completed_waterings WHERE crop_id = ?").all(id);
     const climates = db.prepare("SELECT * FROM climate_templates").all();
 
     const completedMap = {};
@@ -591,6 +591,18 @@ app.post('/api/inventory', (req, res) => {
       stock_ml || 0.0
     );
     res.status(201).json({ id: result.lastInsertRowid, name, message: "Inventory product added." });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete inventory item
+app.delete('/api/inventory/:id', (req, res) => {
+  const { id } = req.params;
+  try {
+    const stmt = db.prepare("DELETE FROM inventory WHERE id = ?");
+    stmt.run(id);
+    res.json({ message: "Inventory item deleted successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

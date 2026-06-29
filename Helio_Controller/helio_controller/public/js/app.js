@@ -886,6 +886,9 @@ function renderInventoryList() {
                 <button class="btn btn-outline btn-sm" onclick="openEditInventoryModal(${item.id})">
                     <i class="fa-solid fa-pen-to-square"></i> <span class="hide-mobile">Editar</span>
                 </button>
+                <button class="btn btn-outline btn-sm" style="color: var(--red); border-color: rgba(239, 68, 68, 0.2);" onclick="deleteInventoryItem(${item.id})">
+                    <i class="fa-solid fa-trash"></i> <span class="hide-mobile">Eliminar</span>
+                </button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -904,6 +907,23 @@ function openEditInventoryModal(itemId) {
     document.getElementById("edit-inv-stock").value = item.stock_ml;
 
     openModal("modal-edit-inventory");
+}
+
+async function deleteInventoryItem(itemId) {
+    if (!confirm("¿Seguro que deseas eliminar este producto del inventario?")) return;
+    try {
+        const res = await fetch(`/api/inventory/${itemId}`, {
+            method: 'DELETE'
+        });
+        if (res.ok) {
+            await fetchInventory();
+        } else {
+            const data = await res.json();
+            alert("Error al eliminar: " + data.error);
+        }
+    } catch (err) {
+        console.error(err);
+    }
 }
 
 // ==========================================
