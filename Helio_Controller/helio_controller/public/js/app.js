@@ -5,6 +5,7 @@ let fullSchedule = [];
 let inventory = [];
 let climateLogs = [];
 let activeSection = "sec-dashboard";
+let vpdMode = 'auto';
 
 // Helper: Format Dates
 function formatDate(dateStr) {
@@ -419,78 +420,8 @@ function updateDashboard() {
         document.getElementById("poda-banner").style.display = "none";
     }
     
-    // VPD Widget update logic
-    let stageName = "Desconocida";
-    let vpdMinRange = 0.4;
-    let vpdMaxRange = 0.8;
-    
-    if (nextWatering) {
-        if (nextWatering.phase === 'Crecimiento') {
-            if (nextWatering.week === 1) {
-                stageName = "Crecimiento Temprano (Semana 1)";
-                vpdMinRange = 0.4;
-                vpdMaxRange = 0.8;
-            } else {
-                stageName = "Crecimiento Tardío (Semana 2)";
-                vpdMinRange = 0.8;
-                vpdMaxRange = 1.2;
-            }
-        } else { // Floración
-            if (nextWatering.week <= 2) {
-                stageName = "Floración Temprana (Semanas 1-2)";
-                vpdMinRange = 0.8;
-                vpdMaxRange = 1.2;
-            } else {
-                stageName = "Floración Media / Tardía (Semanas 3-8)";
-                vpdMinRange = 1.2;
-                vpdMaxRange = 1.6;
-            }
-        }
-    }
-    
-    const targetVPD = nextWatering && nextWatering.climate_targets ? nextWatering.climate_targets.vpd : null;
-    
-    // Find latest climate log with VPD or enough data to calculate it
-    const latestClimateLog = climateLogs.find(log => log.vpd !== null || (log.temp_day !== null && log.humidity !== null));
-    let currentVPD = null;
-    if (latestClimateLog) {
-        if (latestClimateLog.vpd !== null) {
-            currentVPD = latestClimateLog.vpd;
-        } else {
-            currentVPD = calculateLeafVPD(latestClimateLog.temp_day, latestClimateLog.humidity);
-        }
-    }
-    
-    const vpdValEl = document.getElementById("vpd-current-val");
-    const vpdTgtEl = document.getElementById("vpd-target-val");
-    const vpdRngEl = document.getElementById("vpd-target-range");
-    const vpdStgEl = document.getElementById("vpd-stage-text");
-    const vpdBdgEl = document.getElementById("vpd-status-badge");
-    
-    if (currentVPD !== null) {
-        vpdValEl.textContent = currentVPD.toFixed(2);
-        
-        // Status evaluation
-        vpdBdgEl.className = "badge";
-        if (currentVPD >= vpdMinRange && currentVPD <= vpdMaxRange) {
-            vpdBdgEl.textContent = "Óptimo";
-            vpdBdgEl.classList.add("badge-optimal");
-        } else if (currentVPD >= (vpdMinRange - 0.15) && currentVPD <= (vpdMaxRange + 0.15)) {
-            vpdBdgEl.textContent = "Aceptable";
-            vpdBdgEl.classList.add("badge-acceptable");
-        } else {
-            vpdBdgEl.textContent = "Peligro";
-            vpdBdgEl.classList.add("badge-danger");
-        }
-    } else {
-        vpdValEl.textContent = "--";
-        vpdBdgEl.className = "badge badge-outline";
-        vpdBdgEl.textContent = "Sin Datos";
-    }
-    
-    vpdTgtEl.textContent = targetVPD ? `${targetVPD.toFixed(2)} kPa` : "-- kPa";
-    vpdRngEl.textContent = `${vpdMinRange.toFixed(1)} - ${vpdMaxRange.toFixed(1)} kPa`;
-    vpdStgEl.innerHTML = `<strong>Etapa de Cultivo Actual:</strong> ${stageName}<br><span class="muted-text">Ajusta tu deshumidificador o extractor para mantenerte en el rango recomendado de esta fase.</span>`;
+    // Update VPD widget display
+    updateDashboardVPD();
 
     // Costspent calculation
     updateFinancialSummary();
@@ -1457,17 +1388,221 @@ function closeAllModals() {
 }
 
 function setupVpdWidget() {
-    const btn = document.getElementById("btn-toggle-vpd-chart");
+    const btnChart = document.getElementById("btn-toggle-vpd-chart");
     const drawer = document.getElementById("vpd-drawer");
-    if (!btn || !drawer) return;
+    if (btnChart && drawer) {
+        btnChart.addEventListener("click", () => {
+            if (drawer.style.display === "none") {
+                drawer.style.display = "block";
+                btnChart.innerHTML = `<i class="fa-solid fa-eye-slash"></i> Ocultar Tablas de Referencia VPD`;
+            } else {
+                drawer.style.display = "none";
+                btnChart.innerHTML = `<i class="fa-solid fa-image"></i> Ver Tablas de Referencia VPD`;
+            }
+        });
+    }
+
+    // Toggle auto / manual mode
+    const btnAuto = document.getElementById("btn-vpd-mode-auto");
+    const btnManual = document.getElementById("btn-vpd-mode-manual");
+    const autoComp = document.getElementById("vpd-auto-comparison");
+    const manualCtrl = document.getElementById("vpd-manual-controls");
+    const targetPhaseContainer = document.getElementById("vpd-target-phase-container");
+
+    if (btnAuto && btnManual) {
+        btnAuto.addEventListener("click", () => {
+            vpdMode = 'auto';
+            btnAuto.classList.add("active");
+            btnManual.classList.remove("active");
+            
+            // Styles
+            btnAuto.style.background = "var(--accent)";
+            btnAuto.style.color = "white";
+            btnManual.style.background = "transparent";
+            btnManual.style.color = "var(--text-secondary)";
+
+            if (autoComp) autoComp.style.display = "flex";
+            if (manualCtrl) manualCtrl.style.display = "none";
+            if (targetPhaseContainer) targetPhaseContainer.style.display = "none";
+
+            updateDashboardVPD();
+        });
+
+        btnManual.addEventListener("click", () => {
+            vpdMode = 'manual';
+            btnManual.classList.add("active");
+            btnAuto.classList.remove("active");
+
+            // Styles
+            btnManual.style.background = "var(--accent)";
+            btnManual.style.color = "white";
+            btnAuto.style.background = "transparent";
+            btnAuto.style.color = "var(--text-secondary)";
+
+            if (autoComp) autoComp.style.display = "none";
+            if (manualCtrl) manualCtrl.style.display = "flex";
+            if (targetPhaseContainer) targetPhaseContainer.style.display = "block";
+
+            updateDashboardVPD();
+        });
+    }
+
+    // Sliders & Phase selector event listeners
+    const tempSlider = document.getElementById("vpd-manual-temp-slider");
+    const humSlider = document.getElementById("vpd-manual-hum-slider");
+    const tempValDisp = document.getElementById("vpd-manual-temp-val");
+    const humValDisp = document.getElementById("vpd-manual-hum-val");
+    const manualPhase = document.getElementById("vpd-manual-phase");
+
+    if (tempSlider && tempValDisp) {
+        tempSlider.addEventListener("input", () => {
+            tempValDisp.textContent = `${tempSlider.value}°C`;
+            updateDashboardVPD();
+        });
+    }
+
+    if (humSlider && humValDisp) {
+        humSlider.addEventListener("input", () => {
+            humValDisp.textContent = `${humSlider.value}%`;
+            updateDashboardVPD();
+        });
+    }
+
+    if (manualPhase) {
+        manualPhase.addEventListener("change", () => {
+            updateDashboardVPD();
+        });
+    }
+}
+
+function updateDashboardVPD() {
+    const vpdBoxContainer = document.getElementById("vpd-box-container");
+    const vpdBoxNum = document.getElementById("vpd-box-num");
+    const vpdBoxLabel = document.getElementById("vpd-box-label");
+    const vpdPointer = document.getElementById("vpd-pointer");
+    const vpdStageText = document.getElementById("vpd-stage-text");
     
-    btn.addEventListener("click", () => {
-        if (drawer.style.display === "none") {
-            drawer.style.display = "block";
-            btn.innerHTML = `<i class="fa-solid fa-eye-slash"></i> Ocultar Tablas de Referencia VPD`;
-        } else {
-            drawer.style.display = "none";
-            btn.innerHTML = `<i class="fa-solid fa-image"></i> Ver Tablas de Referencia VPD`;
+    if (!vpdBoxContainer || !vpdBoxNum || !vpdBoxLabel || !vpdPointer || !vpdStageText) return;
+
+    let vpdVal = null;
+    let minRange = 0.4;
+    let maxRange = 0.8;
+    let stageName = "Desconocida";
+    
+    if (vpdMode === 'auto') {
+        // Auto Mode: read from database logs
+        const nextWatering = fullSchedule.find(s => !s.completed);
+        if (nextWatering) {
+            if (nextWatering.phase === 'Crecimiento') {
+                if (nextWatering.week === 1) {
+                    stageName = "Crecimiento Temprano (Semana 1)";
+                    minRange = 0.4;
+                    maxRange = 0.8;
+                } else {
+                    stageName = "Crecimiento Tardío (Semana 2)";
+                    minRange = 0.8;
+                    maxRange = 1.2;
+                }
+            } else { // Floración
+                if (nextWatering.week <= 2) {
+                    stageName = "Floración Temprana (Semanas 1-2)";
+                    minRange = 0.8;
+                    maxRange = 1.2;
+                } else {
+                    stageName = "Floración Media / Tardía (Semanas 3-8)";
+                    minRange = 1.2;
+                    maxRange = 1.6;
+                }
+            }
         }
-    });
+        
+        // Find latest climate log with VPD or enough data to calculate it
+        const latestClimateLog = climateLogs.find(log => log.vpd !== null || (log.temp_day !== null && log.humidity !== null));
+        if (latestClimateLog) {
+            if (latestClimateLog.vpd !== null) {
+                vpdVal = latestClimateLog.vpd;
+            } else {
+                vpdVal = calculateLeafVPD(latestClimateLog.temp_day, latestClimateLog.humidity);
+            }
+        }
+        
+        // Update comparison fields
+        const targetVPD = nextWatering && nextWatering.climate_targets ? nextWatering.climate_targets.vpd : null;
+        const tgtValEl = document.getElementById("vpd-target-val");
+        const tgtRngEl = document.getElementById("vpd-target-range");
+        if (tgtValEl) tgtValEl.textContent = targetVPD ? `${targetVPD.toFixed(2)} kPa` : "-- kPa";
+        if (tgtRngEl) tgtRngEl.textContent = `${minRange.toFixed(1)} - ${maxRange.toFixed(1)} kPa`;
+        
+        vpdStageText.innerHTML = `<strong>Etapa de Cultivo Actual:</strong> ${stageName}<br><span class="muted-text">Leyendo datos automáticos de tu última medición.</span>`;
+        
+    } else {
+        // Manual Mode: read from sliders
+        const tempSlider = document.getElementById("vpd-manual-temp-slider");
+        const humSlider = document.getElementById("vpd-manual-hum-slider");
+        const temp = tempSlider ? parseFloat(tempSlider.value) : 24;
+        const hum = humSlider ? parseFloat(humSlider.value) : 60;
+        vpdVal = calculateLeafVPD(temp, hum);
+        
+        const phaseVal = document.getElementById("vpd-manual-phase").value;
+        if (phaseVal === 'early-veg') {
+            stageName = "Propagación / Crecimiento Temprano";
+            minRange = 0.4;
+            maxRange = 0.8;
+        } else if (phaseVal === 'late-veg') {
+            stageName = "Crecimiento Tardío / Flora Temprana";
+            minRange = 0.8;
+            maxRange = 1.2;
+        } else {
+            stageName = "Floración Media / Tardía";
+            minRange = 1.2;
+            maxRange = 1.6;
+        }
+        vpdStageText.innerHTML = `<strong>Modo Calculadora Manual:</strong> Simulando condiciones.<br><span class="muted-text">Mueve los deslizadores de temperatura y humedad para ensayar valores de VPD.</span>`;
+    }
+    
+    // Render the VPD Box and move pointer
+    if (vpdVal !== null && !isNaN(vpdVal)) {
+        vpdBoxNum.textContent = vpdVal.toFixed(2);
+        
+        // Move pointer: range 0.0 to 3.0 kPa
+        const percentage = Math.min(100, Math.max(0, (vpdVal / 3.0) * 100));
+        vpdPointer.style.left = `${percentage}%`;
+        
+        // Evaluate status colors
+        if (vpdVal >= minRange && vpdVal <= maxRange) {
+            vpdBoxContainer.style.background = "rgba(16, 185, 129, 0.15)";
+            vpdBoxContainer.style.borderColor = "rgba(16, 185, 129, 0.3)";
+            vpdBoxNum.style.color = "#10b981";
+            vpdBoxLabel.style.color = "#10b981";
+            vpdBoxLabel.textContent = "¡Óptimo! ✅";
+        } else if (vpdVal >= (minRange - 0.15) && vpdVal <= (maxRange + 0.15)) {
+            vpdBoxContainer.style.background = "rgba(245, 158, 11, 0.15)";
+            vpdBoxContainer.style.borderColor = "rgba(245, 158, 11, 0.3)";
+            vpdBoxNum.style.color = "#f59e0b";
+            vpdBoxLabel.style.color = "#f59e0b";
+            vpdBoxLabel.textContent = "Aceptable ⚠️";
+        } else {
+            if (vpdVal < minRange) {
+                vpdBoxContainer.style.background = "rgba(59, 130, 246, 0.15)";
+                vpdBoxContainer.style.borderColor = "rgba(59, 130, 246, 0.3)";
+                vpdBoxNum.style.color = "#3b82f6";
+                vpdBoxLabel.style.color = "#3b82f6";
+                vpdBoxLabel.textContent = "Peligro: Demasiado Húmedo 🌧️";
+            } else {
+                vpdBoxContainer.style.background = "rgba(239, 68, 68, 0.15)";
+                vpdBoxContainer.style.borderColor = "rgba(239, 68, 68, 0.3)";
+                vpdBoxNum.style.color = "#ef4444";
+                vpdBoxLabel.style.color = "#ef4444";
+                vpdBoxLabel.textContent = "Peligro: Demasiado Seco 🏜️";
+            }
+        }
+    } else {
+        vpdBoxNum.textContent = "--";
+        vpdPointer.style.left = "0%";
+        vpdBoxContainer.style.background = "rgba(255, 255, 255, 0.02)";
+        vpdBoxContainer.style.borderColor = "var(--border-color)";
+        vpdBoxNum.style.color = "var(--text-secondary)";
+        vpdBoxLabel.style.color = "var(--text-secondary)";
+        vpdBoxLabel.textContent = "Sin Datos";
+    }
 }
