@@ -7,25 +7,7 @@ window.fetch = function(url, options) {
     return originalFetch(url, options);
 };
 
-// Lock viewport height on mobile to prevent virtual keyboard resizing flickers
-if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-    const lockViewportHeight = () => {
-        document.documentElement.style.height = `${window.innerHeight}px`;
-        document.body.style.height = `${window.innerHeight}px`;
-        const container = document.querySelector('.app-container');
-        if (container) {
-            container.style.minHeight = `${window.innerHeight}px`;
-        }
-    };
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', lockViewportHeight);
-    } else {
-        lockViewportHeight();
-    }
-    window.addEventListener("orientationchange", () => {
-        setTimeout(lockViewportHeight, 200);
-    });
-}
+
 
 // Global App State
 let currentCropId = null;
