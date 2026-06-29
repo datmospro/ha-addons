@@ -47,6 +47,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setupClimateSection();
     setupInventorySection();
     setupModals();
+    setupVpdWidget();
     
     // Initial fetch
     fetchCrops();
@@ -398,6 +399,72 @@ function updateDashboard() {
         document.getElementById("poda-banner").style.display = "none";
     }
     
+    // VPD Widget update logic
+    let stageName = "Desconocida";
+    let vpdMinRange = 0.4;
+    let vpdMaxRange = 0.8;
+    
+    if (nextWatering) {
+        if (nextWatering.phase === 'Crecimiento') {
+            if (nextWatering.week === 1) {
+                stageName = "Crecimiento Temprano (Semana 1)";
+                vpdMinRange = 0.4;
+                vpdMaxRange = 0.8;
+            } else {
+                stageName = "Crecimiento Tardío (Semana 2)";
+                vpdMinRange = 0.8;
+                vpdMaxRange = 1.2;
+            }
+        } else { // Floración
+            if (nextWatering.week <= 2) {
+                stageName = "Floración Temprana (Semanas 1-2)";
+                vpdMinRange = 0.8;
+                vpdMaxRange = 1.2;
+            } else {
+                stageName = "Floración Media / Tardía (Semanas 3-8)";
+                vpdMinRange = 1.2;
+                vpdMaxRange = 1.6;
+            }
+        }
+    }
+    
+    const targetVPD = nextWatering && nextWatering.climate_targets ? nextWatering.climate_targets.vpd : null;
+    
+    // Find latest climate log with VPD
+    const latestClimateLogWithVPD = climateLogs.find(log => log.vpd !== null);
+    const currentVPD = latestClimateLogWithVPD ? latestClimateLogWithVPD.vpd : null;
+    
+    const vpdValEl = document.getElementById("vpd-current-val");
+    const vpdTgtEl = document.getElementById("vpd-target-val");
+    const vpdRngEl = document.getElementById("vpd-target-range");
+    const vpdStgEl = document.getElementById("vpd-stage-text");
+    const vpdBdgEl = document.getElementById("vpd-status-badge");
+    
+    if (currentVPD !== null) {
+        vpdValEl.textContent = currentVPD.toFixed(2);
+        
+        // Status evaluation
+        vpdBdgEl.className = "badge";
+        if (currentVPD >= vpdMinRange && currentVPD <= vpdMaxRange) {
+            vpdBdgEl.textContent = "Óptimo";
+            vpdBdgEl.classList.add("badge-optimal");
+        } else if (currentVPD >= (vpdMinRange - 0.15) && currentVPD <= (vpdMaxRange + 0.15)) {
+            vpdBdgEl.textContent = "Aceptable";
+            vpdBdgEl.classList.add("badge-acceptable");
+        } else {
+            vpdBdgEl.textContent = "Peligro";
+            vpdBdgEl.classList.add("badge-danger");
+        }
+    } else {
+        vpdValEl.textContent = "--";
+        vpdBdgEl.className = "badge badge-outline";
+        vpdBdgEl.textContent = "Sin Datos";
+    }
+    
+    vpdTgtEl.textContent = targetVPD ? `${targetVPD.toFixed(2)} kPa` : "-- kPa";
+    vpdRngEl.textContent = `${vpdMinRange.toFixed(1)} - ${vpdMaxRange.toFixed(1)} kPa`;
+    vpdStgEl.innerHTML = `<strong>Etapa de Cultivo Actual:</strong> ${stageName}<br><span class="muted-text">Ajusta tu deshumidificador o extractor para mantenerte en el rango recomendado de esta fase.</span>`;
+
     // Costspent calculation
     updateFinancialSummary();
 }
@@ -1336,5 +1403,21 @@ function openModal(modalId) {
 function closeAllModals() {
     document.querySelectorAll(".modal-overlay").forEach(modal => {
         modal.classList.remove("active");
+    });
+}
+
+function setupVpdWidget() {
+    const btn = document.getElementById("btn-toggle-vpd-chart");
+    const drawer = document.getElementById("vpd-drawer");
+    if (!btn || !drawer) return;
+    
+    btn.addEventListener("click", () => {
+        if (drawer.style.display === "none") {
+            drawer.style.display = "block";
+            btn.innerHTML = `<i class="fa-solid fa-eye-slash"></i> Ocultar Tablas de Referencia VPD`;
+        } else {
+            drawer.style.display = "none";
+            btn.innerHTML = `<i class="fa-solid fa-image"></i> Ver Tablas de Referencia VPD`;
+        }
     });
 }

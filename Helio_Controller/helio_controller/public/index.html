@@ -169,6 +169,58 @@
                         </div>
                     </div>
 
+                    <!-- VPD Card -->
+                    <div class="card card-vpd-widget" id="card-vpd">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fa-solid fa-cloud-sun text-accent"></i> Control de VPD</h3>
+                            <span class="badge" id="vpd-status-badge">Sin Datos</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="vpd-display-container">
+                                <div class="vpd-value-large">
+                                    <span class="num" id="vpd-current-val">--</span>
+                                    <span class="unit">kPa Actual</span>
+                                </div>
+                                <div class="vpd-info-comparison">
+                                    <div class="cmp-row">
+                                        <span class="lbl">Objetivo Riego:</span>
+                                        <span class="val" id="vpd-target-val">-- kPa</span>
+                                    </div>
+                                    <div class="cmp-row">
+                                        <span class="lbl">Rango Recomendado:</span>
+                                        <span class="val" id="vpd-target-range">-- kPa</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="vpd-stage-info" id="vpd-stage-text">
+                                Fase actual: Cargando...
+                            </div>
+                            
+                            <div class="vpd-expandable-resources">
+                                <button type="button" class="btn btn-outline btn-sm btn-block" id="btn-toggle-vpd-chart" style="margin-bottom: 0.5rem;">
+                                    <i class="fa-solid fa-image"></i> Ver Tablas de Referencia VPD
+                                </button>
+                                
+                                <div class="vpd-charts-drawer" id="vpd-drawer" style="display: none; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem;">
+                                    <div class="vpd-drawer-content" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                                        <h4 style="font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary);">Rangos de VPD por Fase de Cultivo:</h4>
+                                        <img src="images/vpd_stages.png" alt="Etapas de VPD" style="width: 100%; border-radius: 4px; border: 1px solid var(--border-color);">
+                                        
+                                        <h4 style="font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary); margin-top: 0.25rem;">Tabla de Transpiración VPD Completa (DimLux):</h4>
+                                        <a href="images/vpd_chart.png" target="_blank" title="Ver imagen en tamaño completo">
+                                            <img src="images/vpd_chart.png" alt="Tabla DimLux VPD" style="width: 100%; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+                                        </a>
+                                    </div>
+                                </div>
+                                
+                                <a href="https://dimluxlighting.com/knowledge/blog/vapor-pressure-deficit-the-ultimate-guide-to-vpd/" target="_blank" class="vpd-link" style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.8125rem; color: var(--accent); text-decoration: none; font-weight: 600; margin-top: 0.5rem;">
+                                    <i class="fa-solid fa-circle-info"></i> Leer la guía definitiva de VPD (DimLux)
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Budget / Stock Summary Card -->
                     <div class="card card-inventory-widget">
                         <div class="card-header">
