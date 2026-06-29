@@ -1560,6 +1560,27 @@ function updateDashboardVPD() {
         vpdStageText.innerHTML = `<strong>Modo Calculadora Manual:</strong> Simulando condiciones.<br><span class="muted-text">Mueve los deslizadores de temperatura y humedad para ensayar valores de VPD.</span>`;
     }
     
+    // Calculate and apply dynamic gradient on the track bar
+    const vpdTrack = document.querySelector(".vpd-gauge-bar-track");
+    if (vpdTrack) {
+        const p1 = Math.max(0, Math.min(100, ((minRange - 0.15) / 3.0) * 100));
+        const p2 = Math.max(0, Math.min(100, (minRange / 3.0) * 100));
+        const p3 = Math.max(0, Math.min(100, (maxRange / 3.0) * 100));
+        const p4 = Math.max(0, Math.min(100, ((maxRange + 0.15) / 3.0) * 100));
+        
+        vpdTrack.style.background = `linear-gradient(to right, 
+            #3b82f6 0%, 
+            #3b82f6 ${p1}%, 
+            #f59e0b ${p1}%, 
+            #f59e0b ${p2}%, 
+            #10b981 ${p2}%, 
+            #10b981 ${p3}%, 
+            #f59e0b ${p3}%, 
+            #f59e0b ${p4}%, 
+            #ef4444 ${p4}%, 
+            #ef4444 100%)`;
+    }
+
     // Render the VPD Box and move pointer
     if (vpdVal !== null && !isNaN(vpdVal)) {
         vpdBoxNum.textContent = vpdVal.toFixed(2);
