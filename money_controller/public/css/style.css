@@ -1754,22 +1754,6 @@ body {
     white-space: normal;
     word-break: break-word;
   }
-
-  @media (max-width: 576px) {
-    .top-bar-actions {
-      flex-direction: column;
-      align-items: stretch;
-      width: 100%;
-      gap: 8px;
-    }
-    .top-bar-actions .btn {
-      width: 100%;
-    }
-    .status-indicator {
-      width: 100%;
-      justify-content: flex-start;
-    }
-  }
   
   .summary-cards {
     grid-template-columns: repeat(2, 1fr);
@@ -1778,15 +1762,26 @@ body {
   
   .summary-cards .card {
     padding: 12px 10px;
-    gap: 8px;
-    flex-direction: column;
-    align-items: flex-start;
+    gap: 10px;
+    transition: var(--transition);
   }
   
-  .summary-cards .card:last-child {
+  /* Tarjeta 1 (Saldo), Tarjeta 4 (Límite) y Tarjeta 5 (Balance) ocupan el ancho completo */
+  .summary-cards .card:nth-child(1),
+  .summary-cards .card:nth-child(4),
+  .summary-cards .card:nth-child(5) {
     grid-column: span 2;
     flex-direction: row;
     align-items: center;
+    justify-content: flex-start;
+  }
+  
+  /* Tarjeta 2 (Ingresos) y Tarjeta 3 (Gastos) comparten fila a media anchura */
+  .summary-cards .card:nth-child(2),
+  .summary-cards .card:nth-child(3) {
+    grid-column: span 1;
+    flex-direction: column;
+    align-items: flex-start;
   }
   
   .card-icon {
@@ -1962,6 +1957,23 @@ body {
   
   #telegram-config-fields > div:last-child button {
     width: 100%;
+  }
+}
+
+/* Stacking for top-bar-actions on screens <= 576px (top-level media query for webview safety) */
+@media (max-width: 576px) {
+  .top-bar-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+  .top-bar-actions .btn {
+    width: 100% !important;
+  }
+  .status-indicator {
+    width: 100% !important;
+    justify-content: flex-start !important;
   }
 }
 
