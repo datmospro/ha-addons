@@ -1720,7 +1720,15 @@ body {
   .main-content {
     margin-left: 0;
     margin-bottom: 75px;
-    padding: 16px;
+    padding: 12px;
+  }
+  
+  .panel-card {
+    padding: 14px;
+  }
+  
+  .grid-item {
+    padding: 12px;
   }
   
   .top-bar {
@@ -1734,6 +1742,33 @@ body {
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 8px;
+  }
+  
+  .status-indicator {
+    max-width: 100%;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+  }
+  
+  .status-indicator span:not(.dot) {
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  @media (max-width: 576px) {
+    .top-bar-actions {
+      flex-direction: column;
+      align-items: stretch;
+      width: 100%;
+      gap: 8px;
+    }
+    .top-bar-actions .btn {
+      width: 100%;
+    }
+    .status-indicator {
+      width: 100%;
+      justify-content: flex-start;
+    }
   }
   
   .summary-cards {
@@ -1767,10 +1802,56 @@ body {
   
   .card-data h3 {
     font-size: 0.7rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
   }
   
   .card-data .amount {
     font-size: 1.15rem;
+  }
+  
+  /* Filter Bar responsivo */
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .filter-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+  }
+  
+  .filter-group .form-select,
+  .filter-group .form-control,
+  .filter-group .date-range-inputs,
+  .filter-bar .search-box {
+    width: 100% !important;
+  }
+  
+  .date-range-inputs {
+    display: flex;
+    width: 100%;
+    box-sizing: border-box;
+    align-items: center;
+  }
+  
+  .date-range-inputs .form-control {
+    flex-grow: 1;
+    width: 50% !important;
+  }
+  
+  /* Compresión de tablas */
+  .table {
+    font-size: 0.8rem;
+  }
+  
+  .table th, .table td {
+    padding: 8px 6px;
   }
   
   #transactions-table th:nth-child(3),
@@ -1784,6 +1865,8 @@ body {
   #recurring-list-container td:nth-child(2),
   #recurring-list-container th:nth-child(3),
   #recurring-list-container td:nth-child(3),
+  #recurring-list-container th:nth-child(4),
+  #recurring-list-container td:nth-child(4),
   #recurring-list-container th:nth-child(5),
   #recurring-list-container td:nth-child(5) {
     display: none;
@@ -1806,6 +1889,15 @@ body {
     margin: 16px;
     width: calc(100% - 32px);
     padding: 16px;
+  }
+  
+  /* Ajustes del calendario en tablets/móviles */
+  .calendar-card {
+    padding: 10px;
+  }
+  
+  .calendar-days-grid {
+    gap: 4px;
   }
   
   .calendar-header {
@@ -1853,7 +1945,7 @@ body {
   }
   
   .cal-day-bal {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     padding: 1px 2px;
     border-radius: 2px;
   }
@@ -1861,6 +1953,7 @@ body {
   .calendar-day {
     padding: 4px 2px;
     aspect-ratio: 1;
+    min-width: 0;
   }
   
   #telegram-config-fields > div:last-child {
@@ -1882,9 +1975,21 @@ body {
     height: 24px;
   }
   
+  .calendar-card {
+    padding: 6px;
+  }
+  
+  .calendar-days-grid {
+    gap: 3px;
+  }
+  
   .cal-day-bal {
-    font-size: 0.55rem;
-    padding: 1px 2px;
+    font-size: 0.5rem;
+    padding: 1px;
+  }
+  
+  .calendar-day {
+    padding: 2px 1px;
   }
   
   .cal-day-num {
