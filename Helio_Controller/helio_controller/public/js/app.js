@@ -1315,10 +1315,10 @@ function renderInventoryList() {
             <td><strong>${item.name}</strong></td>
             <td>${item.format_volume_ml} ${formatUnit}</td>
             <td>${item.price.toFixed(2)} €</td>
+            <td>${item.purchased_qty} botellas</td>
             <td>${stockDisplay}</td>
             <td>${neededDisplay}</td>
             <td>${balanceDisplay}</td>
-            <td>${item.purchased_qty} botellas</td>
             <td>
                 <button class="btn btn-outline btn-sm" onclick="openEditInventoryModal(${item.id})">
                     <i class="fa-solid fa-pen-to-square"></i> <span class="hide-mobile">Editar</span>

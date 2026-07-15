@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=1.4.1">
+    <link rel="stylesheet" href="css/style.css?v=1.4.2">
     <!-- FontAwesome Icons (loaded via cdn for simple clean UI) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -452,10 +452,10 @@
                                         <th>Producto</th>
                                         <th>Formato</th>
                                         <th>Precio Compra</th>
+                                        <th>Cant. Comprada</th>
                                         <th>Stock Restante</th>
                                         <th>Necesario Fin</th>
-                                        <th>Balance / Estado</th>
-                                        <th>Cant. Comprada</th>
+                                        <th>Balance</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
@@ -831,10 +831,13 @@
                     </div>
 
                     <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                        <button type="button" id="btn-delete-watering-log" class="btn btn-danger" style="display: none;"><i class="fa-solid fa-trash"></i> Eliminar Registro</button>
+                        <div>
+                            <button type="button" id="btn-delete-watering-log" class="btn btn-danger" style="display: none;"><i class="fa-solid fa-trash"></i> Eliminar Registro</button>
+                            <button type="button" id="btn-save-recipe-pending" class="btn btn-outline" style="display: none;"><i class="fa-solid fa-floppy-disk"></i> Guardar Receta (Mantener Pendiente)</button>
+                        </div>
                         <div style="display: flex; gap: 0.75rem; margin-left: auto;">
                             <button type="button" class="btn btn-outline btn-close-modal">Cancelar</button>
-                            <button type="submit" class="btn btn-accent">Guardar Riego</button>
+                            <button type="submit" id="btn-submit-watering" class="btn btn-accent">Guardar Riego</button>
                         </div>
                     </div>
                 </form>
@@ -921,6 +924,6 @@
         </div>
     </div>
 
-    <script src="js/app.js?v=1.4.1"></script>
+    <script src="js/app.js?v=1.4.2"></script>
 </body>
 </html>
