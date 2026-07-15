@@ -756,6 +756,48 @@ function setupWateringSection() {
         });
     }
 
+    // Handle save recipe (keep pending)
+    const btnSaveRecipe = document.getElementById("btn-save-recipe-pending");
+    if (btnSaveRecipe) {
+        btnSaveRecipe.addEventListener("click", async () => {
+            if (!currentCrop || !currentWateringItem || currentWateringItem.completed) return;
+            
+            const body = {
+                water_liters: parseFloat(document.getElementById("log-water-liters").value) || 0,
+                silica_power: parseFloat(document.getElementById("log-nut-silica").value) || 0,
+                calmag: parseFloat(document.getElementById("log-nut-calmag").value) || 0,
+                jj_micro: parseFloat(document.getElementById("log-nut-micro").value) || 0,
+                jj_grow: parseFloat(document.getElementById("log-nut-grow").value) || 0,
+                jj_bloom: parseFloat(document.getElementById("log-nut-bloom").value) || 0,
+                voodoo_juice: parseFloat(document.getElementById("log-nut-voodoo").value) || 0,
+                bud_candy: parseFloat(document.getElementById("log-nut-candy").value) || 0,
+                big_bud: parseFloat(document.getElementById("log-nut-bigbud").value) || 0,
+                monster_bloom: parseFloat(document.getElementById("log-nut-monster").value) || 0,
+                bac_f1: parseFloat(document.getElementById("log-nut-bac").value) || 0,
+                enzymes: parseFloat(document.getElementById("log-nut-enzymes").value) || 0,
+                flawless_finish: parseFloat(document.getElementById("log-nut-flawless").value) || 0
+            };
+
+            try {
+                const res = await fetch(`api/crops/${currentCropId}/schedule/${currentWateringItem.riego_num}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (res.ok) {
+                    closeAllModals();
+                    await loadCropData(currentCropId);
+                } else {
+                    const data = await res.json();
+                    alert("Error al guardar la receta: " + data.error);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Error de conexión al guardar la receta.");
+            }
+        });
+    }
+
     // Proportional scaling of nutrients when water volume is modified
     const waterLitersInput = document.getElementById("log-water-liters");
     if (waterLitersInput) {
@@ -900,6 +942,8 @@ function openLogWateringModal(riegoNum) {
 
     if (item.completed) {
         document.getElementById("btn-delete-watering-log").style.display = "block";
+        document.getElementById("btn-save-recipe-pending").style.display = "none";
+        document.getElementById("btn-submit-watering").textContent = "Guardar Cambios";
         // Pre-fill with actual recorded data
         const cd = item.completed_data;
         document.getElementById("log-water-date").value = cd.date;
@@ -923,6 +967,8 @@ function openLogWateringModal(riegoNum) {
         document.getElementById("log-nut-flawless").value = cd.flawless_finish;
     } else {
         document.getElementById("btn-delete-watering-log").style.display = "none";
+        document.getElementById("btn-save-recipe-pending").style.display = "block";
+        document.getElementById("btn-submit-watering").textContent = "Aplicar Riego (Marcar Completado)";
         // Pre-fill with target values
         setDatetimeInputNow("log-water-date");
         document.getElementById("log-water-plants").value = currentCrop.num_plants;
@@ -1183,9 +1229,65 @@ async function addNewProduct(name) {
     }
 }
 
+function getPendingNutrientTotals() {
+    const totals = {
+        silica_power: 0,
+        calmag: 0,
+        jj_micro: 0,
+        jj_grow: 0,
+        jj_bloom: 0,
+        voodoo_juice: 0,
+        bud_candy: 0,
+        big_bud: 0,
+        monster_bloom: 0,
+        bac_f1: 0,
+        enzymes: 0,
+        flawless_finish: 0
+    };
+
+    fullSchedule.forEach(item => {
+        if (!item.completed) {
+            for (const key of Object.keys(totals)) {
+                totals[key] += (item.target_products[key] || 0);
+            }
+        }
+    });
+
+    return totals;
+}
+
 function renderInventoryList() {
     const tbody = document.getElementById("inventory-list");
     tbody.innerHTML = "";
+
+    const pending = getPendingNutrientTotals();
+    
+    // Calculate enzymes split (Atazyme first, then Sensizym)
+    const atazymeItem = inventory.find(i => i.name === "Atazyme");
+    const atazymeStock = atazymeItem ? atazymeItem.stock_ml : 0;
+    const neededAtazyme = Math.min(pending.enzymes, atazymeStock);
+    const neededSensizym = Math.max(0, pending.enzymes - atazymeStock);
+
+    const getNeededVolume = (itemName) => {
+        if (itemName === "Atazyme") return neededAtazyme;
+        if (itemName === "Sensizym (Advanced Nutrients)") return neededSensizym;
+        
+        const mapping = {
+            "Silica Power (BAC)": pending.silica_power,
+            "Calmag (Atami)": pending.calmag,
+            "Jungle Juice Micro": pending.jj_micro,
+            "Jungle Juice Grow": pending.jj_grow,
+            "Jungle Juice Bloom": pending.jj_bloom,
+            "Voodoo Juice": pending.voodoo_juice,
+            "Bud Candy": pending.bud_candy,
+            "Big Bud Liquid": pending.big_bud,
+            "Monster Bloom (Grotek)": pending.monster_bloom,
+            "BAC F1 Extreme Booster": pending.bac_f1,
+            "Flawless Finish": pending.flawless_finish
+        };
+        
+        return mapping[itemName] || 0;
+    };
 
     inventory.forEach(item => {
         const tr = document.createElement("tr");
@@ -1197,11 +1299,25 @@ function renderInventoryList() {
             stockDisplay = `<span style="color: var(--red); font-weight: 600;"><i class="fa-solid fa-triangle-exclamation"></i> ${stockDisplay}</span>`;
         }
 
+        const neededVal = getNeededVolume(item.name);
+        const neededDisplay = `${Math.round(neededVal)} ${formatUnit}`;
+        
+        const balance = item.stock_ml - neededVal;
+        let balanceDisplay = "";
+        
+        if (balance >= 0) {
+            balanceDisplay = `<span style="color: #10b981; font-weight: 500;"><i class="fa-solid fa-circle-check"></i> Suficiente (+${Math.round(balance)} ${formatUnit})</span>`;
+        } else {
+            balanceDisplay = `<span style="color: var(--red); font-weight: 600;"><i class="fa-solid fa-triangle-exclamation"></i> Falta comprar: ${Math.round(Math.abs(balance))} ${formatUnit}</span>`;
+        }
+
         tr.innerHTML = `
             <td><strong>${item.name}</strong></td>
             <td>${item.format_volume_ml} ${formatUnit}</td>
             <td>${item.price.toFixed(2)} €</td>
             <td>${stockDisplay}</td>
+            <td>${neededDisplay}</td>
+            <td>${balanceDisplay}</td>
             <td>${item.purchased_qty} botellas</td>
             <td>
                 <button class="btn btn-outline btn-sm" onclick="openEditInventoryModal(${item.id})">

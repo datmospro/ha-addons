@@ -501,6 +501,59 @@ app.delete('/api/crops/:id/waterings/:watering_id', (req, res) => {
   }
 });
 
+// Update pending watering template recipe
+app.put('/api/crops/:id/schedule/:riego_num', (req, res) => {
+  const { id, riego_num } = req.params;
+  const {
+    water_liters,
+    silica_power, calmag, jj_micro, jj_grow, jj_bloom,
+    voodoo_juice, bud_candy, big_bud, monster_bloom, bac_f1,
+    enzymes, flawless_finish
+  } = req.body;
+
+  try {
+    const crop = db.prepare("SELECT * FROM crops WHERE id = ?").get(id);
+    if (!crop) return res.status(404).json({ error: "Crop not found" });
+
+    const numPlants = crop.num_plants || 1;
+    const waterLiters = parseFloat(water_liters) || 0;
+    const waterPerPlant = waterLiters / numPlants;
+
+    const getRatio = (val) => (waterLiters > 0 ? (parseFloat(val) || 0) / waterLiters : 0);
+
+    const stmt = db.prepare(`
+      UPDATE watering_templates
+      SET water_per_plant = ?,
+          silica_power = ?, calmag = ?, jj_micro = ?, jj_grow = ?, jj_bloom = ?,
+          voodoo_juice = ?, bud_candy = ?, big_bud = ?, monster_bloom = ?, bac_f1 = ?,
+          enzymes = ?, flawless_finish = ?
+      WHERE crop_id = ? AND riego_num = ?
+    `);
+
+    stmt.run(
+      waterPerPlant,
+      getRatio(silica_power),
+      getRatio(calmag),
+      getRatio(jj_micro),
+      getRatio(jj_grow),
+      getRatio(jj_bloom),
+      getRatio(voodoo_juice),
+      getRatio(bud_candy),
+      getRatio(big_bud),
+      getRatio(monster_bloom),
+      getRatio(bac_f1),
+      getRatio(enzymes),
+      getRatio(flawless_finish),
+      id,
+      riego_num
+    );
+
+    res.json({ message: "Watering recipe template updated successfully." });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ==========================================
 // API - CLIMATE LOGS
 // ==========================================
