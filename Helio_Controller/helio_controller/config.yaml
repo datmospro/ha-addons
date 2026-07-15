@@ -1,5 +1,5 @@
 name: "Helio Controller"
-version: "1.3.0"
+version: "1.3.1"
 slug: "helio_controller"
 description: "Control de cultivo interior de cannabis con tablas de riego, clima, podas y gestión de inventario y costes."
 url: "https://github.com/datmospro/ha-addons/tree/main/helio_controller"

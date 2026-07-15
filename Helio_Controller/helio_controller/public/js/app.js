@@ -486,16 +486,16 @@ function updateDashboard() {
         const nutrientsNames = {
             silica_power: "Silica Power (BAC)",
             calmag: "Calmag (Atami)",
-            jj_micro: "JJ Micro (Base)",
-            jj_grow: "JJ Grow (Base)",
-            jj_bloom: "JJ Bloom (Base)",
             voodoo_juice: "Voodoo Juice",
             bud_candy: "Bud Candy",
             big_bud: "Big Bud Liquid",
             monster_bloom: "Monster Bloom (Grotek)",
             bac_f1: "BAC F1 Booster",
             enzymes: "Enzimas",
-            flawless_finish: "Flawless Finish"
+            flawless_finish: "Flawless Finish",
+            jj_micro: "JJ Micro (Base)",
+            jj_grow: "JJ Grow (Base)",
+            jj_bloom: "JJ Bloom (Base)"
         };
         
         for (const key of Object.keys(nutrientsNames)) {
@@ -1100,9 +1100,6 @@ async function fetchInventory() {
         const excelOrder = [
             "Silica Power (BAC)",
             "Calmag (Atami)",
-            "Jungle Juice Micro",
-            "Jungle Juice Grow",
-            "Jungle Juice Bloom",
             "Voodoo Juice",
             "Bud Candy",
             "Big Bud Liquid",
@@ -1110,7 +1107,10 @@ async function fetchInventory() {
             "BAC F1 Extreme Booster",
             "Atazyme",
             "Sensizym (Advanced Nutrients)",
-            "Flawless Finish"
+            "Flawless Finish",
+            "Jungle Juice Micro",
+            "Jungle Juice Grow",
+            "Jungle Juice Bloom"
         ];
         
         const getOrderIndex = (name) => {
