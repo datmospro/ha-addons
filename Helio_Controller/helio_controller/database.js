@@ -176,6 +176,23 @@ function initDb() {
       console.error("Migration seeding error:", err);
     }
   }
+
+  // Fix copy-paste templates seed bugs if any crop has incorrect templates
+  try {
+    const testRow = db.prepare("SELECT big_bud FROM watering_templates WHERE riego_num = 21.0 LIMIT 1").get();
+    if (testRow && testRow.big_bud > 0) {
+      console.log("Detected old incorrect template seeds in DB. Updating all crops' watering templates to align with Excel sheet...");
+      const crops = db.prepare("SELECT id FROM crops").all();
+      crops.forEach(c => {
+        db.prepare("DELETE FROM watering_templates WHERE crop_id = ?").run(c.id);
+        db.prepare("DELETE FROM climate_templates WHERE crop_id = ?").run(c.id);
+        seedTemplatesForCrop(c.id);
+      });
+      console.log("Crop templates successfully re-seeded from Excel!");
+    }
+  } catch (err) {
+    console.error("Failed to check or fix template seeds:", err);
+  }
 }
 
 function seedTemplatesForCrop(cropId) {
@@ -225,9 +242,9 @@ function seedTemplatesForCrop(cropId) {
     { r: 3.0, ph: 'Crecimiento', w: 1, type: 'Abono', water: 0.5, silica: r1_7, cal: 1.0, micro: 1.0, grow: 1.0, bloom: 1.0, voodoo: 2.0, candy: 0, big: 0, monster: 0, bac: 0, enz: 0, flawless: 0 },
     
     // Crecimiento Sem 2 (67/84 = 0.7976 L water/plant)
-    { r: 4.0, ph: 'Crecimiento', w: 2, type: 'Abono', water: 67/84, silica: r1_7, cal: 1.0, micro: 2.0, grow: 2.0, bloom: 1.0, voodoo: 2.0, candy: 0, big: 0, monster: 0, bac: 0, enz: 0, flawless: 0 },
-    { r: 5.0, ph: 'Crecimiento', w: 2, type: 'Mant.', water: 67/84, silica: r1_7, cal: 1.0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 2.0, flawless: 0 },
-    { r: 6.0, ph: 'Crecimiento', w: 2, type: 'Abono', water: 67/84, silica: r1_7, cal: 1.0, micro: 2.0, grow: 2.0, bloom: 1.0, voodoo: 2.0, candy: 0, big: 0, monster: 0, bac: 0, enz: 0, flawless: 0 },
+    { r: 4.0, ph: 'Crecimiento', w: 2, type: 'Abono', water: 67/84, silica: 0.141791, cal: 1.0, micro: 2.0, grow: 2.0, bloom: 1.0, voodoo: 2.0, candy: 0, big: 0, monster: 0, bac: 0, enz: 0, flawless: 0 },
+    { r: 5.0, ph: 'Crecimiento', w: 2, type: 'Mant.', water: 67/84, silica: 0.141791, cal: 1.0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 2.0, flawless: 0 },
+    { r: 6.0, ph: 'Crecimiento', w: 2, type: 'Abono', water: 67/84, silica: 0.141791, cal: 1.0, micro: 2.0, grow: 2.0, bloom: 1.0, voodoo: 2.0, candy: 0, big: 0, monster: 0, bac: 0, enz: 0, flawless: 0 },
     
     // Floración Sem 1 (1.0L water/plant)
     { r: 7.0, ph: 'Floración', w: 1, type: 'Abono', water: 1.0, silica: r1_7, cal: 1.0, micro: 2.0, grow: 1.5, bloom: 2.0, voodoo: 2.0, candy: 2.0, big: 2.0, monster: 0, bac: 0, enz: 0, flawless: 0 },
@@ -240,40 +257,40 @@ function seedTemplatesForCrop(cropId) {
     { r: 12.0, ph: 'Floración', w: 2, type: 'Mant.', water: 1.0, silica: r1_7, cal: 1.0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 2.0, flawless: 0 },
     
     // Floración Sem 3 (1.5L water/plant)
-    { r: 13.0, ph: 'Floración', w: 3, type: 'Abono', water: 1.5, silica: r1_7, cal: 1.0, micro: 2.0, grow: 0.5, bloom: 3.0, voodoo: 0, candy: 2.0, big: 2.0, monster: 2.0, bac: 0, enz: 0, flawless: 0 },
+    { r: 13.0, ph: 'Floración', w: 3, type: 'Abono', water: 1.5, silica: r1_7, cal: 1.0, micro: 2.0, grow: 0.5, bloom: 3.0, voodoo: 0, candy: 2.0, big: 2.0, monster: 0, bac: 0, enz: 0, flawless: 0 },
     { r: 14.0, ph: 'Floración', w: 3, type: 'Mant.', water: 1.5, silica: r1_7, cal: 1.0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 2.0, flawless: 0 },
-    { r: 15.0, ph: 'Floración', w: 3, type: 'Abono', water: 1.5, silica: r1_7, cal: 1.0, micro: 2.0, grow: 0.5, bloom: 3.0, voodoo: 0, candy: 2.0, big: 2.0, monster: 2.0, bac: 0, enz: 0, flawless: 0 },
+    { r: 15.0, ph: 'Floración', w: 3, type: 'Abono', water: 1.5, silica: r1_7, cal: 1.0, micro: 2.0, grow: 0.5, bloom: 3.0, voodoo: 0, candy: 2.0, big: 2.0, monster: 0, bac: 0, enz: 0, flawless: 0 },
     
     // Floración Sem 4 (1.5L water/plant)
     { r: 16.0, ph: 'Floración', w: 4, type: 'Mant.', water: 1.5, silica: r1_7, cal: 1.0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 2.0, flawless: 0 },
-    { r: 17.0, ph: 'Floración', w: 4, type: 'Abono', water: 1.5, silica: r1_7, cal: 1.0, micro: 2.0, grow: 0.5, bloom: 3.0, voodoo: 0, candy: 2.0, big: 2.0, monster: 2.0, bac: 0, enz: 0, flawless: 0 },
+    { r: 17.0, ph: 'Floración', w: 4, type: 'Abono', water: 1.5, silica: r1_7, cal: 1.0, micro: 2.0, grow: 0.5, bloom: 3.0, voodoo: 0, candy: 2.0, big: 2.0, monster: 0, bac: 0, enz: 0, flawless: 0 },
     { r: 18.0, ph: 'Floración', w: 4, type: 'Mant.', water: 1.5, silica: r1_7, cal: 1.0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 2.0, flawless: 0 },
-    { r: 19.0, ph: 'Floración', w: 4, type: 'Abono', water: 1.5, silica: r1_7, cal: 1.0, micro: 2.0, grow: 0.5, bloom: 3.0, voodoo: 0, candy: 2.0, big: 2.0, monster: 240/126, bac: 0, enz: 0, flawless: 0 }, // 240ml total
+    { r: 19.0, ph: 'Floración', w: 4, type: 'Abono', water: 1.5, silica: r1_7, cal: 1.0, micro: 2.0, grow: 0.5, bloom: 3.0, voodoo: 0, candy: 2.0, big: 1.904762, monster: 0, bac: 0, enz: 0, flawless: 0 },
     { r: 20.0, ph: 'Floración', w: 4, type: 'Mant.', water: 1.5, silica: r1_7, cal: 1.0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 2.0, flawless: 0 },
     
     // Floración Sem 5 (2.0L water/plant)
-    { r: 21.0, ph: 'Floración', w: 5, type: 'Abono', water: 2.0, silica: r1_7, cal: 1.0, micro: 2.0, grow: 0, bloom: 3.0, voodoo: 0, candy: 0, big: 2.0, monster: 0, bac: 50.4/168, enz: 0, flawless: 0 }, // BAC F1: 50.4g total
+    { r: 21.0, ph: 'Floración', w: 5, type: 'Abono', water: 2.0, silica: r1_7, cal: 1.0, micro: 2.0, grow: 0, bloom: 3.0, voodoo: 0, candy: 2.0, big: 0, monster: 0.3, bac: 0, enz: 0, flawless: 0 },
     { r: 22.0, ph: 'Floración', w: 5, type: 'Mant.', water: 2.0, silica: r1_7, cal: 1.0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 2.0, flawless: 0 },
-    { r: 23.0, ph: 'Floración', w: 5, type: 'Abono', water: 2.0, silica: r1_7, cal: 1.0, micro: 2.0, grow: 0, bloom: 3.0, voodoo: 0, candy: 0, big: 2.0, monster: 0, bac: 50.4/168, enz: 0, flawless: 0 },
+    { r: 23.0, ph: 'Floración', w: 5, type: 'Abono', water: 2.0, silica: r1_7, cal: 1.0, micro: 2.0, grow: 0, bloom: 3.0, voodoo: 0, candy: 2.0, big: 0, monster: 0.3, bac: 0, enz: 0, flawless: 0 },
     
     // Floración Sem 6 (2.0L water/plant)
     { r: 24.0, ph: 'Floración', w: 6, type: 'Mant.', water: 2.0, silica: r1_7, cal: 1.0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 2.0, flawless: 0 },
-    { r: 25.0, ph: 'Floración', w: 6, type: 'Abono', water: 2.0, silica: r1_7, cal: 1.0, micro: 2.0, grow: 0, bloom: 3.0, voodoo: 0, candy: 0, big: 2.0, monster: 0, bac: 50.4/168, enz: 0, flawless: 0 },
+    { r: 25.0, ph: 'Floración', w: 6, type: 'Abono', water: 2.0, silica: r1_7, cal: 1.0, micro: 2.0, grow: 0, bloom: 3.0, voodoo: 0, candy: 2.0, big: 0, monster: 0.3, bac: 0, enz: 0, flawless: 0 },
     { r: 26.0, ph: 'Floración', w: 6, type: 'Mant.', water: 2.0, silica: r1_7, cal: 1.0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 2.0, flawless: 0 },
-    { r: 27.0, ph: 'Floración', w: 6, type: 'Abono', water: 2.0, silica: r1_7, cal: 1.0, micro: 2.0, grow: 0, bloom: 3.0, voodoo: 0, candy: 0, big: 2.0, monster: 0, bac: 50.4/168, enz: 0, flawless: 0 },
+    { r: 27.0, ph: 'Floración', w: 6, type: 'Abono', water: 2.0, silica: r1_7, cal: 1.0, micro: 2.0, grow: 0, bloom: 3.0, voodoo: 0, candy: 2.0, big: 0, monster: 0.3, bac: 0, enz: 0, flawless: 0 },
     { r: 28.0, ph: 'Floración', w: 6, type: 'Mant.', water: 2.0, silica: r1_7, cal: 1.0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 2.0, flawless: 0 },
     
     // Floración Sem 7 (2.0L water/plant)
-    { r: 29.0, ph: 'Floración', w: 7, type: 'Abono', water: 2.0, silica: r1_7, cal: 1.0, micro: 1.5, grow: 0, bloom: 3.0, voodoo: 0, candy: 0, big: 2.0, monster: 0, bac: 0, enz: 2.0, flawless: 0 },
+    { r: 29.0, ph: 'Floración', w: 7, type: 'Abono', water: 2.0, silica: r1_7, cal: 1.0, micro: 1.5, grow: 0, bloom: 3.0, voodoo: 0, candy: 2.0, big: 0, monster: 0, bac: 2.0, enz: 0, flawless: 0 },
     { r: 30.0, ph: 'Floración', w: 7, type: 'Mant.', water: 2.0, silica: r1_7, cal: 1.0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 0, flawless: 0 },
-    { r: 31.0, ph: 'Floración', w: 7, type: 'Abono', water: 2.0, silica: r1_7, cal: 1.0, micro: 1.5, grow: 0, bloom: 3.0, voodoo: 0, candy: 0, big: 2.0, monster: 0, bac: 0, enz: 2.0, flawless: 0 },
+    { r: 31.0, ph: 'Floración', w: 7, type: 'Abono', water: 2.0, silica: r1_7, cal: 1.0, micro: 1.5, grow: 0, bloom: 3.0, voodoo: 0, candy: 2.0, big: 0, monster: 0, bac: 2.0, enz: 0, flawless: 0 },
     { r: 32.0, ph: 'Floración', w: 7, type: 'Mant.', water: 2.0, silica: r1_7, cal: 1.0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 0, flawless: 0 },
     
     // Floración Sem 8 (1.5L water/plant)
-    { r: 33.0, ph: 'Floración', w: 8, type: 'Lavado 1', water: 1.5, silica: 0, cal: 0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 0, flawless: 250/126 },
-    { r: 34.0, ph: 'Floración', w: 8, type: 'Lavado 2', water: 1.5, silica: 0, cal: 0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 0, flawless: 250/126 },
-    { r: 35.0, ph: 'Floración', w: 8, type: 'Secado', water: 0, silica: 0, cal: 0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 0, flawless: 0 },
-    { r: 36.0, ph: 'Floración', w: 8, type: 'Secado', water: 0, silica: 0, cal: 0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 0, flawless: 0 }
+    { r: 33.0, ph: 'Floración', w: 8, type: 'Lavado 1', water: 1.5, silica: 0, cal: 0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 0, flawless: 1.984127 },
+    { r: 34.0, ph: 'Floración', w: 8, type: 'Lavado 2', water: 1.5, silica: 0, cal: 0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 0, flawless: 1.984127 },
+    { r: 35.0, ph: 'Floración', w: 8, type: 'Secado', water: 0.0, silica: 0, cal: 0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 0, flawless: 0 },
+    { r: 36.0, ph: 'Floración', w: 8, type: 'Secado', water: 0.0, silica: 0, cal: 0, micro: 0, grow: 0, bloom: 0, voodoo: 0, candy: 0, big: 0, monster: 0, bac: 0, enz: 0, flawless: 0 }
   ];
 
   for (const r of schedule) {
