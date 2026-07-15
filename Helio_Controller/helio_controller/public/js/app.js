@@ -18,6 +18,7 @@ let climateLogs = [];
 let cropsList = [];
 let activeSection = "sec-dashboard";
 let vpdMode = 'auto';
+let currentWateringItem = null;
 
 // Helper: Format Dates
 function formatDate(dateStr) {
@@ -497,7 +498,8 @@ function updateDashboard() {
             flawless_finish: "Flawless Finish"
         };
         
-        for (const [key, val] of Object.entries(nextWatering.target_products)) {
+        for (const key of Object.keys(nutrientsNames)) {
+            const val = nextWatering.target_products[key];
             if (val > 0) {
                 hasNutrients = true;
                 const li = document.createElement("li");
@@ -726,6 +728,72 @@ function setupWateringSection() {
             }
         });
     });
+
+    // Handle delete completed watering log
+    const btnDeleteWatering = document.getElementById("btn-delete-watering-log");
+    if (btnDeleteWatering) {
+        btnDeleteWatering.addEventListener("click", async () => {
+            if (!currentCrop || !currentWateringItem || !currentWateringItem.completed) return;
+            const confirmDelete = confirm(`¿Estás seguro de que deseas eliminar el registro del Riego ${currentWateringItem.riego_num.toFixed(1)}?\nSe restablecerá a estado pendiente y las cantidades de fertilizantes se sumarán de vuelta al stock de tu inventario.`);
+            if (!confirmDelete) return;
+
+            try {
+                const res = await fetch(`api/crops/${currentCropId}/waterings/${currentWateringItem.completed_data.id}`, {
+                    method: 'DELETE'
+                });
+                if (res.ok) {
+                    closeAllModals();
+                    await fetchInventory(); // Refresh stock alert and inventory
+                    await loadCropData(currentCropId); // Reload crop schedule
+                } else {
+                    const data = await res.json();
+                    alert("Error al eliminar el registro: " + data.error);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Error de conexión al eliminar el registro.");
+            }
+        });
+    }
+
+    // Proportional scaling of nutrients when water volume is modified
+    const waterLitersInput = document.getElementById("log-water-liters");
+    if (waterLitersInput) {
+        waterLitersInput.addEventListener("input", () => {
+            if (!currentWateringItem) return;
+            const newLiters = parseFloat(waterLitersInput.value) || 0;
+            const targetLiters = currentWateringItem.target_water_l || 0;
+            if (targetLiters > 0) {
+                const scale = newLiters / targetLiters;
+                
+                const scaleNutrient = (inputId, targetLabelId, baseTargetVal, isGram = false) => {
+                    const input = document.getElementById(inputId);
+                    const label = document.getElementById(targetLabelId);
+                    const scaledVal = Number((baseTargetVal * scale).toFixed(2));
+                    if (input) {
+                        input.value = scaledVal;
+                        updateNutrientHighlight(input);
+                    }
+                    if (label) {
+                        label.textContent = `Objetivo: ${scaledVal} ${isGram ? 'g' : 'ml'}`;
+                    }
+                };
+                
+                scaleNutrient("log-nut-silica", "target-nut-silica", currentWateringItem.target_products.silica_power);
+                scaleNutrient("log-nut-calmag", "target-nut-calmag", currentWateringItem.target_products.calmag);
+                scaleNutrient("log-nut-micro", "target-nut-micro", currentWateringItem.target_products.jj_micro);
+                scaleNutrient("log-nut-grow", "target-nut-grow", currentWateringItem.target_products.jj_grow);
+                scaleNutrient("log-nut-bloom", "target-nut-bloom", currentWateringItem.target_products.jj_bloom);
+                scaleNutrient("log-nut-voodoo", "target-nut-voodoo", currentWateringItem.target_products.voodoo_juice);
+                scaleNutrient("log-nut-candy", "target-nut-candy", currentWateringItem.target_products.bud_candy);
+                scaleNutrient("log-nut-bigbud", "target-nut-bigbud", currentWateringItem.target_products.big_bud);
+                scaleNutrient("log-nut-monster", "target-nut-monster", currentWateringItem.target_products.monster_bloom, true);
+                scaleNutrient("log-nut-bac", "target-nut-bac", currentWateringItem.target_products.bac_f1, true);
+                scaleNutrient("log-nut-enzymes", "target-nut-enzymes", currentWateringItem.target_products.enzymes);
+                scaleNutrient("log-nut-flawless", "target-nut-flawless", currentWateringItem.target_products.flawless_finish);
+            }
+        });
+    }
 }
 
 function renderWateringsList() {
@@ -800,6 +868,8 @@ function openLogWateringModal(riegoNum) {
     const item = fullSchedule.find(s => s.riego_num === riegoNum);
     if (!item) return;
 
+    currentWateringItem = item;
+
     // Reset check states and highlights
     document.querySelectorAll('.nut-input-group').forEach(group => {
         group.classList.remove('added-to-mix');
@@ -829,6 +899,7 @@ function openLogWateringModal(riegoNum) {
     document.getElementById("target-nut-flawless").textContent = roundStr(item.target_products.flawless_finish);
 
     if (item.completed) {
+        document.getElementById("btn-delete-watering-log").style.display = "block";
         // Pre-fill with actual recorded data
         const cd = item.completed_data;
         document.getElementById("log-water-date").value = cd.date;
@@ -851,6 +922,7 @@ function openLogWateringModal(riegoNum) {
         document.getElementById("log-nut-enzymes").value = cd.enzymes;
         document.getElementById("log-nut-flawless").value = cd.flawless_finish;
     } else {
+        document.getElementById("btn-delete-watering-log").style.display = "none";
         // Pre-fill with target values
         setDatetimeInputNow("log-water-date");
         document.getElementById("log-water-plants").value = currentCrop.num_plants;
@@ -1023,7 +1095,31 @@ async function deleteClimateLog(logId) {
 async function fetchInventory() {
     try {
         const res = await fetch('/api/inventory');
-        inventory = await res.json();
+        const rawInventory = await res.json();
+        
+        const excelOrder = [
+            "Silica Power (BAC)",
+            "Calmag (Atami)",
+            "Jungle Juice Micro",
+            "Jungle Juice Grow",
+            "Jungle Juice Bloom",
+            "Voodoo Juice",
+            "Bud Candy",
+            "Big Bud Liquid",
+            "Monster Bloom (Grotek)",
+            "BAC F1 Extreme Booster",
+            "Atazyme",
+            "Sensizym (Advanced Nutrients)",
+            "Flawless Finish"
+        ];
+        
+        const getOrderIndex = (name) => {
+            const idx = excelOrder.findIndex(p => name.toLowerCase().includes(p.toLowerCase()) || p.toLowerCase().includes(name.toLowerCase()));
+            return idx === -1 ? 999 : idx;
+        };
+        
+        inventory = rawInventory.sort((a, b) => getOrderIndex(a.name) - getOrderIndex(b.name));
+        
         if (activeSection === "sec-inventory") renderInventoryList();
         updateFinancialSummary();
     } catch (err) {

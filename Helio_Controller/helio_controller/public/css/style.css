@@ -163,6 +163,17 @@ body {
     transform: translateY(-1px);
 }
 
+.btn-danger {
+    background-color: var(--red);
+    color: #ffffff;
+    border: none;
+}
+
+.btn-danger:hover {
+    background-color: #dc2626;
+    transform: translateY(-1px);
+}
+
 .btn-outline {
     background-color: transparent;
     border: 1px solid var(--border-color);

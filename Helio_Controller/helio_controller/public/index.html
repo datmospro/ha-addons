@@ -828,9 +828,12 @@
                         <textarea id="log-water-notes" rows="2" placeholder="Comentarios sobre la reacción de las plantas, color, drenaje..."></textarea>
                     </div>
 
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline btn-close-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-accent">Guardar Riego</button>
+                    <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <button type="button" id="btn-delete-watering-log" class="btn btn-danger" style="display: none;"><i class="fa-solid fa-trash"></i> Eliminar Registro</button>
+                        <div style="display: flex; gap: 0.75rem; margin-left: auto;">
+                            <button type="button" class="btn btn-outline btn-close-modal">Cancelar</button>
+                            <button type="submit" class="btn btn-accent">Guardar Riego</button>
+                        </div>
                     </div>
                 </form>
             </div>
