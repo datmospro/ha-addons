@@ -1073,6 +1073,46 @@ function openLogWateringModal(riegoNum) {
         updateNutrientHighlight(input);
     });
 
+    // Populate climate target tab inside watering modal
+    const cl = item.climate_targets;
+    if (cl) {
+        document.getElementById("mod-climate-height").textContent = `${cl.height_min} - ${cl.height_max} cm`;
+        document.getElementById("mod-climate-led").textContent = `${Math.round(cl.led_power * 100)}%`;
+        document.getElementById("mod-climate-dist").textContent = `${cl.light_distance} cm`;
+        document.getElementById("mod-climate-temp").textContent = `${cl.temp_day}ºC / ${cl.temp_night}ºC`;
+        document.getElementById("mod-climate-hum").textContent = `${cl.humidity}%`;
+        document.getElementById("mod-climate-vpd").textContent = `${cl.vpd.toFixed(1)} kPa`;
+        document.getElementById("mod-climate-ext").textContent = `${Math.round(cl.extractor * 100)}%`;
+        document.getElementById("mod-climate-poda").textContent = cl.poda_info || "Ninguna recomendación específica para este riego.";
+    } else {
+        document.getElementById("mod-climate-height").textContent = "-- cm";
+        document.getElementById("mod-climate-led").textContent = "--%";
+        document.getElementById("mod-climate-dist").textContent = "-- cm";
+        document.getElementById("mod-climate-temp").textContent = "-- / --";
+        document.getElementById("mod-climate-hum").textContent = "--%";
+        document.getElementById("mod-climate-vpd").textContent = "-- kPa";
+        document.getElementById("mod-climate-ext").textContent = "--%";
+        document.getElementById("mod-climate-poda").textContent = "Ninguno";
+    }
+
+    // Reset watering modal tab to default "Dosis de Riego"
+    document.querySelectorAll('.watering-modal-tab-btn').forEach(btn => {
+        if (btn.getAttribute('data-tab') === 'watering-tab-inputs') {
+            btn.classList.add('btn-accent');
+            btn.classList.remove('btn-outline');
+        } else {
+            btn.classList.add('btn-outline');
+            btn.classList.remove('btn-accent');
+        }
+    });
+    document.querySelectorAll('.watering-modal-tab-content').forEach(c => {
+        if (c.id === 'watering-tab-inputs') {
+            c.style.display = 'block';
+        } else {
+            c.style.display = 'none';
+        }
+    });
+
     openModal("modal-log-watering");
 }
 
@@ -1859,6 +1899,24 @@ function setupModals() {
     const btnNewD = document.getElementById("btn-new-crop-desktop");
     if (btnNew) btnNew.addEventListener("click", handleNewCropOpen);
     if (btnNewD) btnNewD.addEventListener("click", handleNewCropOpen);
+
+    // Watering modal tab switching
+    document.querySelectorAll('.watering-modal-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.watering-modal-tab-btn').forEach(b => {
+                b.classList.remove('btn-accent');
+                b.classList.add('btn-outline');
+            });
+            btn.classList.remove('btn-outline');
+            btn.classList.add('btn-accent');
+
+            const tabId = btn.getAttribute('data-tab');
+            document.querySelectorAll('.watering-modal-tab-content').forEach(content => {
+                content.style.display = 'none';
+            });
+            document.getElementById(tabId).style.display = 'block';
+        });
+    });
 }
 
 function openModal(modalId) {
