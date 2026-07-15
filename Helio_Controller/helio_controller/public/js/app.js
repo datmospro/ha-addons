@@ -148,6 +148,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setupModals();
     setupVpdWidget();
     setupBackupControls();
+    setupGuideSection();
     
     // Initial fetch
     fetchCrops();
@@ -192,8 +193,84 @@ function setupNavigation() {
                 renderWateringsList();
             } else if (targetSec === "sec-dashboard") {
                 updateDashboard();
+            } else if (targetSec === "sec-guide") {
+                const activeTab = document.querySelector('.guide-tab-btn.btn-accent').getAttribute('data-tab');
+                if (activeTab === 'guide-climate-table') {
+                    renderGuideClimateTable();
+                }
             }
         });
+    });
+}
+
+function setupGuideSection() {
+    // Guide sub-tabs
+    document.querySelectorAll('.guide-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.guide-tab-btn').forEach(b => {
+                b.classList.remove('btn-accent');
+                b.classList.add('btn-outline');
+            });
+            btn.classList.remove('btn-outline');
+            btn.classList.add('btn-accent');
+
+            const tabId = btn.getAttribute('data-tab');
+            document.querySelectorAll('.guide-tab-content').forEach(content => {
+                content.style.display = 'none';
+            });
+            document.getElementById(tabId).style.display = 'block';
+
+            if (tabId === 'guide-climate-table') {
+                renderGuideClimateTable();
+            }
+        });
+    });
+}
+
+function renderGuideClimateTable() {
+    const tbody = document.getElementById("guide-climate-list");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    if (!fullSchedule || fullSchedule.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="padding: 2rem; color: var(--text-secondary);">No hay datos de planificación cargados.</td></tr>`;
+        return;
+    }
+
+    fullSchedule.forEach(item => {
+        const cl = item.climate_targets;
+        if (!cl) return;
+
+        const tr = document.createElement("tr");
+        
+        const riegoNum = item.riego_num.toFixed(1);
+        const phaseWeek = `${item.phase} (Sem ${item.week})`;
+        const height = `${cl.height_min} - ${cl.height_max} cm`;
+        const ledPower = `${Math.round(cl.led_power * 100)}%`;
+        const lightDist = `${cl.light_distance} cm`;
+        const temps = `${cl.temp_day}ºC / ${cl.temp_night}ºC`;
+        const humidity = `${cl.humidity}%`;
+        const vpd = `${cl.vpd.toFixed(1)} kPa`;
+        const extractor = `${Math.round(cl.extractor * 100)}%`;
+        
+        let podaHtml = cl.poda_info || "Ninguna";
+        if (cl.poda_info && (cl.poda_info.toLowerCase().includes("poda") || cl.poda_info.toLowerCase().includes("limpiar") || cl.poda_info.toLowerCase().includes("defoliación"))) {
+            podaHtml = `<span class="badge badge-warning" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: 500; font-size: 0.85rem;"><i class="fa-solid fa-scissors"></i> ${cl.poda_info}</span>`;
+        }
+
+        tr.innerHTML = `
+            <td><strong>${riegoNum}</strong></td>
+            <td>${phaseWeek}</td>
+            <td>${height}</td>
+            <td><span style="font-weight: 600; color: #10b981;">${ledPower}</span></td>
+            <td>${lightDist}</td>
+            <td>${temps}</td>
+            <td>${humidity}</td>
+            <td>${vpd}</td>
+            <td>${extractor}</td>
+            <td>${podaHtml}</td>
+        `;
+        tbody.appendChild(tr);
     });
 }
 

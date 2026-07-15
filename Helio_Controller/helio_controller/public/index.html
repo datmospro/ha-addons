@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=1.4.3">
+    <link rel="stylesheet" href="css/style.css?v=1.4.4">
     <!-- FontAwesome Icons (loaded via cdn for simple clean UI) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -468,6 +468,130 @@
                 </div>
             </section>
 
+            <!-- SECTION: GUÍA DE CULTIVO (GUIDE & TIPS) -->
+            <section id="sec-guide" class="app-section">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-book text-green"></i> Guía y Manual de Cultivo</h2>
+                    <p class="section-desc">Instrucciones de mezcla, consejos de riego, rangos de EC óptimos y la tabla de clima completa.</p>
+                </div>
+
+                <!-- Tab Navigation inside Guide -->
+                <div class="tab-container" style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+                    <button type="button" class="btn btn-sm btn-accent guide-tab-btn" data-tab="guide-tips">Consejos y Mezcla</button>
+                    <button type="button" class="btn btn-sm btn-outline guide-tab-btn" data-tab="guide-climate-table">Tabla de Clima y Podas</button>
+                </div>
+
+                <!-- Sub-section: Guide Tips -->
+                <div id="guide-tips" class="guide-tab-content">
+                    <div class="graphs-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+                        <!-- Card: El Orden de Mezcla -->
+                        <div class="card" style="border-left: 4px solid var(--yellow);">
+                            <div class="card-header" style="display: flex; align-items: center;">
+                                <i class="fa-solid fa-flask-vial text-yellow" style="font-size: 1.5rem; margin-right: 0.75rem;"></i>
+                                <h3 class="card-title">El Orden de Mezcla (Muy Importante)</h3>
+                            </div>
+                            <div class="card-body" style="font-size: 0.95rem; line-height: 1.6; color: var(--text-secondary);">
+                                <p style="margin-bottom: 1rem; font-weight: 500; color: var(--text-primary);">
+                                    ⚠️ Para que no haya bloqueos en el tanque y la química no precipite (especialmente mezclando silicio con calcio y fósforo), vierte los productos estrictamente en este orden, removiendo bien entre cada paso:
+                                </p>
+                                <ol style="padding-left: 1.25rem; margin: 0; display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <li><strong>1º Silica Power:</strong> El silicio siempre primero en agua limpia para que no se bloquee.</li>
+                                    <li><strong>2º CalMag:</strong> Vital para estabilizar el agua bajo tus LEDs.</li>
+                                    <li><strong>3º Aditivos y Potenciadores:</strong> Voodoo Juice, Bud Candy, Big Bud, Monster Bloom (este último disuélvelo en una jarrita de agua tibia antes de echarlo al tanque) o BAC F1.</li>
+                                    <li><strong>4º Base Jungle Juice:</strong> Siempre primero el Micro, luego el Grow y finalmente el Bloom.</li>
+                                    <li><strong>5º Regula el pH final:</strong> Clávalo entre 6.0 y 6.5.</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <!-- Card: Control de la EC y Agua -->
+                        <div class="card" style="border-left: 4px solid var(--blue);">
+                            <div class="card-header" style="display: flex; align-items: center;">
+                                <i class="fa-solid fa-droplet text-blue" style="font-size: 1.5rem; margin-right: 0.75rem;"></i>
+                                <h3 class="card-title">Preparación de Agua y Rangos de EC</h3>
+                            </div>
+                            <div class="card-body" style="font-size: 0.95rem; line-height: 1.6; color: var(--text-secondary);">
+                                <p style="margin-bottom: 0.75rem;">
+                                    El agua de tu aire acondicionado actúa como agua desmineralizada (ósmosis) con una EC inicial de 0.0.
+                                </p>
+                                <ul style="padding-left: 1.25rem; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; list-style-type: disc;">
+                                    <li><strong>El paso innegociable (Base CalMag):</strong> En todos los riegos, añade primero CalMag al tanque hasta que el medidor marque una EC de <strong>0.3 a 0.4</strong>.</li>
+                                    <li><strong>Fase Crecimiento (Sem 1 y 2):</strong> La EC final debe situarse entre <strong>0.8 y 1.2</strong> (máximo 1.4 al final).</li>
+                                    <li><strong>Floración Temprana/Media (Sem 1 a 4):</strong> La EC final en el tanque debe subir progresivamente a <strong>1.4 - 1.8</strong>.</li>
+                                    <li><strong>Fase Engorde Máximo (Sem 5 a 7):</strong> Al meter Monster Bloom y BAC F1, la EC subirá a <strong>1.8 - 2.0</strong> (máximo absoluto 2.2).</li>
+                                    <li><strong>Si la EC supera 2.2:</strong> Añade un par de litros de agua limpia para diluir la mezcla a un rango seguro de 1.8 - 2.0.</li>
+                                    <li><strong>Lavado de Raíces (Sem 8):</strong> Usa solo agua desmineralizada (EC 0.0) y Flawless Finish para forzar a la planta a consumir sus reservas.</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Card: Transición de Enzimas -->
+                        <div class="card" style="border-left: 4px solid var(--accent);">
+                            <div class="card-header" style="display: flex; align-items: center;">
+                                <i class="fa-solid fa-dna text-accent" style="font-size: 1.5rem; margin-right: 0.75rem;"></i>
+                                <h3 class="card-title">Transición de Enzimas (Atazyme a Sensizym)</h3>
+                            </div>
+                            <div class="card-body" style="font-size: 0.95rem; line-height: 1.6; color: var(--text-secondary);">
+                                <p style="margin-bottom: 0.75rem;">
+                                    Aprovechamos al máximo tus 200 ml de Atazyme sobrantes para cubrir los primeros riegos de mantenimiento:
+                                </p>
+                                <ul style="padding-left: 1.25rem; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; list-style-type: disc;">
+                                    <li><strong>Riego 2 (Sem 1 Crec.):</strong> Aplica 80 ml de Atazyme completo.</li>
+                                    <li><strong>Riego 5 (Sem 2 Crec.):</strong> Aplica 120 ml de Atazyme completo. Al faltar 8 ml para la dosis ideal, completa esa diferencia con Sensizym.</li>
+                                    <li><strong>Riego 8 en adelante:</strong> Usa el Sensizym de forma normal.</li>
+                                    <li><strong>Riego 32 (Sem 7 Flor.):</strong> Marcado a 0 ml para cuadrar los 3L de Sensizym a comprar y ayudar a secar el sustrato antes del lavado.</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Card: Ahorro con Silica Power -->
+                        <div class="card" style="border-left: 4px solid var(--green);">
+                            <div class="card-header" style="display: flex; align-items: center;">
+                                <i class="fa-solid fa-leaf text-green" style="font-size: 1.5rem; margin-right: 0.75rem;"></i>
+                                <h3 class="card-title">Silica Power (Ahorro Inteligente)</h3>
+                            </div>
+                            <div class="card-body" style="font-size: 0.95rem; line-height: 1.6; color: var(--text-secondary);">
+                                <p>
+                                    Hemos ajustado la dosis de Silica Power a una microdosis de <strong>0.15 ml por Litro</strong> en TODOS los riegos (tanto de abono como de mantenimiento).
+                                </p>
+                                <p style="margin-top: 0.5rem;">
+                                    Esta cantidad es suficiente para blindar las ramas frente al peso de los cogollos potenciados con Monster Bloom, y permite gastar exactamente <strong>552 ml</strong>, agotando tu bote sobrante de 550 ml de manera perfecta sin gastar un euro de más.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub-section: Climate Table -->
+                <div id="guide-climate-table" class="guide-tab-content" style="display: none;">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="table-container">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Riego</th>
+                                            <th>Fase / Semana</th>
+                                            <th>Altura Planta</th>
+                                            <th>LED Potencia</th>
+                                            <th>Distancia Foco</th>
+                                            <th>Temp (D/N)</th>
+                                            <th>Humedad</th>
+                                            <th>VPD Obj.</th>
+                                            <th>Extractor</th>
+                                            <th>Podas y Tareas Extra</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="guide-climate-list">
+                                        <!-- Dynamically populated -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- SECTION: HISTORIAL (GRAPHS AND LOGS) -->
             <section id="sec-history" class="app-section">
                 <div class="section-header">
@@ -570,6 +694,10 @@
                 <i class="fa-solid fa-chart-line"></i>
                 <span>Gráficos</span>
             </button>
+            <button class="nav-btn" data-target="sec-guide">
+                <i class="fa-solid fa-book"></i>
+                <span>Guía</span>
+            </button>
         </nav>
 
         <!-- Sidebar / Navigation for Desktop -->
@@ -608,6 +736,9 @@
                 </button>
                 <button class="sidebar-btn" data-target="sec-history">
                     <i class="fa-solid fa-chart-line"></i> Historial y Gráficos
+                </button>
+                <button class="sidebar-btn" data-target="sec-guide">
+                    <i class="fa-solid fa-book"></i> Guía de Cultivo
                 </button>
             </nav>
         </aside>
@@ -924,6 +1055,6 @@
         </div>
     </div>
 
-    <script src="js/app.js?v=1.4.3"></script>
+    <script src="js/app.js?v=1.4.4"></script>
 </body>
 </html>
