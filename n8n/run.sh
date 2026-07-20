@@ -17,6 +17,10 @@ if [ -f /data/options.json ]; then
       console.log('export N8N_SSL_KEY=\"/ssl/' + options.keyfile + '\";');
     }
     
+    if (options.cmd_line_args) {
+      console.log('export CMD_LINE_ARGS=\"' + options.cmd_line_args.replace(/\"/g, '\\\"') + '\";');
+    }
+    
     if (options.env_vars_list && Array.isArray(options.env_vars_list)) {
       options.env_vars_list.forEach(item => {
         const idx = item.indexOf('=');
@@ -47,5 +51,9 @@ else
   echo "ADVERTENCIA: No se pudo localizar el archivo base-path.js para aplicar el parche dinámico."
 fi
 
-# Ejecutar el entrypoint oficial de n8n
-exec /docker-entrypoint.sh n8n
+# Ejecutar el entrypoint oficial de n8n (el script antepone automáticamente "n8n" a sus argumentos)
+if [ -n "$CMD_LINE_ARGS" ]; then
+  exec /docker-entrypoint.sh $CMD_LINE_ARGS
+else
+  exec /docker-entrypoint.sh start
+fi
