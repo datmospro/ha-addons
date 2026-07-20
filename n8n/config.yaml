@@ -1,6 +1,6 @@
 name: "n8n"
 description: "Servidor de automatización de flujos de trabajo basado en nodos n8n con soporte dinámico de Ingress y acceso directo"
-version: "1.0.1"
+version: "1.0.2"
 slug: "n8n"
 arch:
   - aarch64

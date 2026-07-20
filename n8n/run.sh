@@ -23,7 +23,12 @@ if [ -f /data/options.json ]; then
     
     if (options.env_vars_list && Array.isArray(options.env_vars_list)) {
       options.env_vars_list.forEach(item => {
-        const idx = item.indexOf('=');
+        // Encontrar el primer separador (ya sea '=' o ':')
+        let idx = item.indexOf('=');
+        if (idx === -1) {
+          idx = item.indexOf(':');
+        }
+        
         if (idx > -1) {
           const key = item.substring(0, idx).trim();
           const val = item.substring(idx + 1).trim();
@@ -46,7 +51,7 @@ BASE_PATH_JS=$(find /usr/local/lib/node_modules/n8n /usr/lib/node_modules/n8n -n
 
 if [ -n "$BASE_PATH_JS" ]; then
   echo "Aplicando parche dinámico para base-path.js en: $BASE_PATH_JS"
-  echo 'const match = window.location.pathname.match(/^\/api\/hassio_ingress\/[^/]+\//); window.BASE_PATH = match ? match[0] : "/";' > "$BASE_PATH_JS"
+  echo 'const match = window.location.pathname.match(/^\/api\/hassio_ingress\/[^/]+/); window.BASE_PATH = match ? match[0] + "/" : "/";' > "$BASE_PATH_JS"
 else
   echo "ADVERTENCIA: No se pudo localizar el archivo base-path.js para aplicar el parche dinámico."
 fi
