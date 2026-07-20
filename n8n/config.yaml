@@ -1,0 +1,34 @@
+name: "n8n"
+description: "Servidor de automatización de flujos de trabajo basado en nodos n8n con soporte dinámico de Ingress y acceso directo"
+version: "1.0.0"
+slug: "n8n"
+arch:
+  - aarch64
+  - amd64
+startup: "application"
+boot: "auto"
+ingress: true
+ingress_port: 5678
+ingress_stream: true
+panel_icon: "mdi:sitemap"
+panel_title: "n8n"
+map:
+  - ssl:ro
+  - share:rw
+  - media:rw
+ports:
+  5678/tcp: 5678
+  8081/tcp: 8081
+options:
+  timezone: "Europe/Madrid"
+  ssl: false
+  certfile: ""
+  keyfile: ""
+  env_vars_list: []
+schema:
+  timezone: str?
+  ssl: bool?
+  certfile: str?
+  keyfile: str?
+  env_vars_list:
+    - str?
