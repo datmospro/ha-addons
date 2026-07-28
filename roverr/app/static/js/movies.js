@@ -434,7 +434,7 @@ function renderMovieDetails(container, movie, hash) {
                     <div class="providers-list" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
                         ${movie.watch_providers.map(p => `
                             <div class="provider-badge" title="${escapeHtml(p.name)}" style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 4px 10px; border-radius: 8px; backdrop-filter: blur(4px);">
-                                ${p.logo_url ? `<img src="${p.logo_url}" alt="${escapeHtml(p.name)}" style="width: 22px; height: 22px; border-radius: 5px; object-fit: cover;">` : '<i class="fa-solid fa-play-circle" style="color: #6366f1;"></i>'}
+                                ${p.logo_url ? `<img src="${p.logo_url}" alt="${escapeHtml(p.name)}" onerror="this.style.display='none'" style="width: 22px; height: 22px; border-radius: 5px; object-fit: contain;">` : '<i class="fa-solid fa-play-circle" style="color: #6366f1;"></i>'}
                                 <span style="font-size: 0.85rem; font-weight: 500;">${escapeHtml(p.name)}</span>
                             </div>
                         `).join('')}
