@@ -428,18 +428,16 @@ function renderMovieDetails(container, movie, hash) {
                     </div>
                 </div>` : ''}
 
-                ${movie.watch_providers && movie.watch_providers.length > 0 ? `
-                <div class="providers-section" style="margin-top: 1rem; margin-bottom: 0.5rem;">
-                    <h3 style="font-size: 0.95rem; color: var(--text-muted, #a0aec0); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-tv"></i> Disponible en / Plataforma</h3>
-                    <div class="providers-list" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                        ${movie.watch_providers.map(p => `
-                            <div class="provider-badge" title="${escapeHtml(p.name)}" style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 4px 10px; border-radius: 8px; backdrop-filter: blur(4px);">
-                                ${p.logo_url ? `<img src="${p.logo_url}" alt="${escapeHtml(p.name)}" onerror="this.style.display='none'" style="width: 22px; height: 22px; border-radius: 5px; object-fit: contain;">` : '<i class="fa-solid fa-play-circle" style="color: #6366f1;"></i>'}
-                                <span style="font-size: 0.85rem; font-weight: 500;">${escapeHtml(p.name)}</span>
+                <div class="providers-section" style="margin-top: 1rem; margin-bottom: 0.8rem;">
+                    <h3 style="font-size: 0.95rem; color: var(--text-muted, #a0aec0); margin-bottom: 0.6rem; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-tv"></i> Disponible en / Plataforma</h3>
+                    <div class="providers-list" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                        ${(movie.watch_providers && movie.watch_providers.length > 0 ? movie.watch_providers : [{name: 'Cine', logo_url: 'providers/cine.svg'}]).map(p => `
+                            <div class="provider-logo-card" title="${escapeHtml(p.name)}" style="display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); padding: 3px; border-radius: 12px; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                                <img src="${p.logo_url || 'providers/cine.svg'}" alt="${escapeHtml(p.name)}" onerror="this.src='providers/cine.svg'" style="width: 48px; height: 48px; border-radius: 9px; object-fit: cover; display: block;">
                             </div>
                         `).join('')}
                     </div>
-                </div>` : ''}
+                </div>
                 
                 <div class="ratings-section">
                     <h3>Ratings</h3>

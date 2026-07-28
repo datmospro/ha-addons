@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <rect width="120" height="120" rx="24" fill="#D90429"/>
+  <path d="M35 38 H85 V82 H35 Z" fill="#FFFFFF"/>
+  <path d="M40 38 L48 48 H40 Z M54 38 L62 48 H54 Z M68 38 L76 48 H68 Z" fill="#D90429"/>
+  <path d="M40 48 H85 V52 H40 Z" fill="#2B2D42"/>
+  <text x="60" y="74" font-family="Arial, sans-serif" font-weight="900" font-size="20" fill="#2B2D42" letter-spacing="2" text-anchor="middle">CINE</text>
+</svg>

@@ -875,6 +875,10 @@ def detect_source_info(torrent_name, watch_providers_json=None):
             elif 'DSNP' in upper_name or 'DISNEY' in upper_name:
                 providers.append({'name': 'Disney+', 'logo_url': 'providers/disney.svg'})
 
+    # Default to Cine if no streaming provider found
+    if not providers:
+        providers.append({'name': 'Cine', 'logo_url': 'providers/cine.svg'})
+
     return {
         'watch_providers': providers,
         'source_tag': source_tag
