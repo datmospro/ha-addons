@@ -742,56 +742,6 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False, tmdb_
         
         # Get production country (use first country if multiple)
         production_countries = details.get('production_countries', [])
-        country_code = None
-        if production_countries and len(production_countries) > 0:
-            country_code = production_countries[0].get('iso_3166_1')  # e.g., 'US', 'ES', 'FR'
-        
-def get_provider_local_logo(p_name, logo_path=None):
-    """
-    Returns relative path to local SVG/PNG provider logo.
-    Skips external URL issues in Home Assistant Ingress.
-    """
-    if not p_name:
-        return None
-
-    name_lower = p_name.lower()
-    if 'netflix' in name_lower or 'nf' == name_lower:
-        return 'providers/netflix.svg'
-    elif 'amazon' in name_lower or 'prime' in name_lower or 'amzn' in name_lower:
-        return 'providers/prime.svg'
-    elif 'hbo' in name_lower or 'max' in name_lower or 'hmax' in name_lower:
-        return 'providers/hbo.svg'
-    elif 'disney' in name_lower or 'dsnp' in name_lower:
-        return 'providers/disney.svg'
-    elif 'apple' in name_lower:
-        return 'providers/appletv.svg'
-    elif 'sky' in name_lower or 'showtime' in name_lower:
-        return 'providers/skyshowtime.svg'
-    elif 'movistar' in name_lower:
-        return 'providers/movistar.svg'
-    elif 'filmin' in name_lower:
-        return 'providers/filmin.svg'
-
-    # Download remote TMDB logo locally if provided
-    if logo_path:
-        try:
-            filename = f"prov_{abs(hash(p_name))}.png"
-            remote_url = f"https://image.tmdb.org/t/p/w92{logo_path}" if logo_path.startswith('/') else logo_path
-            save_dir = os.path.join(os.path.dirname(__file__), 'static', 'posters')
-            os.makedirs(save_dir, exist_ok=True)
-            save_path = os.path.join(save_dir, filename)
-            if not os.path.exists(save_path):
-                res = requests.get(remote_url, timeout=5)
-                if res.status_code == 200:
-                    with open(save_path, 'wb') as f:
-                        f.write(res.content)
-            if os.path.exists(save_path):
-                return f"posters/{filename}"
-        except Exception as e:
-            logger.warning(f"Failed downloading provider logo {p_name}: {e}")
-
-    return None
-
         # Get watch providers
         watch_providers = []
         try:
@@ -841,6 +791,52 @@ def get_provider_local_logo(p_name, logo_path=None):
     except Exception as e:
         logger.error(f"❌ [TMDB] API error for '{title}' ({year}): {e}")
         return None
+
+def get_provider_local_logo(p_name, logo_path=None):
+    """
+    Returns relative path to local SVG/PNG provider logo.
+    Skips external URL issues in Home Assistant Ingress.
+    """
+    if not p_name:
+        return None
+
+    name_lower = p_name.lower()
+    if 'netflix' in name_lower or 'nf' == name_lower:
+        return 'providers/netflix.svg'
+    elif 'amazon' in name_lower or 'prime' in name_lower or 'amzn' in name_lower:
+        return 'providers/prime.svg'
+    elif 'hbo' in name_lower or 'max' in name_lower or 'hmax' in name_lower:
+        return 'providers/hbo.svg'
+    elif 'disney' in name_lower or 'dsnp' in name_lower:
+        return 'providers/disney.svg'
+    elif 'apple' in name_lower:
+        return 'providers/appletv.svg'
+    elif 'sky' in name_lower or 'showtime' in name_lower:
+        return 'providers/skyshowtime.svg'
+    elif 'movistar' in name_lower:
+        return 'providers/movistar.svg'
+    elif 'filmin' in name_lower:
+        return 'providers/filmin.svg'
+
+    # Download remote TMDB logo locally if provided
+    if logo_path:
+        try:
+            filename = f"prov_{abs(hash(p_name))}.png"
+            remote_url = f"https://image.tmdb.org/t/p/w92{logo_path}" if logo_path.startswith('/') else logo_path
+            save_dir = os.path.join(os.path.dirname(__file__), 'static', 'posters')
+            os.makedirs(save_dir, exist_ok=True)
+            save_path = os.path.join(save_dir, filename)
+            if not os.path.exists(save_path):
+                res = requests.get(remote_url, timeout=5)
+                if res.status_code == 200:
+                    with open(save_path, 'wb') as f:
+                        f.write(res.content)
+            if os.path.exists(save_path):
+                return f"posters/{filename}"
+        except Exception as e:
+            logger.warning(f"Failed downloading provider logo {p_name}: {e}")
+
+    return None
 
 def detect_source_info(torrent_name, watch_providers_json=None):
     """
