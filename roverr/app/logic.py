@@ -746,6 +746,31 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False, tmdb_
         if production_countries and len(production_countries) > 0:
             country_code = production_countries[0].get('iso_3166_1')  # e.g., 'US', 'ES', 'FR'
         
+        # Get watch providers
+        watch_providers = []
+        try:
+            providers_url = f"https://api.themoviedb.org/3/movie/{movie_id}/watch/providers"
+            providers_res = requests.get(providers_url, params={"api_key": api_key}, timeout=5)
+            if providers_res.status_code == 200:
+                p_results = providers_res.json().get('results', {})
+                current_lang = get_language()
+                pref_country = current_lang.split('-')[-1].upper() if '-' in current_lang else 'ES'
+                country_data = p_results.get(pref_country) or p_results.get('ES') or p_results.get('US') or (next(iter(p_results.values())) if p_results else {})
+                seen_provs = set()
+                for p_type in ['flatrate', 'rent', 'buy']:
+                    for prov in country_data.get(p_type, []):
+                        p_name = prov.get('provider_name')
+                        if p_name and p_name not in seen_provs:
+                            seen_provs.add(p_name)
+                            logo = prov.get('logo_path')
+                            watch_providers.append({
+                                'name': p_name,
+                                'logo_url': f"https://image.tmdb.org/t/p/w92{logo}" if logo else None,
+                                'type': p_type
+                            })
+        except Exception as e:
+            logger.warning(f"⚠️ [TMDB] Failed to fetch watch providers for ID {movie_id}: {e}")
+
         return {
             'title': details.get('title'),
             'year': details.get('release_date', '')[:4],
@@ -762,12 +787,50 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False, tmdb_
             'imdb_rating': imdb_rating,
             'imdb_votes': imdb_votes,
             'tmdb_id': movie_id,  # Add TMDB ID for multi-language search
-            'country_code': country_code  # Add country code for flag display
+            'country_code': country_code,  # Add country code for flag display
+            'watch_providers': json.dumps(watch_providers)
         }
         
     except Exception as e:
         logger.error(f"❌ [TMDB] API error for '{title}' ({year}): {e}")
         return None
+
+def detect_source_info(torrent_name, watch_providers_json=None):
+    """
+    Analyzes torrent name and TMDB watch providers to return platform/source details.
+    """
+    providers = []
+    if watch_providers_json:
+        try:
+            providers = json.loads(watch_providers_json) if isinstance(watch_providers_json, str) else watch_providers_json
+        except Exception:
+            providers = []
+
+    source_tag = None
+    if torrent_name:
+        upper_name = torrent_name.upper()
+        if any(tag in upper_name for tag in ['CAM', 'CAMRIP', 'TELESYNC', 'TS', 'HDCAM']):
+            source_tag = 'Cine'
+        elif any(tag in upper_name for tag in ['WEB-DL', 'WEBRIP', 'WEB']):
+            source_tag = 'WEB-DL'
+        elif 'BLURAY' in upper_name or 'BDRIP' in upper_name:
+            source_tag = 'BluRay'
+
+        # Fallback platform logos from torrent tags if watch_providers is empty
+        if not providers:
+            if 'NF' in upper_name or 'NETFLIX' in upper_name:
+                providers.append({'name': 'Netflix', 'logo_url': 'https://image.tmdb.org/t/p/w92/pbpMk2JmcoNnQwx5JGp8jWnL29W.jpg'})
+            elif 'HMAX' in upper_name or 'HBO' in upper_name or 'MAX' in upper_name:
+                providers.append({'name': 'HBO Max', 'logo_url': 'https://image.tmdb.org/t/p/w92/7A41gYzAJi8yuF6N4t3zL1w7j3.jpg'})
+            elif 'AMZN' in upper_name or 'PRIME' in upper_name:
+                providers.append({'name': 'Amazon Prime Video', 'logo_url': 'https://image.tmdb.org/t/p/w92/p11tstFWvL2p8dOz4393Tzg3w9W.jpg'})
+            elif 'DSNP' in upper_name or 'DISNEY' in upper_name:
+                providers.append({'name': 'Disney+', 'logo_url': 'https://image.tmdb.org/t/p/w92/97yvRBwAQ2G7U3w3nFh71bZ4z3.jpg'})
+
+    return {
+        'watch_providers': providers,
+        'source_tag': source_tag
+    }
 
 def get_movie_videos(tmdb_id, api_key):
     """
@@ -1089,6 +1152,7 @@ def sync_movies(torrents, api_key):
                             imdb_votes=metadata.get('imdb_votes'),
                             tmdb_id=metadata.get('tmdb_id'),  # Save TMDB ID for multi-language search
                             country_code=metadata.get('country_code'),  # Save country code for flag display
+                            watch_providers=metadata.get('watch_providers'),
                             metadata_updated_at=datetime.now(),
                             torrent_name=t['name']
                         )
@@ -1711,6 +1775,9 @@ def get_movie_details(torrent_hash, api_key):
                     except Exception as e:
                         logger.error(f"Error triggering background backdrop download: {e}")
             
+            watch_prov_raw = movie.watch_providers if hasattr(movie, 'watch_providers') else None
+            source_info = detect_source_info(movie.torrent_name or name, watch_prov_raw)
+
             movie_details = {
                 "title": movie.title,
                 "year": movie.year,
@@ -1728,6 +1795,8 @@ def get_movie_details(torrent_hash, api_key):
                 "imdb_votes": movie.imdb_votes,
                 "tmdb_id": movie.tmdb_id if hasattr(movie, 'tmdb_id') else None,
                 "country_code": movie.country_code if hasattr(movie, 'country_code') else None,
+                "watch_providers": source_info['watch_providers'],
+                "source_tag": source_info['source_tag'],
                 "poster_updated": int(movie.metadata_updated_at.timestamp()) if movie.metadata_updated_at else 0,
                 "status_reason": movie.status_reason if hasattr(movie, 'status_reason') else None
             }
@@ -1764,6 +1833,8 @@ def get_movie_details(torrent_hash, api_key):
                 crew = json.loads(metadata.get('crew', '[]'))
                 genres = json.loads(metadata.get('genres', '[]')) if isinstance(metadata.get('genres'), str) else []
                 
+                source_info = detect_source_info(name, metadata.get('watch_providers'))
+
                 movie_details = {
                     "title": metadata.get('title', title),
                     "year": metadata.get('year', year),
@@ -1781,6 +1852,8 @@ def get_movie_details(torrent_hash, api_key):
                     "imdb_votes": metadata.get('imdb_votes'),
                     "tmdb_id": metadata.get('tmdb_id'),
                     "country_code": metadata.get('country_code'),
+                    "watch_providers": source_info['watch_providers'],
+                    "source_tag": source_info['source_tag'],
                     "poster_updated": int(datetime.now().timestamp())
                 }
                 
@@ -1800,6 +1873,7 @@ def get_movie_details(torrent_hash, api_key):
                     movie.imdb_id = metadata.get('imdb_id')
                     movie.imdb_rating = metadata.get('imdb_rating')
                     movie.imdb_votes = metadata.get('imdb_votes')
+                    movie.watch_providers = metadata.get('watch_providers')
                     movie.metadata_updated_at = datetime.now()
                     movie.save()
             else:

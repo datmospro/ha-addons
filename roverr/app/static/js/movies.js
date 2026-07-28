@@ -399,6 +399,7 @@ function renderMovieDetails(container, movie, hash) {
                 
                 <div class="meta-row">
                     <span class="badge status ${statusClass}"${movie.status === 'new' && movie.status_reason ? ` title="${escapeHtml(movie.status_reason)}"` : ''}>${statusIcon} ${statusLabel}</span>
+                    ${movie.source_tag ? `<span class="badge source-tag" style="background: rgba(255, 107, 107, 0.15); color: #ff6b6b; border: 1px solid rgba(255, 107, 107, 0.3); font-weight: 600;"><i class="fa-solid fa-film"></i> ${escapeHtml(movie.source_tag)}</span>` : ''}
                     <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
                     <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${movie.size > 0 ? formatBytes(movie.size) : 'N/A'}</span>
                     ${movie.country_code ? `<span class="badge country" title="${escapeHtml(getCountryName(movie.country_code))}"><span class="flag-emoji">${countryCodeToFlag(movie.country_code)}</span></span>` : ''}
@@ -424,6 +425,19 @@ function renderMovieDetails(container, movie, hash) {
                     </div>
                     <div class="progress-bar large">
                         <div class="details-progress-fill downloading" style="width: ${movie.download_stats.progress}%"></div>
+                    </div>
+                </div>` : ''}
+
+                ${movie.watch_providers && movie.watch_providers.length > 0 ? `
+                <div class="providers-section" style="margin-top: 1rem; margin-bottom: 0.5rem;">
+                    <h3 style="font-size: 0.95rem; color: var(--text-muted, #a0aec0); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-tv"></i> Disponible en / Plataforma</h3>
+                    <div class="providers-list" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                        ${movie.watch_providers.map(p => `
+                            <div class="provider-badge" title="${escapeHtml(p.name)}" style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 4px 10px; border-radius: 8px; backdrop-filter: blur(4px);">
+                                ${p.logo_url ? `<img src="${p.logo_url}" alt="${escapeHtml(p.name)}" style="width: 22px; height: 22px; border-radius: 5px; object-fit: cover;">` : '<i class="fa-solid fa-play-circle" style="color: #6366f1;"></i>'}
+                                <span style="font-size: 0.85rem; font-weight: 500;">${escapeHtml(p.name)}</span>
+                            </div>
+                        `).join('')}
                     </div>
                 </div>` : ''}
                 

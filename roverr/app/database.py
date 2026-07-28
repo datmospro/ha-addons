@@ -55,6 +55,7 @@ class Movie(BaseModel):
     watchlist_expiry = DateTimeField(null=True) # Expiration date for watchlist
     status_reason = CharField(null=True) # Reason for current status (e.g., why stuck in 'new')
     ignored_at = DateTimeField(null=True) # Timestamp of when the movie was ignored
+    watch_providers = TextField(null=True) # JSON string with streaming providers data
 
 def migrate_db():
     """
@@ -81,7 +82,8 @@ def migrate_db():
         ('watchlist', 'BOOLEAN'),
         ('watchlist_expiry', 'DATETIME'),
         ('status_reason', 'TEXT'),
-        ('ignored_at', 'DATETIME')
+        ('ignored_at', 'DATETIME'),
+        ('watch_providers', 'TEXT')
     ]
     
     try:
