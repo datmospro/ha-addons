@@ -1262,9 +1262,80 @@ def sync_movies(torrents, api_key):
                 movie.status = 'orphaned'
                 movie.progress = 0.0
                 movie.state = 'orphaned'
-                movie.save()
+        # Auto-enrich movies with missing metadata/posters in background
+    if api_key:
+        threading.Thread(target=enrich_missing_metadata_background, args=(api_key,), daemon=True).start()
 
     trigger_movies_update_callback()
+
+
+def enrich_missing_metadata_background(api_key):
+    """
+    Scans database for movies missing TMDB metadata/posters and updates them in background.
+    """
+    try:
+        missing_movies = list(Movie.select().where(
+            (Movie.ignored == False) & 
+            ((Movie.poster_path.is_null()) | (Movie.overview.is_null()) | (Movie.tmdb_id.is_null()))
+        ))
+        if not missing_movies:
+            return
+
+        logger.info(f"🔄 [TMDB AUTO-ENRICH] Found {len(missing_movies)} movie(s) with missing metadata/posters. Starting background enrichment...")
+        updated_any = False
+
+        for m in missing_movies:
+            try:
+                search_title = m.title
+                search_year = m.year
+                if m.torrent_name:
+                    cleaned_title, cleaned_year = clean_torrent_name(m.torrent_name)
+                    if cleaned_title:
+                        search_title = cleaned_title
+                    if cleaned_year:
+                        search_year = cleaned_year
+
+                metadata = fetch_complete_movie_metadata(search_title, search_year, api_key)
+                if metadata:
+                    poster_local = m.poster_path
+                    backdrop_local = m.backdrop_path
+
+                    if metadata.get('poster_path') and not poster_local:
+                        poster_url = f"https://image.tmdb.org/t/p/w500{metadata.get('poster_path')}"
+                        poster_local = download_image(poster_url, f"{m.torrent_hash}_poster.jpg")
+
+                    if metadata.get('backdrop_path') and not backdrop_local:
+                        backdrop_url = f"https://image.tmdb.org/t/p/w1280{metadata.get('backdrop_path')}"
+                        backdrop_local = download_image(backdrop_url, f"{m.torrent_hash}_backdrop.jpg")
+
+                    m.title = metadata.get('title', m.title)
+                    m.year = metadata.get('year', m.year)
+                    m.poster_path = poster_local
+                    m.backdrop_path = backdrop_local
+                    m.overview = metadata.get('overview')
+                    m.runtime = metadata.get('runtime')
+                    m.genres = metadata.get('genres')
+                    m.cast = metadata.get('cast')
+                    m.crew = metadata.get('crew')
+                    m.vote_average = metadata.get('vote_average')
+                    m.vote_count = metadata.get('vote_count')
+                    m.imdb_id = metadata.get('imdb_id')
+                    m.imdb_rating = metadata.get('imdb_rating')
+                    m.imdb_votes = metadata.get('imdb_votes')
+                    m.tmdb_id = metadata.get('tmdb_id')
+                    m.country_code = metadata.get('country_code')
+                    m.watch_providers = metadata.get('watch_providers')
+                    m.metadata_updated_at = datetime.now()
+                    m.save()
+                    updated_any = True
+                    logger.info(f"✅ [TMDB AUTO-ENRICH] Successfully updated '{m.title}' ({m.year})")
+            except Exception as e:
+                logger.warning(f"⚠️ [TMDB AUTO-ENRICH] Failed for '{m.title}': {e}")
+
+        if updated_any:
+            trigger_movies_update_callback()
+    except Exception as e:
+        logger.error(f"❌ [TMDB AUTO-ENRICH] Background thread error: {e}")
 
 
 def re_download_poster_background(title, year, torrent_hash, api_key):
