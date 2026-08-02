@@ -742,6 +742,7 @@ def fetch_complete_movie_metadata(title, year, api_key, images_only=False, tmdb_
         
         # Get production country (use first country if multiple)
         production_countries = details.get('production_countries', [])
+        country_code = production_countries[0].get('iso_3166_1') if production_countries else None
         # Get watch providers
         watch_providers = []
         try:
