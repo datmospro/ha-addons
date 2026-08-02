@@ -245,7 +245,7 @@ function createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel)
     card.innerHTML = `
         <input type="checkbox" class="movie-card-checkbox">
         <div class="poster-wrapper">
-            <img src="${posterSrc}" alt="${escapeHtml(movie.title)}" loading="lazy">
+            <img src="${posterSrc}" alt="${escapeHtml(movie.title)}" loading="lazy" onerror="this.onerror=null; this.src='posters/placeholder_unidentified.png';">
             <div class="overlay-status ${statusClass}"${movie.status === 'new' && movie.status_reason ? ` title="${escapeHtml(movie.status_reason)}"` : ''}>
                 ${statusIcon} ${statusLabel}
             </div>

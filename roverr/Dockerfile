@@ -24,7 +24,8 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     jinja2 \
     aiofiles \
     requests \
-    feedparser
+    feedparser \
+    websockets
 
 WORKDIR /app
 
