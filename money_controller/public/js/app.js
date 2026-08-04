@@ -3497,6 +3497,9 @@ async function unskipRecurringOccurrence(ruleId, recurrenceDate) {
       showToast(data.error || 'Error al restaurar la ocurrencia', 'error');
     }
   } catch (err) {
+    console.error('Error unskipping occurrence:', err);
+    showToast('Error de conexión al restaurar la ocurrencia', 'error');
+  }
 }
 
 function switchRecSubtab(subtab) {
