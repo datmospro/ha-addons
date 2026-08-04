@@ -167,9 +167,11 @@ async function runForecastCalculation() {
     // Load fresh recurring rules to obtain current ending dates for chart/calendar indicators
     try {
       const rulesRes = await fetch('/api/recurring');
-      recurringRules = await rulesRes.json();
+      const rawRulesData = await rulesRes.json();
+      recurringRules = Array.isArray(rawRulesData) ? rawRulesData : [];
     } catch (err) {
       console.error('Error fetching fresh recurring rules for forecast:', err);
+      recurringRules = [];
     }
     
     let res;
@@ -281,7 +283,8 @@ async function renderDashboard() {
   
   try {
     const txRes = await fetch(`/api/transactions?start_date=${startOfPrevMonth}&end_date=${endOfMonth}`);
-    const allTxs = await txRes.json();
+    const rawTxData = await txRes.json();
+    const allTxs = Array.isArray(rawTxData) ? rawTxData : (rawTxData.transactions || []);
     
     // Compute current month stats (applying shifted income rules)
     let incomesSum = 0;
@@ -700,7 +703,8 @@ async function renderCompareMonthlyBarChart() {
     const startRange = formatDate(prevFirstMonthDate);
     const endRange = monthData[5].end;
     const res = await fetch(`/api/transactions?start_date=${startRange}&end_date=${endRange}`);
-    const txs = await res.json();
+    const rawTxsData = await res.json();
+    const txs = Array.isArray(rawTxsData) ? rawTxsData : (rawTxsData.transactions || []);
     
     const shiftCatId = settings.shift_income_category ? parseInt(settings.shift_income_category) : null;
     const shiftDay = settings.shift_income_day ? parseInt(settings.shift_income_day) : 25;
@@ -1211,7 +1215,8 @@ async function renderRecurringTab() {
 
   try {
     const res = await fetch('/api/recurring');
-    const rawRules = await res.json();
+    const rawRulesData = await res.json();
+    const rawRules = Array.isArray(rawRulesData) ? rawRulesData : [];
 
     // Map rules to include nextChargeDate and lastChargeDate
     recurringRules = rawRules.map(rule => {
