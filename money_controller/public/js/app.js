@@ -1296,6 +1296,14 @@ async function renderRecurringTab() {
         const valA = a.remaining_occurrences !== null && a.remaining_occurrences !== undefined ? a.remaining_occurrences : -1;
         const valB = b.remaining_occurrences !== null && b.remaining_occurrences !== undefined ? b.remaining_occurrences : -1;
         return valB - valA;
+      } else if (recSort === 'total-remaining-desc') {
+        const valA = a.total_remaining_amount !== null && a.total_remaining_amount !== undefined ? a.total_remaining_amount : -1;
+        const valB = b.total_remaining_amount !== null && b.total_remaining_amount !== undefined ? b.total_remaining_amount : -1;
+        return valB - valA;
+      } else if (recSort === 'total-remaining-asc') {
+        const valA = a.total_remaining_amount !== null && a.total_remaining_amount !== undefined ? a.total_remaining_amount : 999999999;
+        const valB = b.total_remaining_amount !== null && b.total_remaining_amount !== undefined ? b.total_remaining_amount : 999999999;
+        return valA - valB;
       } else if (recSort === 'amount-desc') {
         return b.amount - a.amount;
       } else if (recSort === 'amount-asc') {
@@ -1370,7 +1378,7 @@ async function renderRecurringTab() {
         });
       } else {
         const placeholderRow = document.createElement('tr');
-        placeholderRow.innerHTML = `<td colspan="8" class="text-center text-muted" style="padding: 20px; font-style: italic;">No hay movimientos fijos activos.</td>`;
+        placeholderRow.innerHTML = `<td colspan="10" class="text-center text-muted" style="padding: 20px; font-style: italic;">No hay movimientos fijos activos.</td>`;
         listBody.appendChild(placeholderRow);
       }
 
@@ -1378,7 +1386,7 @@ async function renderRecurringTab() {
       if (finishedRules.length > 0) {
         const headerRow = document.createElement('tr');
         headerRow.innerHTML = `
-          <td colspan="8" style="padding-top: 25px; padding-bottom: 10px; font-weight: 600; font-size: 1rem; color: var(--text-muted); border-bottom: 1px solid var(--border-color); background: transparent;">
+          <td colspan="10" style="padding-top: 25px; padding-bottom: 10px; font-weight: 600; font-size: 1rem; color: var(--text-muted); border-bottom: 1px solid var(--border-color); background: transparent;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <i data-lucide="archive" style="width: 16px;"></i> Historial de Movimientos Finalizados
             </div>
@@ -1483,6 +1491,9 @@ async function renderRecurringTab() {
       </td>
       <td>
         ${rule.end_date ? `<span class="badge" style="background: rgba(251, 146, 60, 0.15); color: #fb923c; font-weight: 600;">${rule.remaining_occurrences !== null ? rule.remaining_occurrences + ' cuotas' : '-'}</span>` : '<span class="text-muted">-</span>'}
+      </td>
+      <td class="text-right">
+        ${rule.total_remaining_amount !== null ? `<strong style="color: #fb923c;">${formatCurrency(rule.total_remaining_amount)}</strong>` : '<span class="text-muted">-</span>'}
       </td>
       <td>${rule.end_date ? formatDisplayDate(rule.end_date) : 'Indefinido'}</td>
       <td class="text-right tx-amount ${rule.type}">
