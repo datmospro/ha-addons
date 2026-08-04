@@ -1393,16 +1393,18 @@ async function renderRecurringTab() {
         ${rule.notes ? `<span class="notes-txt" style="margin-top: 4px; font-style: italic;"><i data-lucide="file-text"></i> ${escapeHtml(rule.notes)}</span>` : ''}
       </div>
 
-      <div class="recurring-card-actions" style="display: flex; align-items: center; justify-content: space-between;">
-        ${rule.nextChargeDate ? `<button class="btn btn-secondary btn-sm" onclick="skipRecurringOccurrence(${rule.id}, '${formatDate(rule.nextChargeDate)}', '${escapeHtml(rule.description)}')" style="padding: 3px 8px; font-size: 0.75rem; color: #f87171; border-color: rgba(248,113,113,0.3);" title="Omitir el próximo cargo del ${formatDisplayDate(formatDate(rule.nextChargeDate))}">🚫 Omitir próximo</button>` : '<span></span>'}
-        <div style="display: flex; gap: 4px;">
-          <button class="btn-table-action" onclick="openEditRecurring(${rule.id})" title="Editar">
-            <i data-lucide="edit-3" style="width: 16px;"></i>
+      <div class="recurring-card-actions">
+        ${rule.nextChargeDate ? `
+          <button class="btn-table-action" onclick="skipRecurringOccurrence(${rule.id}, '${formatDate(rule.nextChargeDate)}', '${escapeHtml(rule.description)}')" style="color: #f87171;" title="Omitir el próximo cargo del ${formatDisplayDate(formatDate(rule.nextChargeDate))}">
+            <i data-lucide="calendar-off" style="width: 16px;"></i>
           </button>
-          <button class="btn-table-action delete" onclick="deleteRecurringRule(${rule.id})" title="Eliminar">
-            <i data-lucide="trash-2" style="width: 16px;"></i>
-          </button>
-        </div>
+        ` : ''}
+        <button class="btn-table-action" onclick="openEditRecurring(${rule.id})" title="Editar">
+          <i data-lucide="edit-3" style="width: 16px;"></i>
+        </button>
+        <button class="btn-table-action delete" onclick="deleteRecurringRule(${rule.id})" title="Eliminar">
+          <i data-lucide="trash-2" style="width: 16px;"></i>
+        </button>
       </div>
     `;
     parentEl.appendChild(card);
@@ -1431,16 +1433,20 @@ async function renderRecurringTab() {
         </span>
       </td>
       <td>${freqMap[rule.frequency] || rule.frequency}</td>
-      <td>${rule.end_date ? formatDisplayDate(rule.end_date) : 'Indefinido'}</td>
       <td>
         ${rule.nextChargeDate ? formatDisplayDate(formatDate(rule.nextChargeDate)) : 'Finalizado'}
       </td>
+      <td>${rule.end_date ? formatDisplayDate(rule.end_date) : 'Indefinido'}</td>
       <td class="text-right tx-amount ${rule.type}">
         ${rule.type === 'income' ? '+' : '-'}${formatCurrency(rule.amount)}
       </td>
       <td class="text-center">
-        <div class="action-buttons" style="justify-content: center; gap: 6px;">
-          ${rule.nextChargeDate ? `<button class="btn btn-secondary btn-sm" onclick="skipRecurringOccurrence(${rule.id}, '${formatDate(rule.nextChargeDate)}', '${escapeHtml(rule.description)}')" style="padding: 2px 6px; font-size: 0.75rem; color: #f87171; border-color: rgba(248,113,113,0.3);" title="Omitir el próximo cargo del ${formatDisplayDate(formatDate(rule.nextChargeDate))}">🚫 Omitir</button>` : ''}
+        <div class="action-buttons">
+          ${rule.nextChargeDate ? `
+            <button class="btn-table-action" onclick="skipRecurringOccurrence(${rule.id}, '${formatDate(rule.nextChargeDate)}', '${escapeHtml(rule.description)}')" style="color: #f87171;" title="Omitir el próximo cargo del ${formatDisplayDate(formatDate(rule.nextChargeDate))}">
+              <i data-lucide="calendar-off"></i>
+            </button>
+          ` : ''}
           <button class="btn-table-action" onclick="openEditRecurring(${rule.id})" title="Editar">
             <i data-lucide="edit-3"></i>
           </button>
