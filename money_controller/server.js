@@ -278,13 +278,47 @@ function getNextUnsatisfiedDate(rule) {
   return null;
 }
 
+function calculateRemainingOccurrences(rule, nextUnsatisfiedDateStr) {
+  if (!rule.end_date) return null;
+  if (!nextUnsatisfiedDateStr) return 0;
+  
+  const endDateObj = new Date(rule.end_date + 'T23:59:59');
+  let d = new Date(nextUnsatisfiedDateStr + 'T12:00:00');
+  
+  if (d > endDateObj) return 0;
+  
+  let count = 0;
+  const maxIterations = 1000;
+  let iter = 0;
+
+  while (d <= endDateObj && iter < maxIterations) {
+    iter++;
+    const dateStr = formatDateLocal(d);
+    if (doesRuleApply(rule, dateStr)) {
+      if (d <= endDateObj) {
+        const isSatisfied = dbOps.hasTransactionForRecurrence(rule.id, dateStr);
+        const isSkipped = dbOps.isOccurrenceSkipped(rule.id, dateStr);
+        if (!isSatisfied && !isSkipped) {
+          count++;
+        }
+      }
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+}
+
 app.get('/api/recurring', (req, res) => {
   try {
     const rules = dbOps.getRecurringRules();
     const rulesWithUnsatisfied = rules.map(rule => {
+      const nextUnsatisfied = getNextUnsatisfiedDate(rule);
+      const remainingOccurrences = calculateRemainingOccurrences(rule, nextUnsatisfied);
       return {
         ...rule,
-        next_unsatisfied_date: getNextUnsatisfiedDate(rule)
+        next_unsatisfied_date: nextUnsatisfied,
+        remaining_occurrences: remainingOccurrences,
+        total_remaining_amount: remainingOccurrences !== null ? remainingOccurrences * rule.amount : null
       };
     });
     res.json(rulesWithUnsatisfied);

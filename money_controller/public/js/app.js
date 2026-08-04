@@ -20,6 +20,7 @@ let recSearch = '';
 let recFilterType = '';
 let recFilterCategory = '';
 let recSort = 'day';
+let recSubtab = 'all';
 let recViewMode = localStorage.getItem('recViewMode') || 'grid';
 let useHeatmap = localStorage.getItem('use_heatmap') === 'true';
 let showEndDates = localStorage.getItem('forecast_show_end_dates') === 'true';
@@ -1247,12 +1248,50 @@ async function renderRecurringTab() {
       return matchesSearch && matchesType && matchesCategory;
     });
 
+    // Filter by subtab if needed
+    const summaryCard = document.getElementById('rec-end-date-summary-card');
+    if (recSubtab === 'end-date') {
+      filteredRules = filteredRules.filter(r => r.end_date !== null && r.end_date !== '');
+
+      // Calculate summary metrics for End Date subtab
+      const activeEndDateRules = filteredRules.filter(r => r.nextChargeDate !== null);
+      const totalAmountPending = activeEndDateRules.reduce((sum, r) => sum + (r.total_remaining_amount || 0), 0);
+      
+      // Find rule closest to ending date
+      const sortedByEnd = [...activeEndDateRules].sort((a, b) => new Date(a.end_date) - new Date(b.end_date));
+      const nextEndingRule = sortedByEnd.length > 0 ? sortedByEnd[0] : null;
+
+      const summaryCountEl = document.getElementById('summary-enddate-count');
+      const summaryNextEl = document.getElementById('summary-enddate-next');
+      const summaryAmountEl = document.getElementById('summary-enddate-amount');
+
+      if (summaryCountEl) summaryCountEl.textContent = activeEndDateRules.length;
+      if (summaryNextEl) {
+        summaryNextEl.textContent = nextEndingRule 
+          ? `${nextEndingRule.description} (${formatDisplayDate(nextEndingRule.end_date)})`
+          : 'Ninguno';
+      }
+      if (summaryAmountEl) summaryAmountEl.textContent = formatCurrency(totalAmountPending);
+
+      if (summaryCard) summaryCard.classList.remove('hidden');
+    } else {
+      if (summaryCard) summaryCard.classList.add('hidden');
+    }
+
     // Split into active and finished lists
     const activeRules = filteredRules.filter(r => r.nextChargeDate !== null);
     const finishedRules = filteredRules.filter(r => r.nextChargeDate === null);
 
     const sortFn = (a, b) => {
-      if (recSort === 'amount-desc') {
+      if (recSort === 'remaining-asc') {
+        const valA = a.remaining_occurrences !== null && a.remaining_occurrences !== undefined ? a.remaining_occurrences : 999999;
+        const valB = b.remaining_occurrences !== null && b.remaining_occurrences !== undefined ? b.remaining_occurrences : 999999;
+        return valA - valB;
+      } else if (recSort === 'remaining-desc') {
+        const valA = a.remaining_occurrences !== null && a.remaining_occurrences !== undefined ? a.remaining_occurrences : -1;
+        const valB = b.remaining_occurrences !== null && b.remaining_occurrences !== undefined ? b.remaining_occurrences : -1;
+        return valB - valA;
+      } else if (recSort === 'amount-desc') {
         return b.amount - a.amount;
       } else if (recSort === 'amount-asc') {
         return a.amount - b.amount;
@@ -1388,6 +1427,7 @@ async function renderRecurringTab() {
         <span><i data-lucide="calendar"></i> Ajuste Cobro: ${dateDetail}</span>
         <span><i data-lucide="calendar-check"></i> Último cobro: ${rule.lastChargeDate ? formatDisplayDate(formatDate(rule.lastChargeDate)) : 'Ninguno'}</span>
         <span><i data-lucide="calendar-clock"></i> Próximo cobro: ${rule.nextChargeDate ? formatDisplayDate(formatDate(rule.nextChargeDate)) : 'Finalizado'}</span>
+        ${rule.end_date ? `<span><i data-lucide="hourglass"></i> Cargos pendientes: <strong style="color: #fb923c;">${rule.remaining_occurrences !== null ? rule.remaining_occurrences + ' cuotas (' + formatCurrency(rule.total_remaining_amount) + ')' : '-'}</strong></span>` : ''}
         <span><i data-lucide="calendar-days"></i> Inicio: ${formatDisplayDate(rule.start_date)}</span>
         ${rule.end_date ? `<span><i data-lucide="calendar-off"></i> Fin: ${formatDisplayDate(rule.end_date)}</span>` : ''}
         ${rule.notes ? `<span class="notes-txt" style="margin-top: 4px; font-style: italic;"><i data-lucide="file-text"></i> ${escapeHtml(rule.notes)}</span>` : ''}
@@ -1435,6 +1475,9 @@ async function renderRecurringTab() {
       <td>${freqMap[rule.frequency] || rule.frequency}</td>
       <td>
         ${rule.nextChargeDate ? formatDisplayDate(formatDate(rule.nextChargeDate)) : 'Finalizado'}
+      </td>
+      <td>
+        ${rule.end_date ? `<span class="badge" style="background: rgba(251, 146, 60, 0.15); color: #fb923c; font-weight: 600;">${rule.remaining_occurrences !== null ? rule.remaining_occurrences + ' cuotas' : '-'}</span>` : '<span class="text-muted">-</span>'}
       </td>
       <td>${rule.end_date ? formatDisplayDate(rule.end_date) : 'Indefinido'}</td>
       <td class="text-right tx-amount ${rule.type}">
@@ -3449,8 +3492,30 @@ async function unskipRecurringOccurrence(ruleId, recurrenceDate) {
       showToast(data.error || 'Error al restaurar la ocurrencia', 'error');
     }
   } catch (err) {
-    console.error('Error unskipping occurrence:', err);
-    showToast('Error de conexión al restaurar la ocurrencia', 'error');
-  }
 }
+
+function switchRecSubtab(subtab) {
+  recSubtab = subtab;
+  
+  const btnAll = document.getElementById('btn-rec-subtab-all');
+  const btnEndDate = document.getElementById('btn-rec-subtab-end-date');
+  const sortSelect = document.getElementById('rec-sort');
+
+  if (subtab === 'end-date') {
+    if (btnAll) btnAll.classList.remove('active');
+    if (btnEndDate) btnEndDate.classList.add('active');
+    
+    // Default sort for end-date subtab: remaining-asc (del que le quedan menos cargos pendientes primero)
+    if (recSort === 'day') {
+      recSort = 'remaining-asc';
+      if (sortSelect) sortSelect.value = 'remaining-asc';
+    }
+  } else {
+    if (btnAll) btnAll.classList.add('active');
+    if (btnEndDate) btnEndDate.classList.remove('active');
+  }
+
+  renderRecurringTab();
+}
+
 

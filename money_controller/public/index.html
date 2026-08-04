@@ -318,6 +318,32 @@
           </button>
         </div>
 
+        <!-- Sub-tabs for Recurring Rules -->
+        <div class="subtabs-bar" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+          <button class="btn btn-secondary subtab-btn active" id="btn-rec-subtab-all" onclick="switchRecSubtab('all')" style="border-radius: 8px;">
+            <i data-lucide="layers" style="width: 16px;"></i> Todos los Movimientos Fijos
+          </button>
+          <button class="btn btn-secondary subtab-btn" id="btn-rec-subtab-end-date" onclick="switchRecSubtab('end-date')" style="border-radius: 8px;">
+            <i data-lucide="hourglass" style="width: 16px;"></i> Movimientos con Fecha Fin (Cuotas Pendientes)
+          </button>
+        </div>
+
+        <!-- Summary metrics bar for End Date subtab (hidden by default) -->
+        <div id="rec-end-date-summary-card" class="glass hidden" style="margin-bottom: 20px; padding: 18px 24px; border-radius: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255,255,255,0.08);">
+          <div>
+            <span class="text-muted" style="font-size: 0.85rem; display: block; margin-bottom: 4px;">Servicios / Préstamos con Fecha Fin</span>
+            <strong id="summary-enddate-count" style="font-size: 1.3rem; color: #38bdf8;">0</strong>
+          </div>
+          <div>
+            <span class="text-muted" style="font-size: 0.85rem; display: block; margin-bottom: 4px;">Próximo a Finalizar</span>
+            <strong id="summary-enddate-next" style="font-size: 1.05rem; color: #34d399;">-</strong>
+          </div>
+          <div>
+            <span class="text-muted" style="font-size: 0.85rem; display: block; margin-bottom: 4px;">Importe Total Pendiente por Abonar</span>
+            <strong id="summary-enddate-amount" style="font-size: 1.3rem; color: #fb923c;">0.00 €</strong>
+          </div>
+        </div>
+
         <!-- Recurring Rules Controls -->
         <div class="recurring-controls-bar glass" style="margin-bottom: 20px; padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
           <div class="search-box">
@@ -339,6 +365,8 @@
 
             <select id="rec-sort" class="form-select">
               <option value="day">Ordenar por Próximo cobro</option>
+              <option value="remaining-asc">Menos cargos pendientes primero</option>
+              <option value="remaining-desc">Más cargos pendientes primero</option>
               <option value="amount-desc">Importe (mayor a menor)</option>
               <option value="amount-asc">Importe (menor a mayor)</option>
               <option value="name">Nombre (A-Z)</option>
@@ -370,6 +398,7 @@
                 <th>Categoría</th>
                 <th>Frecuencia</th>
                 <th>Próximo Cobro</th>
+                <th>Cargos Pendientes</th>
                 <th>Fecha Fin</th>
                 <th class="text-right">Importe</th>
                 <th class="text-center">Acciones</th>
