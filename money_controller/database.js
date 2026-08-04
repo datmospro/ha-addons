@@ -110,6 +110,19 @@ function initDb() {
     console.error("Error checking or adding columns to recurring_rules table:", err);
   }
 
+  // Skipped occurrences table (to ignore specific dates for recurring rules)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS skipped_occurrences (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      recurring_rule_id INTEGER NOT NULL,
+      recurrence_date TEXT NOT NULL,
+      notes TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (recurring_rule_id) REFERENCES recurring_rules(id) ON DELETE CASCADE,
+      UNIQUE(recurring_rule_id, recurrence_date)
+    )
+  `);
+
   // Insert default settings if not exists
   const getSetting = db.prepare('SELECT value FROM settings WHERE key = ?');
   
@@ -303,6 +316,39 @@ const dbOps = {
     const row = db.prepare('SELECT id FROM transactions WHERE recurring_rule_id = ? AND recurrence_date = ?').get(Number(ruleId), dateStr);
     return !!row;
   },
+  skipOccurrence: (ruleId, recurrenceDate, notes = '') => {
+    return db.prepare(`
+      INSERT OR REPLACE INTO skipped_occurrences (recurring_rule_id, recurrence_date, notes) 
+      VALUES (?, ?, ?)
+    `).run(Number(ruleId), recurrenceDate, notes);
+  },
+  unskipOccurrence: (ruleId, recurrenceDate) => {
+    return db.prepare(`
+      DELETE FROM skipped_occurrences 
+      WHERE recurring_rule_id = ? AND recurrence_date = ?
+    `).run(Number(ruleId), recurrenceDate);
+  },
+  getSkippedOccurrences: (ruleId = null) => {
+    if (ruleId) {
+      return db.prepare(`
+        SELECT s.*, r.description as rule_description 
+        FROM skipped_occurrences s 
+        LEFT JOIN recurring_rules r ON s.recurring_rule_id = r.id 
+        WHERE s.recurring_rule_id = ? 
+        ORDER BY s.recurrence_date DESC
+      `).all(Number(ruleId));
+    }
+    return db.prepare(`
+      SELECT s.*, r.description as rule_description 
+      FROM skipped_occurrences s 
+      LEFT JOIN recurring_rules r ON s.recurring_rule_id = r.id 
+      ORDER BY s.recurrence_date DESC
+    `).all();
+  },
+  isOccurrenceSkipped: (ruleId, dateStr) => {
+    const row = db.prepare('SELECT id FROM skipped_occurrences WHERE recurring_rule_id = ? AND recurrence_date = ?').get(Number(ruleId), dateStr);
+    return !!row;
+  },
   linkTransactionToRule: (transactionId, ruleId, recurrenceDate, pattern = null) => {
     const rule = db.prepare('SELECT description, category_id, match_patterns FROM recurring_rules WHERE id = ?').get(Number(ruleId));
     if (rule) {
@@ -388,6 +434,7 @@ const dbOps = {
   resetDatabase: () => {
     db.exec('DELETE FROM transactions');
     db.exec('DELETE FROM recurring_rules');
+    db.exec('DELETE FROM skipped_occurrences');
     return { success: true };
   },
 
@@ -397,7 +444,8 @@ const dbOps = {
       settings: db.prepare('SELECT * FROM settings').all(),
       categories: db.prepare('SELECT * FROM categories').all(),
       transactions: db.prepare('SELECT * FROM transactions').all(),
-      recurring_rules: db.prepare('SELECT * FROM recurring_rules').all()
+      recurring_rules: db.prepare('SELECT * FROM recurring_rules').all(),
+      skipped_occurrences: db.prepare('SELECT * FROM skipped_occurrences').all()
     };
   },
   restoreRawData: (data) => {
@@ -426,6 +474,13 @@ const dbOps = {
         const stmt = db.prepare('INSERT INTO recurring_rules (id, description, amount, type, category_id, frequency, day_of_month, specific_date, start_date, end_date, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         data.recurring_rules.forEach(row => stmt.run(
           row.id, row.description, row.amount, row.type, row.category_id, row.frequency, row.day_of_month, row.specific_date, row.start_date, row.end_date, row.notes
+        ));
+      }
+      if (data.skipped_occurrences) {
+        db.exec('DELETE FROM skipped_occurrences');
+        const stmt = db.prepare('INSERT INTO skipped_occurrences (id, recurring_rule_id, recurrence_date, notes, created_at) VALUES (?, ?, ?, ?, ?)');
+        data.skipped_occurrences.forEach(row => stmt.run(
+          row.id, row.recurring_rule_id, row.recurrence_date, row.notes || null, row.created_at || null
         ));
       }
       db.exec('COMMIT');

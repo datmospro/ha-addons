@@ -266,6 +266,8 @@ function generateForecast(temporaryTransactions = [], startDateParam = null, end
   // B) Bucle futuro: desde hoy (para fijos) y mañana (para puntuales) hasta dentro de 365 días
   const simulatedFutureTransactions = [...futurePlannedTransactions, ...temporaryTransactions];
   const recurringRules = dbOps.getRecurringRules();
+  const skippedOccurrencesList = dbOps.getSkippedOccurrences();
+  const skippedSet = new Set(skippedOccurrencesList.map(s => `${s.recurring_rule_id}_${s.recurrence_date}`));
 
   let futureCurrentDate = new Date(todayStr + 'T12:00:00');
 
@@ -324,27 +326,44 @@ function generateForecast(temporaryTransactions = [], startDateParam = null, end
       if (doesRuleApply(rule, dateStr)) {
         // Comprobar si esta ocurrencia ya existe físicamente en la base de datos (cobrado/sincronizado)
         const isSatisfied = dbOps.hasTransactionForRecurrence(rule.id, dateStr);
+        const isSkipped = skippedSet.has(`${rule.id}_${dateStr}`);
         
-        if (!isSatisfied) {
+        if (isSkipped) {
+          // Evento omitido por el usuario: NO modifica el saldo, pero se registra para visibilidad en UI
+          dayEvents.push({
+            ruleId: rule.id,
+            recurrenceDate: dateStr,
+            description: rule.description + ' (Fijo - Omitido)',
+            amount: rule.amount,
+            type: rule.type,
+            category: rule.category_name || (rule.type === 'income' ? 'Ingresos Fijos' : 'Gastos Fijos'),
+            category_id: rule.category_id,
+            isSkipped: true
+          });
+        } else if (!isSatisfied) {
           if (rule.type === 'income') {
             runningBalance += rule.amount;
             dayEvents.push({
               ruleId: rule.id,
+              recurrenceDate: dateStr,
               description: rule.description + ' (Fijo)',
               amount: rule.amount,
               type: 'income',
               category: rule.category_name || 'Ingresos Fijos',
-              category_id: rule.category_id
+              category_id: rule.category_id,
+              isSkipped: false
             });
           } else {
             runningBalance -= rule.amount;
             dayEvents.push({
               ruleId: rule.id,
+              recurrenceDate: dateStr,
               description: rule.description + ' (Fijo)',
               amount: rule.amount,
               type: 'expense',
               category: rule.category_name || 'Gastos Fijos',
-              category_id: rule.category_id
+              category_id: rule.category_id,
+              isSkipped: false
             });
           }
         }

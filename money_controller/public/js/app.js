@@ -1393,13 +1393,16 @@ async function renderRecurringTab() {
         ${rule.notes ? `<span class="notes-txt" style="margin-top: 4px; font-style: italic;"><i data-lucide="file-text"></i> ${escapeHtml(rule.notes)}</span>` : ''}
       </div>
 
-      <div class="recurring-card-actions">
-        <button class="btn-table-action" onclick="openEditRecurring(${rule.id})" title="Editar">
-          <i data-lucide="edit-3" style="width: 16px;"></i>
-        </button>
-        <button class="btn-table-action delete" onclick="deleteRecurringRule(${rule.id})" title="Eliminar">
-          <i data-lucide="trash-2" style="width: 16px;"></i>
-        </button>
+      <div class="recurring-card-actions" style="display: flex; align-items: center; justify-content: space-between;">
+        ${rule.nextChargeDate ? `<button class="btn btn-secondary btn-sm" onclick="skipRecurringOccurrence(${rule.id}, '${formatDate(rule.nextChargeDate)}', '${escapeHtml(rule.description)}')" style="padding: 3px 8px; font-size: 0.75rem; color: #f87171; border-color: rgba(248,113,113,0.3);" title="Omitir el próximo cargo del ${formatDisplayDate(formatDate(rule.nextChargeDate))}">🚫 Omitir próximo</button>` : '<span></span>'}
+        <div style="display: flex; gap: 4px;">
+          <button class="btn-table-action" onclick="openEditRecurring(${rule.id})" title="Editar">
+            <i data-lucide="edit-3" style="width: 16px;"></i>
+          </button>
+          <button class="btn-table-action delete" onclick="deleteRecurringRule(${rule.id})" title="Eliminar">
+            <i data-lucide="trash-2" style="width: 16px;"></i>
+          </button>
+        </div>
       </div>
     `;
     parentEl.appendChild(card);
@@ -1429,12 +1432,15 @@ async function renderRecurringTab() {
       </td>
       <td>${freqMap[rule.frequency] || rule.frequency}</td>
       <td>${rule.end_date ? formatDisplayDate(rule.end_date) : 'Indefinido'}</td>
-      <td>${rule.nextChargeDate ? formatDisplayDate(formatDate(rule.nextChargeDate)) : 'Finalizado'}</td>
+      <td>
+        ${rule.nextChargeDate ? formatDisplayDate(formatDate(rule.nextChargeDate)) : 'Finalizado'}
+      </td>
       <td class="text-right tx-amount ${rule.type}">
         ${rule.type === 'income' ? '+' : '-'}${formatCurrency(rule.amount)}
       </td>
       <td class="text-center">
-        <div class="action-buttons">
+        <div class="action-buttons" style="justify-content: center; gap: 6px;">
+          ${rule.nextChargeDate ? `<button class="btn btn-secondary btn-sm" onclick="skipRecurringOccurrence(${rule.id}, '${formatDate(rule.nextChargeDate)}', '${escapeHtml(rule.description)}')" style="padding: 2px 6px; font-size: 0.75rem; color: #f87171; border-color: rgba(248,113,113,0.3);" title="Omitir el próximo cargo del ${formatDisplayDate(formatDate(rule.nextChargeDate))}">🚫 Omitir</button>` : ''}
           <button class="btn-table-action" onclick="openEditRecurring(${rule.id})" title="Editar">
             <i data-lucide="edit-3"></i>
           </button>
@@ -1631,15 +1637,48 @@ function selectCalendarDay(dateStr, forecastDay) {
       if (e.type === 'info') return;
 
       const isIncome = e.type === 'income';
-      eventsList.insertAdjacentHTML('beforeend', `
-        <div class="day-event-item ${e.type}">
-          <div>
-            <span class="event-desc">${escapeHtml(e.description)}</span>
-            <span class="event-cat">${escapeHtml(e.category || '')}</span>
+
+      if (e.isSkipped) {
+        eventsList.insertAdjacentHTML('beforeend', `
+          <div class="day-event-item" style="opacity: 0.65; background: rgba(255,255,255,0.03); border-left: 3px solid #6b7280; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; margin-bottom: 8px; border-radius: 6px;">
+            <div>
+              <span class="event-desc" style="text-decoration: line-through;">${escapeHtml(e.description)}</span>
+              <span class="event-cat text-muted" style="display: block; font-size: 0.75rem;">${escapeHtml(e.category || '')} (Omitido)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="event-val text-muted" style="text-decoration: line-through;">0.00 €</span>
+              <button class="btn btn-secondary btn-sm" onclick="unskipRecurringOccurrence(${e.ruleId}, '${e.recurrenceDate}')" title="Activar cargo (Deshacer omisión)" style="padding: 2px 6px; font-size: 0.75rem; border-color: rgba(255,255,255,0.2);">
+                ↩️ Activar
+              </button>
+            </div>
           </div>
-          <span class="event-val">${isIncome ? '+' : '-'}${e.amount.toFixed(2)} €</span>
-        </div>
-      `);
+        `);
+      } else if (e.ruleId && e.recurrenceDate) {
+        eventsList.insertAdjacentHTML('beforeend', `
+          <div class="day-event-item ${e.type}" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span class="event-desc">${escapeHtml(e.description)}</span>
+              <span class="event-cat">${escapeHtml(e.category || '')}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="event-val">${isIncome ? '+' : '-'}${e.amount.toFixed(2)} €</span>
+              <button class="btn btn-secondary btn-sm" onclick="skipRecurringOccurrence(${e.ruleId}, '${e.recurrenceDate}', '${escapeHtml(e.description)}')" title="Omitir este cargo" style="padding: 2px 6px; font-size: 0.75rem; color: #f87171; border-color: rgba(248,113,113,0.3);">
+                🚫 Omitir
+              </button>
+            </div>
+          </div>
+        `);
+      } else {
+        eventsList.insertAdjacentHTML('beforeend', `
+          <div class="day-event-item ${e.type}">
+            <div>
+              <span class="event-desc">${escapeHtml(e.description)}</span>
+              <span class="event-cat">${escapeHtml(e.category || '')}</span>
+            </div>
+            <span class="event-val">${isIncome ? '+' : '-'}${e.amount.toFixed(2)} €</span>
+          </div>
+        `);
+      }
     });
   }
 
@@ -3356,3 +3395,56 @@ function formatMarkdownToHTML(text) {
   
   return html;
 }
+
+async function skipRecurringOccurrence(ruleId, recurrenceDate, description = '') {
+  if (!confirm(`¿Estás seguro de que deseas omitir el cargo de "${description || 'este movimiento'}" para la fecha ${formatDisplayDate(recurrenceDate)}? No restará ni sumará al saldo.`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/recurring/${ruleId}/skip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recurrenceDate })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Ocurrencia omitida correctamente');
+      await loadDashboardData();
+      renderRecurringTab();
+      if (document.getElementById('forecast-tab')?.classList.contains('active')) {
+        renderForecastTab();
+      }
+    } else {
+      showToast(data.error || 'Error al omitir la ocurrencia', 'error');
+    }
+  } catch (err) {
+    console.error('Error skipping occurrence:', err);
+    showToast('Error de conexión al omitir la ocurrencia', 'error');
+  }
+}
+
+async function unskipRecurringOccurrence(ruleId, recurrenceDate) {
+  try {
+    const res = await fetch(`/api/recurring/${ruleId}/unskip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recurrenceDate })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Omisión cancelada. El movimiento vuelve a la previsión.');
+      await loadDashboardData();
+      renderRecurringTab();
+      if (document.getElementById('forecast-tab')?.classList.contains('active')) {
+        renderForecastTab();
+      }
+    } else {
+      showToast(data.error || 'Error al restaurar la ocurrencia', 'error');
+    }
+  } catch (err) {
+    console.error('Error unskipping occurrence:', err);
+    showToast('Error de conexión al restaurar la ocurrencia', 'error');
+  }
+}
+

@@ -268,7 +268,8 @@ function getNextUnsatisfiedDate(rule) {
         break;
       }
       const isSatisfied = dbOps.hasTransactionForRecurrence(rule.id, dateStr);
-      if (!isSatisfied) {
+      const isSkipped = dbOps.isOccurrenceSkipped(rule.id, dateStr);
+      if (!isSatisfied && !isSkipped) {
         return dateStr;
       }
     }
@@ -325,6 +326,43 @@ app.delete('/api/recurring/:id', (req, res) => {
     const result = dbOps.deleteRecurringRule(req.params.id);
     if (result.changes === 0) return res.status(404).json({ error: 'Recurring rule not found' });
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Skip/Unskip recurring occurrences
+app.post('/api/recurring/:id/skip', (req, res) => {
+  try {
+    const { recurrenceDate, notes } = req.body;
+    if (!recurrenceDate) {
+      return res.status(400).json({ error: 'recurrenceDate is required' });
+    }
+    dbOps.skipOccurrence(req.params.id, recurrenceDate, notes || '');
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/recurring/:id/unskip', (req, res) => {
+  try {
+    const { recurrenceDate } = req.body;
+    if (!recurrenceDate) {
+      return res.status(400).json({ error: 'recurrenceDate is required' });
+    }
+    dbOps.unskipOccurrence(req.params.id, recurrenceDate);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/skipped-occurrences', (req, res) => {
+  try {
+    const ruleId = req.query.rule_id ? req.query.rule_id : null;
+    const skipped = dbOps.getSkippedOccurrences(ruleId);
+    res.json(skipped);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
