@@ -288,19 +288,17 @@ function calculateRemainingOccurrences(rule, nextUnsatisfiedDateStr) {
   if (d > endDateObj) return 0;
   
   let count = 0;
-  const maxIterations = 1000;
+  const maxIterations = 50000; // Allow up to 137 years of daily iteration (~50,000 days)
   let iter = 0;
 
   while (d <= endDateObj && iter < maxIterations) {
     iter++;
     const dateStr = formatDateLocal(d);
     if (doesRuleApply(rule, dateStr)) {
-      if (d <= endDateObj) {
-        const isSatisfied = dbOps.hasTransactionForRecurrence(rule.id, dateStr);
-        const isSkipped = dbOps.isOccurrenceSkipped(rule.id, dateStr);
-        if (!isSatisfied && !isSkipped) {
-          count++;
-        }
+      const isSatisfied = dbOps.hasTransactionForRecurrence(rule.id, dateStr);
+      const isSkipped = dbOps.isOccurrenceSkipped(rule.id, dateStr);
+      if (!isSatisfied && !isSkipped) {
+        count++;
       }
     }
     d.setDate(d.getDate() + 1);
