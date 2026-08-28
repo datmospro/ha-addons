@@ -359,13 +359,40 @@ window.TrainerModule = {
 
     if (this.currentSetIndex < setsCount) {
       // More sets left in this exercise -> Rest timer then next set
+      const nextSetIndex = this.currentSetIndex + 1;
+      const nextExInfo = {
+        name: ex.name,
+        details: `Serie ${nextSetIndex} de ${setsCount} | ${ex.reps}${ex.is_isometric ? 's' : ' reps'} | ${ex.weight_kg || 0} kg`,
+        ex: ex
+      };
+
       this.startRest(ex.rest_sec || 60, () => {
         this.currentSetIndex++;
         this.renderCurrentExercise();
-      });
+      }, nextExInfo, false);
+
     } else {
-      // All sets complete for this exercise! Advance to next exercise
-      this.nextExercise();
+      // All sets complete for this exercise! Check if there is a next exercise
+      if (this.currentExerciseIndex < this.activeRoutine.exercises.length - 1) {
+        const nextEx = this.activeRoutine.exercises[this.currentExerciseIndex + 1];
+        const restTime = parseInt(nextEx.rest_sec || ex.rest_sec || 60, 10);
+        const nextExInfo = {
+          name: nextEx.name,
+          details: `Serie 1 de ${nextEx.sets || 3} | ${nextEx.reps}${nextEx.is_isometric ? 's' : ' reps'} | ${nextEx.weight_kg || 0} kg`,
+          ex: nextEx
+        };
+
+        this.startRest(restTime, () => {
+          this.currentExerciseIndex++;
+          this.currentSetIndex = 1;
+          this.renderCurrentExercise();
+          this.renderUpcomingExercisesList();
+        }, nextExInfo, true);
+
+      } else {
+        // Final exercise complete!
+        this.finishWorkout();
+      }
     }
   },
 
@@ -435,7 +462,7 @@ window.TrainerModule = {
     }
   },
 
-  startRest: function(seconds, onComplete) {
+  startRest: function(seconds, onComplete, nextExInfo = null, isExerciseChange = false) {
     this.restSeconds = seconds;
     this.onRestCompleteCallback = onComplete;
 
@@ -443,12 +470,41 @@ window.TrainerModule = {
     document.getElementById('view-rest-active').style.display = 'block';
     document.getElementById('trainer-rest-seconds').textContent = `${this.restSeconds}s`;
 
+    const badge = document.getElementById('trainer-rest-badge');
+    if (badge) {
+      if (isExerciseChange) {
+        badge.textContent = '⚡ CAMBIO DE EJERCICIO - DESCANSO';
+        badge.style.background = 'rgba(249, 115, 22, 0.2)';
+        badge.style.color = 'var(--accent-orange)';
+      } else {
+        badge.textContent = 'Tiempo de Descanso entre Series';
+        badge.style.background = 'rgba(16, 185, 129, 0.15)';
+        badge.style.color = 'var(--primary)';
+      }
+    }
+
+    if (nextExInfo) {
+      const nameEl = document.getElementById('rest-next-ex-name');
+      const detailsEl = document.getElementById('rest-next-ex-details');
+      const animBox = document.getElementById('rest-next-anim-box');
+
+      if (nameEl) nameEl.textContent = nextExInfo.name;
+      if (detailsEl) detailsEl.textContent = nextExInfo.details;
+      if (animBox && nextExInfo.ex) {
+        animBox.innerHTML = window.WorkoutModule.getAnimationGraphicHtml(nextExInfo.ex);
+      }
+    }
+
     clearInterval(this.restTimerInterval);
     this.restTimerInterval = setInterval(() => {
       if (this.isPaused) return;
 
       this.restSeconds--;
       document.getElementById('trainer-rest-seconds').textContent = `${this.restSeconds}s`;
+
+      if (this.restSeconds <= 3 && this.restSeconds > 0) {
+        this.playAudioBeep(600, 0.15);
+      }
 
       if (this.restSeconds <= 0) {
         this.playAudioBeep(1046, 0.3);

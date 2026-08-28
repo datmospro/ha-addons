@@ -466,11 +466,24 @@
             </div>
           </div>
 
-          <div id="view-rest-active" style="display: none;">
-            <span class="text-muted" style="font-size: 0.9rem; font-weight: 700; text-transform: uppercase;">Tiempo de Descanso</span>
-            <div class="rest-timer-display" id="trainer-rest-seconds">60s</div>
-            <button class="btn btn-secondary" id="btn-skip-rest" style="margin-top: 10px; width: 100%; padding: 12px; font-weight: 700; background: var(--primary); color: #000;">
-              <i data-lucide="fast-forward"></i> OMITIR DESCANSO & SIGUIENTE SERIE
+          <div id="view-rest-active" style="display: none; text-align: center;">
+            <span class="badge" id="trainer-rest-badge" style="background: rgba(16,185,129,0.15); color: var(--primary); font-size: 0.8rem; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; font-weight: 700; display: inline-block; margin-bottom: 8px;">
+              Tiempo de Descanso
+            </span>
+            <div class="rest-timer-display" id="trainer-rest-seconds" style="margin: 4px 0 12px 0;">60s</div>
+
+            <!-- Next Exercise / Set Preview Card -->
+            <div id="trainer-rest-next-preview" style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; margin-bottom: 14px; text-align: center;">
+              <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">A continuación:</span>
+              <h4 id="rest-next-ex-name" style="font-size: 1.1rem; font-weight: 800; color: var(--primary); margin: 4px 0;">Nombre del Ejercicio</h4>
+              <div id="rest-next-ex-details" style="font-size: 0.82rem; font-weight: 700; color: var(--accent-cyan); margin-bottom: 8px;">Serie 1 de 3 | 12 reps</div>
+              <div id="rest-next-anim-box" style="width: 100%; height: 130px; background: #050811; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                <!-- Animation preview -->
+              </div>
+            </div>
+
+            <button class="btn btn-secondary" id="btn-skip-rest" style="width: 100%; padding: 12px; font-weight: 700; background: var(--primary); color: #000; justify-content: center;">
+              <i data-lucide="fast-forward"></i> OMITIR DESCANSO & SIGUIENTE
             </button>
           </div>
 
@@ -856,11 +869,11 @@
   </div>
 
   <!-- JavaScript Modules -->
-  <script src="js/app.js?v=1.2.0"></script>
-  <script src="js/diet.js?v=1.2.0"></script>
-  <script src="js/recipe_finder.js?v=1.2.0"></script>
-  <script src="js/workout.js?v=1.2.0"></script>
-  <script src="js/trainer.js?v=1.2.0"></script>
-  <script src="js/music.js?v=1.2.0"></script>
+  <script src="js/app.js?v=1.2.1"></script>
+  <script src="js/diet.js?v=1.2.1"></script>
+  <script src="js/recipe_finder.js?v=1.2.1"></script>
+  <script src="js/workout.js?v=1.2.1"></script>
+  <script src="js/trainer.js?v=1.2.1"></script>
+  <script src="js/music.js?v=1.2.1"></script>
 </body>
 </html>
