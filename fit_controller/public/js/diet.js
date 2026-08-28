@@ -9,6 +9,7 @@ window.DietModule = {
     this.bindEvents();
     this.bindModals();
     this.bindCategoryFilterEvents();
+    this.loadPlanAndRecipes();
   },
 
   loadPlanAndRecipes: async function() {
@@ -18,7 +19,7 @@ window.DietModule = {
 
   loadPlan: async function() {
     try {
-      const people = window.FitApp.peopleCount || 1;
+      const people = (window.FitApp && window.FitApp.peopleCount) || 1;
       const data = await window.apiFetch(`api/diet/plan?people=${people}`);
       this.currentPlanData = data;
       this.renderWeeklyGrid();
@@ -31,7 +32,7 @@ window.DietModule = {
   loadRecipeCatalog: async function() {
     try {
       const data = await window.apiFetch('api/recipes');
-      this.recipeCatalog = data.local || [];
+      this.recipeCatalog = Array.isArray(data) ? data : (data.local || []);
       this.renderRecipeCatalog();
       this.populateAssignModalDropdown();
     } catch (err) {
@@ -59,7 +60,7 @@ window.DietModule = {
     ];
 
     const todayKey = this.getCurrentDayOfWeekSpanish();
-    const peopleCount = window.FitApp.peopleCount || 1;
+    const peopleCount = (window.FitApp && window.FitApp.peopleCount) || 1;
 
     container.style.display = 'grid';
     container.style.gridTemplateColumns = 'repeat(auto-fit, minmax(280px, 1fr))';
@@ -68,13 +69,12 @@ window.DietModule = {
     container.innerHTML = days.map(d => {
       const isToday = d.key === todayKey;
       const dayData = this.currentPlanData[d.key] || { meals: [], totalsPerPerson: { kcal: 0, protein: 0, carbs: 0, fat: 0 } };
-      const hasMeals = dayData.meals && dayData.meals.length > 0;
 
       const mealTypes = [
-        { id: 'desayuno', label: 'Desayuno', icon: 'coffee' },
-        { id: 'almuerzo', label: 'Almuerzo', icon: 'utensils' },
-        { id: 'merienda', label: 'Merienda', icon: 'apple' },
-        { id: 'cena', label: 'Cena', icon: 'moon' }
+        { id: 'desayuno', label: 'Desayuno' },
+        { id: 'almuerzo', label: 'Almuerzo' },
+        { id: 'merienda', label: 'Merienda' },
+        { id: 'cena', label: 'Cena' }
       ];
 
       return `
@@ -107,7 +107,7 @@ window.DietModule = {
                     <div style="background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.08); padding: 8px 10px; border-radius: 8px;">
                       <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span style="font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted);">${mt.label}</span>
-                        <button onclick="window.DietModule.removeMeal(${meal.id})" style="background: none; border: none; color: var(--accent-red); cursor: pointer; padding: 0;" title="Quitar plato">
+                        <button onclick="window.DietModule.removeMeal('${meal.id}')" style="background: none; border: none; color: var(--accent-red); cursor: pointer; padding: 0;" title="Quitar plato">
                           <i data-lucide="x" style="width: 12px; height: 12px;"></i>
                         </button>
                       </div>
@@ -136,7 +136,7 @@ window.DietModule = {
               <button class="btn btn-primary" onclick="window.DietModule.openDayMealDetailsModal('${d.key}')" style="flex: 1; font-size: 0.8rem; padding: 7px; font-weight: 800; justify-content: center;">
                 <i data-lucide="eye" style="width: 13px; height: 13px;"></i> Ver Menú & Recetas
               </button>
-              <button class="btn btn-secondary" onclick="window.DietModule.openAssignModal('${d.key}')" style="font-size: 0.8rem; padding: 7px;" title="Asignar Plato">
+              <button class="btn btn-secondary" onclick="window.DietModule.openAssignModal('${d.key}', 'almuerzo')" style="font-size: 0.8rem; padding: 7px;" title="Asignar Plato">
                 <i data-lucide="plus" style="width: 13px; height: 13px;"></i>
               </button>
             </div>
@@ -201,10 +201,10 @@ window.DietModule = {
           </div>
 
           <div style="display: flex; gap: 8px; margin-top: auto;">
-            <button class="btn btn-secondary" onclick="window.DietModule.openEditRecipeModal(${r.id})" style="flex: 1; font-size: 0.78rem; padding: 6px; justify-content: center;">
+            <button class="btn btn-secondary" onclick="window.DietModule.openEditRecipeModal('${r.id}')" style="flex: 1; font-size: 0.78rem; padding: 6px; justify-content: center;">
               <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i> Editar
             </button>
-            <button class="btn btn-secondary" onclick="window.DietModule.deleteRecipe(${r.id})" style="padding: 6px; font-size: 0.78rem; color: var(--accent-red); border-color: rgba(239,68,68,0.2);" title="Eliminar plato">
+            <button class="btn btn-secondary" onclick="window.DietModule.deleteRecipe('${r.id}')" style="padding: 6px; font-size: 0.78rem; color: var(--accent-red); border-color: rgba(239,68,68,0.2);" title="Eliminar plato">
               <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
             </button>
           </div>
@@ -227,30 +227,13 @@ window.DietModule = {
     });
   },
 
-  bindEvents: function() {
-    const btnShopDiet = document.getElementById('btn-open-shopping-list-from-diet');
-    if (btnShopDiet) {
-      btnShopDiet.addEventListener('click', () => {
-        const btnMainShop = document.getElementById('btn-open-shopping-list');
-        if (btnMainShop) btnMainShop.click();
-      });
-    }
-  },
+  bindEvents: function() {},
 
   bindModals: function() {
-    // 1. Create / Edit Recipe Modal
+    // 1. Create / Edit Recipe Modal Form Handler
     const modalCreateR = document.getElementById('modal-create-recipe');
-    const btnOpenCreateR = document.getElementById('btn-open-create-recipe-modal');
     const btnCloseCreateR = document.getElementById('btn-close-create-recipe');
 
-    if (btnOpenCreateR) {
-      btnOpenCreateR.addEventListener('click', () => {
-        document.getElementById('edit-recipe-id').value = '';
-        document.getElementById('form-create-recipe').reset();
-        document.getElementById('modal-create-recipe-title').innerHTML = `<i data-lucide="utensils"></i> Crear Nuevo Plato Personalizado`;
-        modalCreateR.classList.add('active');
-      });
-    }
     if (btnCloseCreateR) {
       btnCloseCreateR.addEventListener('click', () => modalCreateR.classList.remove('active'));
     }
@@ -310,14 +293,10 @@ window.DietModule = {
       });
     }
 
-    // 2. Assign Meal Modal
+    // 2. Assign Meal Modal Form Handler
     const modalAssign = document.getElementById('modal-assign-meal-to-day');
-    const btnOpenAssign = document.getElementById('btn-open-assign-meal-modal');
     const btnCloseAssign = document.getElementById('btn-close-assign-meal');
 
-    if (btnOpenAssign) {
-      btnOpenAssign.addEventListener('click', () => this.openAssignModal('lunes', 'almuerzo'));
-    }
     if (btnCloseAssign) {
       btnCloseAssign.addEventListener('click', () => modalAssign.classList.remove('active'));
     }
@@ -327,7 +306,8 @@ window.DietModule = {
       formAssign.addEventListener('submit', async (e) => {
         e.preventDefault();
         const day_of_week = document.getElementById('assign-meal-day').value;
-        const meal_type = document.getElementById('assign-meal-type').value;
+        const selectMealType = document.getElementById('diet-assign-meal-type');
+        const meal_type = selectMealType ? selectMealType.value : 'almuerzo';
         const recipe_id = document.getElementById('assign-meal-recipe-id').value;
 
         try {
@@ -352,6 +332,18 @@ window.DietModule = {
     }
   },
 
+  openCreateRecipeModal: function() {
+    document.getElementById('edit-recipe-id').value = '';
+    document.getElementById('form-create-recipe').reset();
+    document.getElementById('modal-create-recipe-title').innerHTML = `<i data-lucide="utensils"></i> Crear Nuevo Plato Personalizado`;
+    const modal = document.getElementById('modal-create-recipe');
+    if (modal) {
+      modal.style.zIndex = '2500';
+      modal.classList.add('active');
+    }
+    if (window.lucide) lucide.createIcons();
+  },
+
   populateAssignModalDropdown: function() {
     const select = document.getElementById('assign-meal-recipe-id');
     if (!select) return;
@@ -362,8 +354,10 @@ window.DietModule = {
   },
 
   openAssignModal: function(day = 'lunes', mealType = 'almuerzo') {
-    document.getElementById('assign-meal-day').value = day;
-    document.getElementById('assign-meal-type').value = mealType;
+    document.getElementById('assign-meal-day').value = day || 'lunes';
+    const selectMealType = document.getElementById('diet-assign-meal-type');
+    if (selectMealType) selectMealType.value = mealType || 'almuerzo';
+
     this.populateAssignModalDropdown();
 
     const modal = document.getElementById('modal-assign-meal-to-day');
@@ -371,6 +365,7 @@ window.DietModule = {
       modal.style.zIndex = '2500';
       modal.classList.add('active');
     }
+    if (window.lucide) lucide.createIcons();
   },
 
   openEditRecipeModal: function(recipeId) {
@@ -407,6 +402,7 @@ window.DietModule = {
       modal.style.zIndex = '2500';
       modal.classList.add('active');
     }
+    if (window.lucide) lucide.createIcons();
   },
 
   deleteRecipe: async function(recipeId) {
@@ -432,7 +428,7 @@ window.DietModule = {
     const dayData = (this.currentPlanData && this.currentPlanData[dayKey]) ? this.currentPlanData[dayKey] : null;
     if (!dayData) return;
 
-    const peopleCount = window.FitApp.peopleCount || 1;
+    const peopleCount = (window.FitApp && window.FitApp.peopleCount) || 1;
     document.getElementById('day-details-title').innerHTML = `<i data-lucide="utensils"></i> Menú Completo del ${dayKey.toUpperCase()}`;
     document.getElementById('day-details-subtitle').textContent = `Total del Día: ${dayData.totalsPerPerson.kcal} kcal/persona | Ingredientes multiplicados para ${peopleCount} ${peopleCount === 1 ? 'persona' : 'personas'}`;
 
@@ -452,7 +448,7 @@ window.DietModule = {
           </div>
 
           <h4 style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 8px;">${m.recipe_title}</h4>
-          
+
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 12px;">
             <div>
               <span style="font-size: 0.8rem; font-weight: 700; color: var(--primary);">Ingredientes (${peopleCount} pers.):</span>
@@ -485,10 +481,10 @@ window.DietModule = {
     const todayKey = this.getCurrentDayOfWeekSpanish();
     const dayData = this.currentPlanData[todayKey] || { totalsPerPerson: { kcal: 0, protein: 0, carbs: 0, fat: 0 } };
 
-    const targetKcal = window.FitApp.currentProfile ? window.FitApp.currentProfile.daily_kcal_target : 1850;
-    const targetProtein = window.FitApp.currentProfile ? window.FitApp.currentProfile.daily_protein_target : 140;
-    const targetCarbs = window.FitApp.currentProfile ? window.FitApp.currentProfile.daily_carbs_target : 160;
-    const targetFat = window.FitApp.currentProfile ? window.FitApp.currentProfile.daily_fat_target : 55;
+    const targetKcal = (window.FitApp && window.FitApp.currentProfile) ? window.FitApp.currentProfile.daily_kcal_target : 1850;
+    const targetProtein = (window.FitApp && window.FitApp.currentProfile) ? window.FitApp.currentProfile.daily_protein_target : 140;
+    const targetCarbs = (window.FitApp && window.FitApp.currentProfile) ? window.FitApp.currentProfile.daily_carbs_target : 160;
+    const targetFat = (window.FitApp && window.FitApp.currentProfile) ? window.FitApp.currentProfile.daily_fat_target : 55;
 
     const txtKcal = document.getElementById('macro-txt-kcal');
     const txtProtein = document.getElementById('macro-txt-protein');
