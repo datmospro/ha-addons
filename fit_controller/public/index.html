@@ -52,6 +52,10 @@
           <i data-lucide="history"></i>
           <span>Historial Entrenos</span>
         </button>
+        <button class="nav-btn" data-tab="settings" id="btn-tab-settings">
+          <i data-lucide="settings"></i>
+          <span>Configuración</span>
+        </button>
       </nav>
 
       <div class="sidebar-footer">
@@ -283,6 +287,66 @@
           <div id="workout-history-list">
             <!-- Populated dynamically -->
           </div>
+        </div>
+      <!-- 6. SETTINGS TAB -->
+      <section class="tab-panel" id="panel-settings">
+        <div class="grid-2" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 20px;">
+          
+          <!-- Music Playlists Manager Card -->
+          <div class="card">
+            <h3 class="card-title" style="margin-bottom: 14px;"><i data-lucide="music"></i> Playlists y Listas de Música Gym</h3>
+            <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 16px;">
+              Añade o edita los enlaces de tus vídeos o playlists de YouTube/YouTube Music para que aparezcan en el selector del reproductor.
+            </p>
+
+            <form id="form-add-music-playlist" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; background: rgba(15,23,42,0.6); padding: 14px; border-radius: 12px; border: 1px solid var(--border-color);">
+              <input type="hidden" id="music-playlist-edit-id">
+
+              <div>
+                <label style="font-size: 0.8rem; color: var(--text-muted);">Nombre / Título de la Lista o Vídeo</label>
+                <input type="text" id="music-playlist-title" class="input-field" placeholder="ej: 🔥 Mi Sesión de Electro Gym 2026" style="width: 100%;" required>
+              </div>
+
+              <div>
+                <label style="font-size: 0.8rem; color: var(--text-muted);">URL o ID de YouTube / YouTube Music</label>
+                <input type="text" id="music-playlist-url" class="input-field" placeholder="https://www.youtube.com/watch?v=... o https://music.youtube.com/playlist?list=..." style="width: 100%;" required>
+              </div>
+
+              <button type="submit" class="btn btn-primary" style="margin-top: 4px;">
+                <i data-lucide="plus-circle"></i> Guardar Lista de Música
+              </button>
+            </form>
+
+            <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 12px;">Listas Guardadas</h4>
+            <div id="settings-playlists-list">
+              <!-- Populated dynamically via music.js -->
+            </div>
+          </div>
+
+          <!-- Quick Settings & Profile Card -->
+          <div class="card">
+            <h3 class="card-title" style="margin-bottom: 14px;"><i data-lucide="sliders"></i> Preferencias de la Aplicación</h3>
+            <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 16px;">
+              Configura los parámetros de tu perfil, objetivo de peso y multiplicador de personas.
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+              <button class="btn btn-secondary" onclick="document.getElementById('modal-profile').classList.add('active')" style="justify-content: space-between; padding: 14px;">
+                <span style="display: flex; align-items: center; gap: 10px; font-weight: 700;">
+                  <i data-lucide="user-cog" style="color: var(--primary);"></i> Editar Perfil & Metas TDEE
+                </span>
+                <i data-lucide="chevron-right"></i>
+              </button>
+
+              <button class="btn btn-secondary" onclick="document.getElementById('modal-shopping-list').classList.add('active')" style="justify-content: space-between; padding: 14px;">
+                <span style="display: flex; align-items: center; gap: 10px; font-weight: 700;">
+                  <i data-lucide="shopping-bag" style="color: var(--accent-orange);"></i> Ver Lista de la Compra Semanal
+                </span>
+                <i data-lucide="chevron-right"></i>
+              </button>
+            </div>
+          </div>
+
         </div>
       </section>
 
@@ -728,11 +792,11 @@
   </div>
 
   <!-- JavaScript Modules -->
-  <script src="js/app.js?v=1.1.0"></script>
-  <script src="js/diet.js?v=1.1.0"></script>
-  <script src="js/recipe_finder.js?v=1.1.0"></script>
-  <script src="js/workout.js?v=1.1.0"></script>
-  <script src="js/trainer.js?v=1.1.0"></script>
-  <script src="js/music.js?v=1.1.0"></script>
+  <script src="js/app.js?v=1.1.1"></script>
+  <script src="js/diet.js?v=1.1.1"></script>
+  <script src="js/recipe_finder.js?v=1.1.1"></script>
+  <script src="js/workout.js?v=1.1.1"></script>
+  <script src="js/trainer.js?v=1.1.1"></script>
+  <script src="js/music.js?v=1.1.1"></script>
 </body>
 </html>

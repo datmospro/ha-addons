@@ -39,7 +39,8 @@ window.FitApp = {
       'diet': { title: 'Planificador Semanal de Dieta', subtitle: 'Control de comidas e ingredientes ajustados a las personas.' },
       'recipe-finder': { title: 'Buscador de Recetas Saludables', subtitle: 'Filtra por calorías, proteína y carbohidratos en bases abiertas.' },
       'workout': { title: 'Rutinas & Ejercicios', subtitle: 'Planifica tus entrenamientos con animaciones explicativas.' },
-      'history': { title: 'Historial de Entrenos', subtitle: 'Registro de tus entrenamientos completados y calorías quemadas.' }
+      'history': { title: 'Historial de Entrenos', subtitle: 'Registro de tus entrenamientos completados y calorías quemadas.' },
+      'settings': { title: 'Configuración & Música', subtitle: 'Administra tus listas de reproducción de música para entrenar y preferencias.' }
     };
 
     navButtons.forEach(btn => {

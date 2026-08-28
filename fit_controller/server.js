@@ -597,6 +597,52 @@ app.get('/api/workout/logs', (req, res) => {
   }
 });
 
+// ----------------------------------------------------
+// MUSIC PLAYLIST ENDPOINTS
+// ----------------------------------------------------
+
+app.get('/api/music/playlists', (req, res) => {
+  try {
+    const playlists = db.prepare(`SELECT * FROM music_playlists ORDER BY id ASC`).all();
+    res.json(playlists);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/music/playlists', (req, res) => {
+  try {
+    const { title, url } = req.body;
+    if (!title || !url) {
+      return res.status(400).json({ error: 'Título y URL son requeridos' });
+    }
+    const stmt = db.prepare(`INSERT INTO music_playlists (title, url) VALUES (?, ?)`);
+    const result = stmt.run(title, url);
+    res.json({ id: result.lastInsertRowid, success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/music/playlists/:id', (req, res) => {
+  try {
+    const { title, url } = req.body;
+    db.prepare(`UPDATE music_playlists SET title = ?, url = ? WHERE id = ?`).run(title, url, req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/music/playlists/:id', (req, res) => {
+  try {
+    db.prepare(`DELETE FROM music_playlists WHERE id = ?`).run(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Fallback to SPA index.html
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

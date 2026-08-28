@@ -1,6 +1,63 @@
-// Workout Music Player Module (Privacy-enhanced with youtube-nocookie to prevent Error 153 & adblock issues)
+// Workout Music Player & Playlist Manager Module
 window.MusicModule = {
+  playlists: [],
+
   init: function() {
+    this.bindWidgetEvents();
+    this.bindSettingsEvents();
+    this.loadPlaylists();
+  },
+
+  loadPlaylists: async function() {
+    try {
+      this.playlists = await window.apiFetch('api/music/playlists');
+      this.renderWidgetDropdown();
+      this.renderSettingsPlaylistTable();
+    } catch (err) {
+      console.error('Error loading playlists:', err);
+    }
+  },
+
+  renderWidgetDropdown: function() {
+    const select = document.getElementById('music-playlist-select');
+    if (!select) return;
+
+    select.innerHTML = `<option value="">-- Seleccionar Lista de Música --</option>` +
+      this.playlists.map(p => `
+        <option value="${p.url}">${p.title}</option>
+      `).join('');
+  },
+
+  renderSettingsPlaylistTable: function() {
+    const tableContainer = document.getElementById('settings-playlists-list');
+    if (!tableContainer) return;
+
+    if (this.playlists.length === 0) {
+      tableContainer.innerHTML = `<p class="text-muted">No hay listas de reproducción configuradas aún.</p>`;
+      return;
+    }
+
+    tableContainer.innerHTML = this.playlists.map(p => `
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px; background: rgba(15,23,42,0.6); border-radius: 10px; margin-bottom: 8px; border: 1px solid var(--border-color);">
+        <div style="flex: 1; padding-right: 12px;">
+          <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--primary);">${p.title}</h4>
+          <span class="text-muted" style="font-size: 0.78rem; word-break: break-all;">${p.url}</span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary" onclick="window.MusicModule.editPlaylistPrompt(${p.id})" style="font-size: 0.78rem; padding: 6px 10px;">
+            <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i> Editar
+          </button>
+          <button class="btn btn-secondary" onclick="window.MusicModule.deletePlaylist(${p.id})" style="font-size: 0.78rem; padding: 6px 10px; color: var(--accent-red); border-color: rgba(239,68,68,0.2);">
+            <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+          </button>
+        </div>
+      </div>
+    `).join('');
+
+    if (window.lucide) lucide.createIcons();
+  },
+
+  bindWidgetEvents: function() {
     const select = document.getElementById('music-playlist-select');
     const iframe = document.getElementById('music-iframe');
     const customInput = document.getElementById('music-custom-url');
@@ -16,6 +73,60 @@ window.MusicModule = {
       btnCustom.addEventListener('click', () => {
         this.playUrl(customInput.value);
       });
+    }
+  },
+
+  bindSettingsEvents: function() {
+    const formAdd = document.getElementById('form-add-music-playlist');
+    if (formAdd) {
+      formAdd.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const editId = document.getElementById('music-playlist-edit-id').value;
+        const title = document.getElementById('music-playlist-title').value;
+        const rawUrl = document.getElementById('music-playlist-url').value;
+
+        const formattedUrl = this.formatEmbedUrl(rawUrl);
+
+        try {
+          if (editId) {
+            await window.apiFetch(`api/music/playlists/${editId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title, url: formattedUrl })
+            });
+          } else {
+            await window.apiFetch('api/music/playlists', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title, url: formattedUrl })
+            });
+          }
+
+          document.getElementById('music-playlist-edit-id').value = '';
+          formAdd.reset();
+          await this.loadPlaylists();
+        } catch (err) {
+          alert('Error al guardar lista de música: ' + err.message);
+        }
+      });
+    }
+  },
+
+  editPlaylistPrompt: function(id) {
+    const p = this.playlists.find(item => item.id === id);
+    if (!p) return;
+
+    document.getElementById('music-playlist-edit-id').value = p.id;
+    document.getElementById('music-playlist-title').value = p.title;
+    document.getElementById('music-playlist-url').value = p.url;
+  },
+
+  deletePlaylist: async function(id) {
+    try {
+      await window.apiFetch(`api/music/playlists/${id}`, { method: 'DELETE' });
+      await this.loadPlaylists();
+    } catch (err) {
+      alert('Error al eliminar lista: ' + err.message);
     }
   },
 

@@ -143,6 +143,15 @@ function initDb() {
     )
   `);
 
+  // 8. Music Playlists Table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS music_playlists (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      url TEXT NOT NULL
+    )
+  `);
+
   seedDefaultData();
 }
 
@@ -367,6 +376,15 @@ function seedDefaultData() {
     reStmt.run(r1.lastInsertRowid, 2, 2, 3, 12, 0, 45);
     reStmt.run(r1.lastInsertRowid, 3, 3, 4, 10, 10, 60);
     reStmt.run(r1.lastInsertRowid, 5, 4, 3, 45, 0, 45);
+  }
+
+  // Seed default music playlists
+  const playlistCount = db.prepare(`SELECT COUNT(*) as count FROM music_playlists`).get().count;
+  if (playlistCount === 0) {
+    const musicStmt = db.prepare(`INSERT INTO music_playlists (title, url) VALUES (?, ?)`);
+    musicStmt.run('🔥 Workout Beats 24/7 (Lofi & Chill)', 'https://www.youtube-nocookie.com/embed/5qap5aO4i9A');
+    musicStmt.run('⚡ Lofi Hip Hop Radio 24/7', 'https://www.youtube-nocookie.com/embed/jfKfPfyJRdk');
+    musicStmt.run('🎧 Gym Motivation Playlist', 'https://www.youtube-nocookie.com/embed/videoseries?list=PL4fGSI1pDJn6jWjXda_m58fROa0hflS7R');
   }
 }
 
