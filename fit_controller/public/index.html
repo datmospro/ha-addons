@@ -390,8 +390,13 @@
         <span class="text-muted" id="trainer-exercise-progress">Ejercicio 1 de 4</span>
       </div>
       
-      <div style="display: flex; gap: 12px; align-items: center;">
+      <div style="display: flex; gap: 10px; align-items: center;">
         <div style="font-size: 1.2rem; font-weight: 800; color: var(--accent-orange);" id="trainer-total-timer">00:00</div>
+
+        <button class="btn btn-secondary" id="btn-pause-workout" onclick="window.TrainerModule.toggleMasterPause()" style="background: rgba(245,158,11,0.2); color: var(--accent-yellow); border: 1px solid rgba(245,158,11,0.4); font-weight: 700; padding: 8px 14px;">
+          <i data-lucide="pause" style="width: 14px; height: 14px;"></i> <span id="btn-pause-text">Pausar</span>
+        </button>
+
         <button class="btn btn-secondary" id="btn-close-trainer" style="background: rgba(239,68,68,0.2); color: var(--accent-red); border: none;">
           <i data-lucide="x"></i> Salir
         </button>
@@ -402,6 +407,16 @@
       <!-- Main Exercise View -->
       <div class="trainer-main-view" style="position: relative;">
         
+        <!-- Pause Overlay -->
+        <div id="trainer-pause-overlay" style="display: none; position: absolute; inset: 0; background: rgba(9, 13, 22, 0.95); z-index: 60; flex-direction: column; align-items: center; justify-content: center; border-radius: 16px; backdrop-filter: blur(12px);">
+          <div style="font-size: 4rem; margin-bottom: 10px;">⏸️</div>
+          <span style="font-size: 1.4rem; font-weight: 800; color: var(--accent-yellow); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Entrenamiento en Pausa</span>
+          <span style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 20px;">Todos los contadores, pitidos y música han sido detenidos.</span>
+          <button class="btn btn-primary" onclick="window.TrainerModule.toggleMasterPause()" style="padding: 12px 28px; font-weight: 800; font-size: 1.1rem;">
+            <i data-lucide="play"></i> Reanudar Entrenamiento
+          </button>
+        </div>
+
         <!-- Big Preparation Countdown Overlay -->
         <div id="trainer-prep-overlay" style="display: none; position: absolute; inset: 0; background: rgba(9, 13, 22, 0.95); z-index: 50; flex-direction: column; align-items: center; justify-content: center; border-radius: 16px; backdrop-filter: blur(10px);">
           <span style="font-size: 1.2rem; font-weight: 700; color: var(--accent-orange); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">¡Prepárate!</span>
@@ -806,11 +821,11 @@
   </div>
 
   <!-- JavaScript Modules -->
-  <script src="js/app.js?v=1.1.4"></script>
-  <script src="js/diet.js?v=1.1.4"></script>
-  <script src="js/recipe_finder.js?v=1.1.4"></script>
-  <script src="js/workout.js?v=1.1.4"></script>
-  <script src="js/trainer.js?v=1.1.4"></script>
-  <script src="js/music.js?v=1.1.4"></script>
+  <script src="js/app.js?v=1.1.5"></script>
+  <script src="js/diet.js?v=1.1.5"></script>
+  <script src="js/recipe_finder.js?v=1.1.5"></script>
+  <script src="js/workout.js?v=1.1.5"></script>
+  <script src="js/trainer.js?v=1.1.5"></script>
+  <script src="js/music.js?v=1.1.5"></script>
 </body>
 </html>

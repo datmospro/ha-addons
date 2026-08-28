@@ -14,6 +14,7 @@ window.TrainerModule = {
   audioCtx: null,
   soundEnabled: true,
   beepVolume: 0.70,
+  isPaused: false,
   onRestCompleteCallback: null,
 
   init: function() {
@@ -42,7 +43,7 @@ window.TrainerModule = {
   },
 
   playAudioBeep: function(freq = 880, duration = 0.2) {
-    if (!this.soundEnabled) return;
+    if (!this.soundEnabled || this.isPaused) return;
     this.initAudio();
     if (!this.audioCtx) return;
 
@@ -70,16 +71,46 @@ window.TrainerModule = {
 
   // Distinctive 3-tone victory chord for completing a series/set
   playVictoryChime: function() {
-    if (!this.soundEnabled) return;
+    if (!this.soundEnabled || this.isPaused) return;
     this.initAudio();
     if (!this.audioCtx) return;
 
     const notes = [523.25, 659.25, 783.99]; // C5, E5, G5 triad
     notes.forEach((freq, idx) => {
       setTimeout(() => {
-        this.playAudioBeep(freq, 0.25);
+        if (!this.isPaused) this.playAudioBeep(freq, 0.25);
       }, idx * 120);
     });
+  },
+
+  toggleMasterPause: function() {
+    this.isPaused = !this.isPaused;
+
+    const overlay = document.getElementById('trainer-pause-overlay');
+    const pauseTxt = document.getElementById('btn-pause-text');
+    const pauseBtn = document.getElementById('btn-pause-workout');
+
+    if (this.isPaused) {
+      if (overlay) overlay.style.display = 'flex';
+      if (pauseTxt) pauseTxt.textContent = 'Reanudar';
+      if (pauseBtn) {
+        pauseBtn.style.background = 'var(--primary)';
+        pauseBtn.style.color = '#000';
+      }
+      if (window.MusicModule) {
+        window.MusicModule.pauseMusic();
+      }
+    } else {
+      if (overlay) overlay.style.display = 'none';
+      if (pauseTxt) pauseTxt.textContent = 'Pausar';
+      if (pauseBtn) {
+        pauseBtn.style.background = 'rgba(245,158,11,0.2)';
+        pauseBtn.style.color = 'var(--accent-yellow)';
+      }
+      if (window.MusicModule) {
+        window.MusicModule.resumeMusic();
+      }
+    }
   },
 
   bindEvents: function() {
@@ -133,6 +164,8 @@ window.TrainerModule = {
 
   startRoutine: async function(routineId) {
     this.initAudio();
+    this.isPaused = false;
+
     let routine = (window.WorkoutModule.currentRoutines || []).find(r => r.id === routineId);
     if (!routine) {
       const routines = await window.apiFetch('api/workout/routines');
@@ -153,6 +186,9 @@ window.TrainerModule = {
     document.getElementById('trainer-routine-name').textContent = routine.name;
     document.getElementById('modal-trainer').classList.add('active');
 
+    const overlay = document.getElementById('trainer-pause-overlay');
+    if (overlay) overlay.style.display = 'none';
+
     // Auto-select a random workout music playlist and play automatically!
     if (window.MusicModule) {
       window.MusicModule.playRandomPlaylist();
@@ -161,6 +197,7 @@ window.TrainerModule = {
     // Start main workout clock
     clearInterval(this.workoutTimerInterval);
     this.workoutTimerInterval = setInterval(() => {
+      if (this.isPaused) return;
       this.workoutSeconds++;
       const m = String(Math.floor(this.workoutSeconds / 60)).padStart(2, '0');
       const s = String(this.workoutSeconds % 60).padStart(2, '0');
@@ -226,6 +263,8 @@ window.TrainerModule = {
 
     clearInterval(this.prepTimerInterval);
     this.prepTimerInterval = setInterval(() => {
+      if (this.isPaused) return;
+
       prepTime--;
       if (prepTime > 0) {
         if (prepSecondsEl) prepSecondsEl.textContent = prepTime;
@@ -254,6 +293,8 @@ window.TrainerModule = {
       document.getElementById('trainer-target-reps').textContent = `${secondsLeft}s`;
 
       this.cadenceTimerInterval = setInterval(() => {
+        if (this.isPaused) return;
+
         secondsLeft--;
         if (secondsLeft > 0) {
           document.getElementById('trainer-target-reps').textContent = `${secondsLeft}s`;
@@ -265,7 +306,7 @@ window.TrainerModule = {
 
           // Auto-advance to rest or next set/exercise!
           setTimeout(() => {
-            this.handleSetCompleted();
+            if (!this.isPaused) this.handleSetCompleted();
           }, 800);
         }
       }, 1000);
@@ -279,6 +320,8 @@ window.TrainerModule = {
       let stepInCadence = cadenceSec;
 
       this.cadenceTimerInterval = setInterval(() => {
+        if (this.isPaused) return;
+
         stepInCadence--;
         if (stepInCadence <= 0) {
           stepInCadence = cadenceSec;
@@ -295,7 +338,7 @@ window.TrainerModule = {
 
             // Auto-advance to rest or next set/exercise!
             setTimeout(() => {
-              this.handleSetCompleted();
+              if (!this.isPaused) this.handleSetCompleted();
             }, 800);
           }
         }
@@ -402,6 +445,8 @@ window.TrainerModule = {
 
     clearInterval(this.restTimerInterval);
     this.restTimerInterval = setInterval(() => {
+      if (this.isPaused) return;
+
       this.restSeconds--;
       document.getElementById('trainer-rest-seconds').textContent = `${this.restSeconds}s`;
 
@@ -449,12 +494,18 @@ window.TrainerModule = {
   },
 
   stopWorkout: function(isFinished = false) {
+    this.isPaused = false;
     clearInterval(this.workoutTimerInterval);
     clearInterval(this.restTimerInterval);
     clearInterval(this.cadenceTimerInterval);
     clearInterval(this.prepTimerInterval);
-    const overlay = document.getElementById('trainer-prep-overlay');
-    if (overlay) overlay.style.display = 'none';
+
+    const overlayPrep = document.getElementById('trainer-prep-overlay');
+    if (overlayPrep) overlayPrep.style.display = 'none';
+
+    const overlayPause = document.getElementById('trainer-pause-overlay');
+    if (overlayPause) overlayPause.style.display = 'none';
+
     document.getElementById('modal-trainer').classList.remove('active');
   }
 };

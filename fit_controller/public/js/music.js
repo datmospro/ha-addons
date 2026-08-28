@@ -111,6 +111,24 @@ window.MusicModule = {
     }
   },
 
+  pauseMusic: function() {
+    const iframe = document.getElementById('music-iframe');
+    if (iframe && iframe.contentWindow) {
+      try {
+        iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
+      } catch (err) {}
+    }
+  },
+
+  resumeMusic: function() {
+    const iframe = document.getElementById('music-iframe');
+    if (iframe && iframe.contentWindow) {
+      try {
+        iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+      } catch (err) {}
+    }
+  },
+
   bindWidgetEvents: function() {
     const select = document.getElementById('music-playlist-select');
     const iframe = document.getElementById('music-iframe');
