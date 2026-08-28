@@ -37,8 +37,7 @@ window.RecipeModule = {
     params.append('source', 'all');
 
     try {
-      const res = await fetch(`/api/recipes?${params.toString()}`);
-      const data = await res.json();
+      const data = await window.apiFetch(`api/recipes?${params.toString()}`);
       this.renderResults(data.local, data.external);
     } catch (err) {
       console.error('Error searching recipes:', err);
@@ -103,7 +102,7 @@ window.RecipeModule = {
     if (!selectedMeal) return;
 
     try {
-      await fetch('/api/diet/plan', {
+      await window.apiFetch('api/diet/plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -127,12 +126,11 @@ window.RecipeModule = {
 
   importAndAssign: async function(recipeObj) {
     try {
-      const res = await fetch('/api/recipes/import-external', {
+      const data = await window.apiFetch('api/recipes/import-external', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(recipeObj)
       });
-      const data = await res.json();
       if (data.id) {
         await this.assignToPlan(data.id);
       }

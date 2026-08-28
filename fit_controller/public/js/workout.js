@@ -15,8 +15,7 @@ window.WorkoutModule = {
 
   loadRoutines: async function() {
     try {
-      const res = await fetch('/api/workout/routines');
-      this.currentRoutines = await res.json();
+      this.currentRoutines = await window.apiFetch('api/workout/routines');
       this.renderRoutines();
     } catch (err) {
       console.error('Error loading routines:', err);
@@ -25,8 +24,7 @@ window.WorkoutModule = {
 
   loadExerciseCatalog: async function(muscle = 'all') {
     try {
-      const res = await fetch(`/api/workout/exercises?muscle=${muscle}`);
-      this.exerciseCatalog = await res.json();
+      this.exerciseCatalog = await window.apiFetch(`api/workout/exercises?muscle=${muscle}`);
       this.renderCatalog();
     } catch (err) {
       console.error('Error loading exercise catalog:', err);
@@ -117,7 +115,6 @@ window.WorkoutModule = {
   },
 
   getSvgFallbackHtml: function(key) {
-    // Vector animations matching muscle groups / exercises
     const svgMap = {
       squat: `<svg viewBox="0 0 100 100" fill="none" stroke="#10b981" stroke-width="4"><circle cx="50" cy="20" r="10"/><path d="M50 30 v25 L35 75 L20 90 M50 55 L65 75 L80 90 M30 40 h40"/></svg>`,
       pushup: `<svg viewBox="0 0 100 100" fill="none" stroke="#06b6d4" stroke-width="4"><circle cx="20" cy="40" r="10"/><path d="M25 48 L75 55 L90 75 M35 50 L35 75 M55 52 L55 75"/></svg>`,
@@ -150,7 +147,7 @@ window.WorkoutModule = {
       const day = prompt('Día preferido (lunes, martes, miercoles, etc.):', 'lunes');
 
       try {
-        await fetch('/api/workout/routines', {
+        await window.apiFetch('api/workout/routines', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, day_of_week: day || 'lunes' })
@@ -178,7 +175,7 @@ window.WorkoutModule = {
     const rest = prompt('Segundos de descanso entre series:', selectedEx.default_rest_sec || 60);
 
     try {
-      await fetch('/api/workout/routine-exercise', {
+      await window.apiFetch('api/workout/routine-exercise', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -199,7 +196,7 @@ window.WorkoutModule = {
   deleteRoutine: async function(id) {
     if (!confirm('¿Seguro que deseas eliminar esta rutina?')) return;
     try {
-      await fetch(`/api/workout/routines/${id}`, { method: 'DELETE' });
+      await window.apiFetch(`api/workout/routines/${id}`, { method: 'DELETE' });
       this.loadRoutines();
     } catch (err) {
       alert('Error al eliminar rutina: ' + err.message);
@@ -208,8 +205,7 @@ window.WorkoutModule = {
 
   loadHistory: async function() {
     try {
-      const res = await fetch('/api/workout/logs');
-      const logs = await res.json();
+      const logs = await window.apiFetch('api/workout/logs');
       const container = document.getElementById('workout-history-list');
 
       if (logs.length === 0) {

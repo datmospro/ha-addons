@@ -58,8 +58,7 @@ window.TrainerModule = {
   startRoutine: async function(routineId) {
     let routine = (window.WorkoutModule.currentRoutines || []).find(r => r.id === routineId);
     if (!routine) {
-      const res = await fetch('/api/workout/routines');
-      const routines = await res.json();
+      const routines = await window.apiFetch('api/workout/routines');
       routine = routines.find(r => r.id === routineId);
     }
 
@@ -206,7 +205,7 @@ window.TrainerModule = {
     alert(`🎉 ¡Entrenamiento Completado con Éxito!\n\nDuración: ${Math.floor(this.workoutSeconds / 60)} min\nSeries totales: ${this.totalSetsCompleted}\nCalorías quemadas est.: ${kcalBurned} kcal`);
 
     try {
-      await fetch('/api/workout/log', {
+      await window.apiFetch('api/workout/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

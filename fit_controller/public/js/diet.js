@@ -5,8 +5,7 @@ window.DietModule = {
   loadPlan: async function() {
     try {
       const people = window.FitApp.peopleCount || 1;
-      const res = await fetch(`/api/diet/plan?people=${people}`);
-      const data = await res.json();
+      const data = await window.apiFetch(`api/diet/plan?people=${people}`);
       this.currentPlanData = data;
       this.renderWeeklyGrid();
       this.updateDashboardMacros();
@@ -127,7 +126,7 @@ window.DietModule = {
 
   removeMeal: async function(id) {
     try {
-      await fetch(`/api/diet/plan/${id}`, { method: 'DELETE' });
+      await window.apiFetch(`api/diet/plan/${id}`, { method: 'DELETE' });
       this.loadPlan();
     } catch (err) {
       alert('Error al quitar comida: ' + err.message);
@@ -138,8 +137,7 @@ window.DietModule = {
     const modal = document.getElementById('modal-shopping-list');
     document.getElementById('btn-open-shopping-list').addEventListener('click', async () => {
       try {
-        const res = await fetch('/api/diet/shopping-list');
-        const list = await res.json();
+        const list = await window.apiFetch('api/diet/shopping-list');
         
         const container = document.getElementById('shopping-list-content');
         if (list.length === 0) {

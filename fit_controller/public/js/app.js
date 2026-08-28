@@ -1,4 +1,18 @@
 // Core Application State & Global Helper Module
+
+// Robust fetch helper for HA Ingress relative routing
+window.apiFetch = async function(endpoint, options = {}) {
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+  const res = await fetch(cleanEndpoint, options);
+  
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Error ${res.status}: ${errorText}`);
+  }
+  
+  return res.json();
+};
+
 window.FitApp = {
   currentProfile: null,
   peopleCount: 1,
@@ -59,7 +73,7 @@ window.FitApp = {
       this.peopleCount = parseInt(e.target.value, 10);
       
       try {
-        await fetch('/api/diet/people-count', {
+        await window.apiFetch('api/diet/people-count', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ people_count: this.peopleCount })
@@ -75,8 +89,7 @@ window.FitApp = {
 
   loadProfile: async function() {
     try {
-      const res = await fetch('/api/profile');
-      const data = await res.json();
+      const data = await window.apiFetch('api/profile');
       this.currentProfile = data;
       this.peopleCount = data.default_people_count || 1;
 
@@ -130,12 +143,11 @@ window.FitApp = {
       };
 
       try {
-        const res = await fetch('/api/profile', {
+        const updated = await window.apiFetch('api/profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         });
-        const updated = await res.json();
         this.currentProfile = updated;
         this.renderDashboardProfile();
         modal.classList.remove('active');
