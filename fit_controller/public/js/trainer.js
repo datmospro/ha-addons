@@ -477,21 +477,29 @@ window.TrainerModule = {
         badge.style.background = 'rgba(249, 115, 22, 0.2)';
         badge.style.color = 'var(--accent-orange)';
       } else {
-        badge.textContent = 'Tiempo de Descanso entre Series';
+        badge.textContent = '☕ DESCANSO ENTRE SERIES';
         badge.style.background = 'rgba(16, 185, 129, 0.15)';
         badge.style.color = 'var(--primary)';
       }
     }
 
     if (nextExInfo) {
-      const nameEl = document.getElementById('rest-next-ex-name');
+      const mainNameEl = document.getElementById('trainer-ex-name');
+      const mainDescEl = document.getElementById('trainer-ex-instructions');
+      const mainAnimBox = document.getElementById('trainer-anim-container');
       const detailsEl = document.getElementById('rest-next-ex-details');
-      const animBox = document.getElementById('rest-next-anim-box');
 
-      if (nameEl) nameEl.textContent = nextExInfo.name;
-      if (detailsEl) detailsEl.textContent = nextExInfo.details;
-      if (animBox && nextExInfo.ex) {
-        animBox.innerHTML = window.WorkoutModule.getAnimationGraphicHtml(nextExInfo.ex);
+      if (mainNameEl) {
+        mainNameEl.textContent = `${isExerciseChange ? '👉 Próximo Ejercicio:' : '👉 Próxima Serie:'} ${nextExInfo.name}`;
+      }
+      if (mainDescEl && nextExInfo.ex) {
+        mainDescEl.textContent = nextExInfo.ex.instructions || 'Prepárate para comenzar.';
+      }
+      if (mainAnimBox && nextExInfo.ex) {
+        mainAnimBox.innerHTML = window.WorkoutModule.getAnimationGraphicHtml(nextExInfo.ex);
+      }
+      if (detailsEl) {
+        detailsEl.textContent = nextExInfo.details;
       }
     }
 
