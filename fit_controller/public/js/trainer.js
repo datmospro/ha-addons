@@ -16,12 +16,60 @@ window.TrainerModule = {
 
   init: function() {
     this.bindEvents();
+
+    // Global listener to unlock AudioContext on initial user gesture in browser/webview
+    document.addEventListener('click', () => {
+      this.initAudio();
+    }, { once: false });
+  },
+
+  initAudio: function() {
+    try {
+      if (!this.audioCtx) {
+        const AudioClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioClass) {
+          this.audioCtx = new AudioClass();
+        }
+      }
+      if (this.audioCtx && this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume();
+      }
+    } catch (e) {
+      console.log('Audio init fallback');
+    }
+  },
+
+  playAudioBeep: function(freq = 880, duration = 0.2) {
+    if (!this.soundEnabled) return;
+    this.initAudio();
+    if (!this.audioCtx) return;
+
+    try {
+      const now = this.audioCtx.currentTime;
+      const osc = this.audioCtx.createOscillator();
+      const gain = this.audioCtx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+
+      gain.gain.setValueAtTime(0.5, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      osc.connect(gain);
+      gain.connect(this.audioCtx.destination);
+
+      osc.start(now);
+      osc.stop(now + duration);
+    } catch (e) {
+      console.error('Audio beep failed:', e);
+    }
   },
 
   bindEvents: function() {
     const btnQuickStart = document.getElementById('btn-quick-start-workout');
     if (btnQuickStart) {
       btnQuickStart.addEventListener('click', async () => {
+        this.initAudio();
         const routines = window.WorkoutModule.currentRoutines;
         if (!routines || routines.length === 0) {
           await window.WorkoutModule.loadRoutines();
@@ -41,17 +89,49 @@ window.TrainerModule = {
 
     const btnCompleteSet = document.getElementById('btn-complete-set');
     if (btnCompleteSet) {
-      btnCompleteSet.addEventListener('click', () => this.handleSetCompleted());
+      btnCompleteSet.addEventListener('click', () => {
+        this.initAudio();
+        this.handleSetCompleted();
+      });
     }
 
     const btnSkipRest = document.getElementById('btn-skip-rest');
     if (btnSkipRest) {
-      btnSkipRest.addEventListener('click', () => this.endRest(true));
+      btnSkipRest.addEventListener('click', () => {
+        this.initAudio();
+        this.endRest(true);
+      });
+    }
+
+    const btnNextEx = document.getElementById('btn-next-exercise');
+    if (btnNextEx) {
+      btnNextEx.addEventListener('click', () => {
+        this.initAudio();
+        this.nextExercise();
+      });
+    }
+
+    const btnPrevEx = document.getElementById('btn-prev-exercise');
+    if (btnPrevEx) {
+      btnPrevEx.addEventListener('click', () => {
+        this.initAudio();
+        this.prevExercise();
+      });
+    }
+
+    const btnSoundToggle = document.getElementById('btn-sound-toggle');
+    if (btnSoundToggle) {
+      btnSoundToggle.addEventListener('click', () => {
+        this.initAudio();
+        this.playAudioBeep(1046, 0.4);
+        alert('🔔 Sonido probado: ¡El metrónomo sonoro está activado y funcionando!');
+      });
     }
 
     const btnToday = document.getElementById('btn-start-today-routine');
     if (btnToday) {
       btnToday.addEventListener('click', () => {
+        this.initAudio();
         if (window.WorkoutModule.currentRoutines.length > 0) {
           this.startRoutine(window.WorkoutModule.currentRoutines[0].id);
         }
@@ -60,6 +140,7 @@ window.TrainerModule = {
   },
 
   startRoutine: async function(routineId) {
+    this.initAudio();
     let routine = (window.WorkoutModule.currentRoutines || []).find(r => r.id === routineId);
     if (!routine) {
       const routines = await window.apiFetch('api/workout/routines');
@@ -98,13 +179,16 @@ window.TrainerModule = {
     const ex = this.activeRoutine.exercises[this.currentExerciseIndex];
     if (!ex) return;
 
+    const totalEx = this.activeRoutine.exercises.length;
+    const setsCount = parseInt(ex.sets || 3, 10);
+
     document.getElementById('trainer-exercise-progress').textContent = 
-      `Ejercicio ${this.currentExerciseIndex + 1} de ${this.activeRoutine.exercises.length}`;
+      `Ejercicio ${this.currentExerciseIndex + 1} de ${totalEx}`;
 
     document.getElementById('trainer-ex-name').textContent = ex.name;
     document.getElementById('trainer-ex-instructions').textContent = ex.instructions || 'Mantén la técnica correcta con respiración fluida.';
 
-    document.getElementById('trainer-current-set').textContent = `${this.currentSetIndex} / ${ex.sets}`;
+    document.getElementById('trainer-current-set').textContent = `${this.currentSetIndex} / ${setsCount}`;
     document.getElementById('trainer-target-reps').textContent = ex.reps;
     document.getElementById('trainer-weight-kg').textContent = ex.weight_kg || 0;
 
@@ -124,9 +208,9 @@ window.TrainerModule = {
 
   startCadenceOrIsometricPacer: function(ex) {
     clearInterval(this.cadenceTimerInterval);
-    this.playAudioBeep(880, 0.2); // Start set chime
+    this.playAudioBeep(880, 0.2); // Start chime
 
-    const cadenceSec = parseInt(ex.cadence_sec || 3, 10);
+    const cadenceSec = parseInt(ex.cadence_sec !== undefined ? ex.cadence_sec : 3, 10);
 
     if (ex.is_isometric) {
       // Isometric Hold Exercise (e.g. Plank for X seconds)
@@ -137,11 +221,11 @@ window.TrainerModule = {
         secondsLeft--;
         if (secondsLeft > 0) {
           document.getElementById('trainer-target-reps').textContent = `${secondsLeft}s`;
-          if (secondsLeft <= 3) this.playAudioBeep(600, 0.15); // Countdown warning
+          if (secondsLeft <= 3) this.playAudioBeep(600, 0.15); // Warning chime
         } else {
           document.getElementById('trainer-target-reps').textContent = `0s ¡Listo!`;
           clearInterval(this.cadenceTimerInterval);
-          this.playAudioBeep(1046, 0.4); // Double success chime
+          this.playAudioBeep(1046, 0.4); // Completion chime
         }
       }, 1000);
 
@@ -167,47 +251,53 @@ window.TrainerModule = {
     }
   },
 
-  renderUpcomingExercisesList: function() {
-    const container = document.getElementById('trainer-exercise-list');
-    if (!container) return;
-
-    container.innerHTML = this.activeRoutine.exercises.map((ex, idx) => {
-      const isCurrent = idx === this.currentExerciseIndex;
-      const isDone = idx < this.currentExerciseIndex;
-
-      return `
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: ${isCurrent ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.03)'}; border-radius: 8px; border-left: 3px solid ${isCurrent ? 'var(--primary)' : isDone ? 'var(--text-muted)' : 'transparent'};">
-          <span style="font-size: 0.85rem; font-weight: ${isCurrent ? '700' : '400'}; color: ${isCurrent ? 'var(--primary)' : '#fff'};">${ex.name}</span>
-          <span style="font-size: 0.75rem;" class="text-muted">${ex.sets}x${ex.reps}${ex.is_isometric ? 's' : ''}</span>
-        </div>
-      `;
-    }).join('');
-  },
-
   handleSetCompleted: function() {
     clearInterval(this.cadenceTimerInterval);
     const ex = this.activeRoutine.exercises[this.currentExerciseIndex];
-    this.totalSetsCompleted++;
+    if (!ex) return;
 
-    if (this.currentSetIndex < ex.sets) {
-      // More sets left in this exercise -> Rest timer
+    this.totalSetsCompleted++;
+    const setsCount = parseInt(ex.sets || 3, 10);
+
+    if (this.currentSetIndex < setsCount) {
+      // More sets left in this exercise -> Rest timer then next set
       this.startRest(ex.rest_sec || 60, () => {
         this.currentSetIndex++;
         this.renderCurrentExercise();
       });
     } else {
-      // Exercise complete! Move to next exercise or finish routine
-      if (this.currentExerciseIndex < this.activeRoutine.exercises.length - 1) {
-        this.startRest(ex.rest_sec || 60, () => {
-          this.currentExerciseIndex++;
-          this.currentSetIndex = 1;
-          this.renderCurrentExercise();
-          this.renderUpcomingExercisesList();
-        });
-      } else {
-        // Routine completed!
-        this.finishWorkout();
-      }
+      // All sets complete for this exercise! Advance to next exercise
+      this.nextExercise();
+    }
+  },
+
+  nextExercise: function() {
+    clearInterval(this.cadenceTimerInterval);
+    clearInterval(this.restTimerInterval);
+
+    if (this.currentExerciseIndex < this.activeRoutine.exercises.length - 1) {
+      const ex = this.activeRoutine.exercises[this.currentExerciseIndex];
+      this.startRest(ex ? (ex.rest_sec || 60) : 60, () => {
+        this.currentExerciseIndex++;
+        this.currentSetIndex = 1;
+        this.renderCurrentExercise();
+        this.renderUpcomingExercisesList();
+      });
+    } else {
+      // Final exercise complete!
+      this.finishWorkout();
+    }
+  },
+
+  prevExercise: function() {
+    clearInterval(this.cadenceTimerInterval);
+    clearInterval(this.restTimerInterval);
+
+    if (this.currentExerciseIndex > 0) {
+      this.currentExerciseIndex--;
+      this.currentSetIndex = 1;
+      this.renderCurrentExercise();
+      this.renderUpcomingExercisesList();
     }
   },
 
@@ -240,27 +330,6 @@ window.TrainerModule = {
       const cb = this.onRestCompleteCallback;
       this.onRestCompleteCallback = null;
       cb();
-    }
-  },
-
-  playAudioBeep: function(freq = 880, duration = 0.2) {
-    if (!this.soundEnabled) return;
-    try {
-      if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (this.audioCtx.state === 'suspended') {
-        this.audioCtx.resume();
-      }
-      const osc = this.audioCtx.createOscillator();
-      const gain = this.audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(this.audioCtx.destination);
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.25, this.audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + duration);
-      osc.start();
-      osc.stop(this.audioCtx.currentTime + duration);
-    } catch (e) {
-      console.log('Audio beep fallback');
     }
   },
 

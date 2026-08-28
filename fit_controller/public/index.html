@@ -363,16 +363,28 @@
               </div>
             </div>
 
-            <button class="btn btn-primary" id="btn-complete-set" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 800;">
+            <button class="btn btn-primary" id="btn-complete-set" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 800; margin-bottom: 10px;">
               <i data-lucide="check-circle"></i> COMPLETAR SERIE & INICIAR DESCANSO
             </button>
+
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary" id="btn-prev-exercise" style="flex: 1; font-size: 0.78rem;">
+                <i data-lucide="chevron-left"></i> Anterior Ejercicio
+              </button>
+              <button class="btn btn-secondary" id="btn-sound-toggle" style="font-size: 0.78rem;" title="Activar/Desactivar Sonido de Pitidos">
+                <i data-lucide="volume-2"></i> Sound Test 🔔
+              </button>
+              <button class="btn btn-secondary" id="btn-next-exercise" style="flex: 1; font-size: 0.78rem; color: var(--accent-orange); border-color: rgba(249,115,22,0.3);">
+                Siguiente Ejercicio <i data-lucide="chevron-right"></i>
+              </button>
+            </div>
           </div>
 
           <div id="view-rest-active" style="display: none;">
             <span class="text-muted" style="font-size: 0.9rem; font-weight: 700; text-transform: uppercase;">Tiempo de Descanso</span>
             <div class="rest-timer-display" id="trainer-rest-seconds">60s</div>
-            <button class="btn btn-secondary" id="btn-skip-rest" style="margin-top: 10px;">
-              <i data-lucide="fast-forward"></i> Omitir Descanso
+            <button class="btn btn-secondary" id="btn-skip-rest" style="margin-top: 10px; width: 100%; padding: 12px; font-weight: 700; background: var(--primary); color: #000;">
+              <i data-lucide="fast-forward"></i> OMITIR DESCANSO & SIGUIENTE SERIE
             </button>
           </div>
 
