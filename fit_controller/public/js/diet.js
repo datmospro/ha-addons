@@ -60,7 +60,6 @@ window.DietModule = {
     ];
 
     const todayKey = this.getCurrentDayOfWeekSpanish();
-    const peopleCount = (window.FitApp && window.FitApp.peopleCount) || 1;
 
     container.style.display = 'grid';
     container.style.gridTemplateColumns = 'repeat(auto-fit, minmax(280px, 1fr))';
@@ -234,8 +233,11 @@ window.DietModule = {
     const modalCreateR = document.getElementById('modal-create-recipe');
     const btnCloseCreateR = document.getElementById('btn-close-create-recipe');
 
-    if (btnCloseCreateR) {
-      btnCloseCreateR.addEventListener('click', () => modalCreateR.classList.remove('active'));
+    if (btnCloseCreateR && modalCreateR) {
+      btnCloseCreateR.addEventListener('click', () => {
+        modalCreateR.style.display = 'none';
+        modalCreateR.classList.remove('active');
+      });
     }
 
     const formCreateR = document.getElementById('form-create-recipe');
@@ -283,7 +285,10 @@ window.DietModule = {
               body: JSON.stringify(body)
             });
           }
-          modalCreateR.classList.remove('active');
+          if (modalCreateR) {
+            modalCreateR.style.display = 'none';
+            modalCreateR.classList.remove('active');
+          }
           formCreateR.reset();
           await this.loadRecipeCatalog();
           await this.loadPlan();
@@ -297,8 +302,11 @@ window.DietModule = {
     const modalAssign = document.getElementById('modal-assign-meal-to-day');
     const btnCloseAssign = document.getElementById('btn-close-assign-meal');
 
-    if (btnCloseAssign) {
-      btnCloseAssign.addEventListener('click', () => modalAssign.classList.remove('active'));
+    if (btnCloseAssign && modalAssign) {
+      btnCloseAssign.addEventListener('click', () => {
+        modalAssign.style.display = 'none';
+        modalAssign.classList.remove('active');
+      });
     }
 
     const formAssign = document.getElementById('form-assign-meal');
@@ -316,7 +324,10 @@ window.DietModule = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ day_of_week, meal_type, recipe_id })
           });
-          modalAssign.classList.remove('active');
+          if (modalAssign) {
+            modalAssign.style.display = 'none';
+            modalAssign.classList.remove('active');
+          }
           await this.loadPlan();
         } catch (err) {
           alert('Error al asignar plato: ' + err.message);
@@ -324,23 +335,74 @@ window.DietModule = {
       });
     }
 
-    // 3. Day Meal Details Modal
+    // 3. Day Meal Details Modal Close
     const modalDayDetails = document.getElementById('modal-day-meal-details');
     const btnCloseDayDetails = document.getElementById('btn-close-day-meal-details');
-    if (btnCloseDayDetails) {
-      btnCloseDayDetails.addEventListener('click', () => modalDayDetails.classList.remove('active'));
+    if (btnCloseDayDetails && modalDayDetails) {
+      btnCloseDayDetails.addEventListener('click', () => {
+        modalDayDetails.style.display = 'none';
+        modalDayDetails.classList.remove('active');
+      });
+    }
+
+    // 4. Shopping List Modal Close
+    const modalShop = document.getElementById('modal-shopping-list');
+    const btnCloseShop = document.getElementById('btn-close-shopping-list');
+    if (btnCloseShop && modalShop) {
+      btnCloseShop.addEventListener('click', () => {
+        modalShop.style.display = 'none';
+        modalShop.classList.remove('active');
+      });
     }
   },
 
-  openCreateRecipeModal: function() {
-    document.getElementById('edit-recipe-id').value = '';
-    document.getElementById('form-create-recipe').reset();
-    document.getElementById('modal-create-recipe-title').innerHTML = `<i data-lucide="utensils"></i> Crear Nuevo Plato Personalizado`;
-    const modal = document.getElementById('modal-create-recipe');
-    if (modal) {
-      modal.style.zIndex = '2500';
-      modal.classList.add('active');
+  openShoppingListModal: async function() {
+    const modal = document.getElementById('modal-shopping-list');
+    if (!modal) return;
+
+    try {
+      const items = await window.apiFetch('api/diet/shopping-list');
+      const container = document.getElementById('shopping-list-content');
+      if (container) {
+        if (!items || items.length === 0) {
+          container.innerHTML = '<p class="text-muted" style="padding: 16px;">No hay ingredientes asignados en el plan semanal.</p>';
+        } else {
+          container.innerHTML = `
+            <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;">
+              ${items.map(item => `
+                <li style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); border-radius: 8px;">
+                  <span style="font-weight: 700; color: #fff; font-size: 0.9rem;">${item.name}</span>
+                  <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--primary); font-weight: 800; font-size: 0.82rem; padding: 4px 10px;">${item.displayAmount}</span>
+                </li>
+              `).join('')}
+            </ul>
+          `;
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching shopping list:', err);
     }
+
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+    if (window.lucide) lucide.createIcons();
+  },
+
+  openCreateRecipeModal: function() {
+    const modal = document.getElementById('modal-create-recipe');
+    if (!modal) return;
+
+    const elEditId = document.getElementById('edit-recipe-id');
+    if (elEditId) elEditId.value = '';
+
+    const form = document.getElementById('form-create-recipe');
+    if (form) form.reset();
+
+    const titleEl = document.getElementById('modal-create-recipe-title');
+    if (titleEl) titleEl.innerHTML = `<i data-lucide="utensils"></i> Crear Nuevo Plato Personalizado`;
+
+    modal.style.display = 'flex';
+    modal.classList.add('active');
     if (window.lucide) lucide.createIcons();
   },
 
@@ -354,21 +416,26 @@ window.DietModule = {
   },
 
   openAssignModal: function(day = 'lunes', mealType = 'almuerzo') {
-    document.getElementById('assign-meal-day').value = day || 'lunes';
+    const modal = document.getElementById('modal-assign-meal-to-day');
+    if (!modal) return;
+
+    const elDay = document.getElementById('assign-meal-day');
+    if (elDay) elDay.value = day || 'lunes';
+
     const selectMealType = document.getElementById('diet-assign-meal-type');
     if (selectMealType) selectMealType.value = mealType || 'almuerzo';
 
     this.populateAssignModalDropdown();
 
-    const modal = document.getElementById('modal-assign-meal-to-day');
-    if (modal) {
-      modal.style.zIndex = '2500';
-      modal.classList.add('active');
-    }
+    modal.style.display = 'flex';
+    modal.classList.add('active');
     if (window.lucide) lucide.createIcons();
   },
 
   openEditRecipeModal: function(recipeId) {
+    const modal = document.getElementById('modal-create-recipe');
+    if (!modal) return;
+
     const r = this.recipeCatalog.find(item => Number(item.id) === Number(recipeId));
     if (!r) return;
 
@@ -397,11 +464,8 @@ window.DietModule = {
     document.getElementById('new-recipe-instructions').value = instructionsArr.join('\n');
 
     document.getElementById('modal-create-recipe-title').innerHTML = `<i data-lucide="edit-3"></i> Editar Plato: ${r.title}`;
-    const modal = document.getElementById('modal-create-recipe');
-    if (modal) {
-      modal.style.zIndex = '2500';
-      modal.classList.add('active');
-    }
+    modal.style.display = 'flex';
+    modal.classList.add('active');
     if (window.lucide) lucide.createIcons();
   },
 
@@ -425,16 +489,18 @@ window.DietModule = {
   },
 
   openDayMealDetailsModal: function(dayKey) {
+    const modal = document.getElementById('modal-day-meal-details');
+    if (!modal) return;
+
     const dayData = (this.currentPlanData && this.currentPlanData[dayKey]) ? this.currentPlanData[dayKey] : null;
-    if (!dayData) return;
 
     const peopleCount = (window.FitApp && window.FitApp.peopleCount) || 1;
     document.getElementById('day-details-title').innerHTML = `<i data-lucide="utensils"></i> Menú Completo del ${dayKey.toUpperCase()}`;
-    document.getElementById('day-details-subtitle').textContent = `Total del Día: ${dayData.totalsPerPerson.kcal} kcal/persona | Ingredientes multiplicados para ${peopleCount} ${peopleCount === 1 ? 'persona' : 'personas'}`;
+    document.getElementById('day-details-subtitle').textContent = dayData ? `Total del Día: ${dayData.totalsPerPerson.kcal} kcal/persona | Ingredientes multiplicados para ${peopleCount} ${peopleCount === 1 ? 'persona' : 'personas'}` : 'Sin datos';
 
     const grid = document.getElementById('day-meal-details-grid');
-    if (!dayData.meals || dayData.meals.length === 0) {
-      grid.innerHTML = `<p class="text-muted">No hay platos asignados a este día aún.</p>`;
+    if (!dayData || !dayData.meals || dayData.meals.length === 0) {
+      grid.innerHTML = `<p class="text-muted" style="padding: 16px;">No hay platos asignados a este día aún.</p>`;
     } else {
       grid.innerHTML = dayData.meals.map(m => `
         <div style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px;">
@@ -467,11 +533,8 @@ window.DietModule = {
       `).join('');
     }
 
-    const modal = document.getElementById('modal-day-meal-details');
-    if (modal) {
-      modal.style.zIndex = '2500';
-      modal.classList.add('active');
-    }
+    modal.style.display = 'flex';
+    modal.classList.add('active');
     if (window.lucide) lucide.createIcons();
   },
 
