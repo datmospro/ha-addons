@@ -523,6 +523,17 @@ app.post('/api/workout/routines', (req, res) => {
   }
 });
 
+app.put('/api/workout/routines/:id', (req, res) => {
+  try {
+    const { name, day_of_week, description } = req.body;
+    db.prepare(`UPDATE routines SET name = ?, day_of_week = ?, description = ? WHERE id = ?`)
+      .run(name, day_of_week || 'lunes', description || '', req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/workout/routines/:id', (req, res) => {
   try {
     db.prepare(`DELETE FROM routine_exercises WHERE routine_id = ?`).run(req.params.id);

@@ -664,15 +664,17 @@
     </div>
   </div>
 
-  <!-- MODAL: CREAR NUEVA RUTINA -->
+  <!-- MODAL: CREAR / EDITAR RUTINA -->
   <div class="trainer-overlay" id="modal-create-routine" style="background: rgba(0,0,0,0.8);">
     <div class="card" style="max-width: 480px; margin: auto; width: 90%;">
       <div class="card-header">
-        <h3 class="card-title"><i data-lucide="plus-circle"></i> Crear Nueva Rutina</h3>
+        <h3 class="card-title"><i data-lucide="activity"></i> <span id="modal-routine-title-text">Crear Nueva Rutina</span></h3>
         <button class="btn btn-secondary" id="btn-close-create-routine" style="padding: 6px 10px;"><i data-lucide="x"></i></button>
       </div>
 
       <form id="form-create-routine" style="display: flex; flex-direction: column; gap: 14px;">
+        <input type="hidden" id="routine-edit-id">
+
         <div>
           <label style="font-size: 0.8rem; color: var(--text-muted);">Nombre de la Rutina</label>
           <input type="text" id="routine-name-input" class="input-field" placeholder="ej: Rutina de Torso & Core" style="width: 100%;" required>
@@ -821,11 +823,11 @@
   </div>
 
   <!-- JavaScript Modules -->
-  <script src="js/app.js?v=1.1.5"></script>
-  <script src="js/diet.js?v=1.1.5"></script>
-  <script src="js/recipe_finder.js?v=1.1.5"></script>
-  <script src="js/workout.js?v=1.1.5"></script>
-  <script src="js/trainer.js?v=1.1.5"></script>
-  <script src="js/music.js?v=1.1.5"></script>
+  <script src="js/app.js?v=1.1.6"></script>
+  <script src="js/diet.js?v=1.1.6"></script>
+  <script src="js/recipe_finder.js?v=1.1.6"></script>
+  <script src="js/workout.js?v=1.1.6"></script>
+  <script src="js/trainer.js?v=1.1.6"></script>
+  <script src="js/music.js?v=1.1.6"></script>
 </body>
 </html>

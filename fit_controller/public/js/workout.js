@@ -32,49 +32,85 @@ window.WorkoutModule = {
     }
   },
 
+  getCurrentDayOfWeekSpanish: function() {
+    const daysMap = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+    return daysMap[new Date().getDay()];
+  },
+
   renderRoutineCalendar: function() {
     const calendarGrid = document.getElementById('workout-calendar-grid');
     if (!calendarGrid) return;
 
-    const days = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+    const days = [
+      { key: 'lunes', label: 'Lunes' },
+      { key: 'martes', label: 'Martes' },
+      { key: 'miercoles', label: 'Miércoles' },
+      { key: 'jueves', label: 'Jueves' },
+      { key: 'viernes', label: 'Viernes' },
+      { key: 'sabado', label: 'Sábado' },
+      { key: 'domingo', label: 'Domingo' }
+    ];
 
-    calendarGrid.innerHTML = days.map(day => {
-      const routine = this.currentRoutines.find(r => (r.day_of_week || '').toLowerCase() === day);
+    const todayKey = this.getCurrentDayOfWeekSpanish();
+
+    calendarGrid.style.display = 'grid';
+    calendarGrid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(280px, 1fr))';
+    calendarGrid.style.gap = '16px';
+
+    calendarGrid.innerHTML = days.map(d => {
+      const isToday = d.key === todayKey;
+      const routine = this.currentRoutines.find(r => (r.day_of_week || '').toLowerCase() === d.key);
 
       if (routine) {
+        const exCount = routine.exercises ? routine.exercises.length : 0;
+
         return `
-          <div class="day-column" style="background: rgba(30, 41, 59, 0.9); border-color: rgba(16, 185, 129, 0.3);">
-            <div class="day-header">
-              <div class="day-title">${day}</div>
-              <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--primary); font-size: 0.7rem; font-weight: 700;">${routine.exercises ? routine.exercises.length : 0} ejercicios</span>
-            </div>
+          <div class="card" style="background: rgba(30, 41, 59, 0.7); border: 1px solid ${isToday ? 'var(--primary)' : 'var(--border-color)'}; box-shadow: ${isToday ? '0 0 20px rgba(16,185,129,0.2)' : 'none'}; display: flex; flex-direction: column; justify-content: space-between; border-radius: 14px; padding: 16px;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 1.1rem; font-weight: 900; text-transform: uppercase; color: ${isToday ? 'var(--primary)' : '#fff'};">${d.label}</span>
+                  ${isToday ? `<span class="badge" style="background: var(--primary); color: #000; font-size: 0.68rem; font-weight: 900; padding: 2px 6px; border-radius: 4px;">HOY</span>` : ''}
+                </div>
+                <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--primary); font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px;">
+                  <i data-lucide="dumbbell" style="width: 10px; height: 10px;"></i> ${exCount} Ejercicios
+                </span>
+              </div>
 
-            <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
-              <h4 style="font-size: 1.05rem; font-weight: 800; color: var(--primary);">${routine.name}</h4>
-              <p class="text-muted" style="font-size: 0.78rem;">${routine.description || 'Rutina asignada'}</p>
+              <h4 style="font-size: 1.15rem; font-weight: 800; color: var(--primary); margin-bottom: 4px;">${routine.name}</h4>
+              <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 12px;">${routine.description || 'Rutina asignada para este día'}</p>
 
-              <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 4px;">
-                ${(routine.exercises || []).slice(0, 3).map(e => `
-                  <div style="font-size: 0.75rem; background: rgba(15,23,42,0.6); padding: 4px 8px; border-radius: 6px; display: flex; justify-content: space-between;">
-                    <span>${e.name}</span>
-                    <strong style="color: var(--accent-cyan);">${e.sets}x${e.reps}</strong>
+              <!-- Exercises Preview Pills -->
+              <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;">
+                ${(routine.exercises || []).slice(0, 4).map(e => `
+                  <div style="font-size: 0.78rem; background: rgba(15,23,42,0.7); border: 1px solid rgba(255,255,255,0.05); padding: 6px 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 600; color: #e2e8f0;">${e.name}</span>
+                    <strong style="color: var(--accent-cyan); font-size: 0.75rem;">${e.sets}x${e.reps}${e.is_isometric ? 's' : ''}</strong>
                   </div>
                 `).join('')}
-                ${(routine.exercises || []).length > 3 ? `<span class="text-muted" style="font-size: 0.72rem;">... (+${routine.exercises.length - 3} más)</span>` : ''}
+                ${(routine.exercises || []).length > 4 ? `<span class="text-muted" style="font-size: 0.72rem; text-align: center;">+ ${(routine.exercises || []).length - 4} ejercicios más...</span>` : ''}
               </div>
             </div>
 
-            <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 12px;">
-              <button class="btn btn-secondary" onclick="window.WorkoutModule.openRoutineDetailsModal(${routine.id})" style="width: 100%; font-size: 0.78rem; justify-content: center;">
-                <i data-lucide="eye" style="width: 14px; height: 14px;"></i> Ver Animaciones
-              </button>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border-color);">
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn-primary" onclick="window.TrainerModule.startRoutine(${routine.id})" style="flex: 1; font-size: 0.82rem; padding: 8px; font-weight: 800; justify-content: center;">
+                  <i data-lucide="play" style="width: 14px; height: 14px;"></i> Entrenar
+                </button>
+                <button class="btn btn-secondary" onclick="window.WorkoutModule.openRoutineDetailsModal(${routine.id})" style="font-size: 0.82rem; padding: 8px;" title="Ver Animaciones y Vídeos">
+                  <i data-lucide="eye" style="width: 14px; height: 14px;"></i>
+                </button>
+              </div>
 
               <div style="display: flex; gap: 6px;">
-                <button class="btn btn-primary" onclick="window.TrainerModule.startRoutine(${routine.id})" style="flex: 1; font-size: 0.78rem; padding: 6px; justify-content: center;">
-                  <i data-lucide="play" style="width: 12px; height: 12px;"></i> Entrenar
+                <button class="btn btn-secondary" onclick="window.WorkoutModule.openEditRoutineModal(${routine.id})" style="flex: 1; font-size: 0.78rem; padding: 6px; justify-content: center;">
+                  <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i> Editar
                 </button>
-                <button class="btn btn-secondary" onclick="window.WorkoutModule.openAddExerciseModal(${routine.id})" style="padding: 6px;" title="Añadir ejercicio">
-                  <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+                <button class="btn btn-secondary" onclick="window.WorkoutModule.openAddExerciseModal(${routine.id})" style="font-size: 0.78rem; padding: 6px; justify-content: center;" title="Añadir Ejercicio">
+                  <i data-lucide="plus" style="width: 12px; height: 12px;"></i> Ejercicio
+                </button>
+                <button class="btn btn-secondary" onclick="window.WorkoutModule.deleteRoutine(${routine.id})" style="padding: 6px; font-size: 0.78rem; color: var(--accent-red); border-color: rgba(239,68,68,0.2);" title="Eliminar Rutina">
+                  <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
                 </button>
               </div>
             </div>
@@ -83,16 +119,21 @@ window.WorkoutModule = {
       }
 
       return `
-        <div class="day-column" style="opacity: 0.7;">
-          <div class="day-header">
-            <div class="day-title">${day}</div>
-            <span class="text-muted" style="font-size: 0.75rem;">Descanso</span>
+        <div class="card" style="background: rgba(15, 23, 42, 0.4); border: 1px dashed var(--border-color); display: flex; flex-direction: column; justify-content: space-between; border-radius: 14px; padding: 16px; opacity: 0.85;">
+          <div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <span style="font-size: 1.1rem; font-weight: 900; text-transform: uppercase; color: ${isToday ? 'var(--primary)' : 'var(--text-muted)'};">${d.label}</span>
+              ${isToday ? `<span class="badge" style="background: var(--primary); color: #000; font-size: 0.68rem; font-weight: 900; padding: 2px 6px; border-radius: 4px;">HOY</span>` : '<span class="text-muted" style="font-size: 0.75rem;">Descanso</span>'}
+            </div>
+
+            <div style="text-align: center; padding: 24px 0;">
+              <i data-lucide="coffee" style="width: 32px; height: 32px; color: var(--text-muted); opacity: 0.5; margin-bottom: 8px;"></i>
+              <p class="text-muted" style="font-size: 0.82rem;">Día de descanso o recuperación activa</p>
+            </div>
           </div>
-          <div style="flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px 0;">
-            <p class="text-muted" style="font-size: 0.8rem;">Día libre o de recuperación muscular</p>
-          </div>
-          <button class="btn btn-secondary" onclick="window.WorkoutModule.openCreateRoutineModalForDay('${day}')" style="width: 100%; font-size: 0.75rem; justify-content: center;">
-            + Asignar Rutina
+
+          <button class="btn btn-secondary" onclick="window.WorkoutModule.openCreateRoutineModalForDay('${d.key}')" style="width: 100%; font-size: 0.8rem; justify-content: center; margin-top: auto;">
+            <i data-lucide="plus-circle" style="width: 14px; height: 14px;"></i> Asignar Rutina
           </button>
         </div>
       `;
@@ -251,13 +292,18 @@ window.WorkoutModule = {
   },
 
   bindModals: function() {
-    // 1. Create Routine Modal
+    // 1. Create / Edit Routine Modal
     const modalCreateRoutine = document.getElementById('modal-create-routine');
     const btnOpenCreateRoutine = document.getElementById('btn-open-create-routine-modal');
     const btnCloseCreateRoutine = document.getElementById('btn-close-create-routine');
 
     if (btnOpenCreateRoutine) {
-      btnOpenCreateRoutine.addEventListener('click', () => modalCreateRoutine.classList.add('active'));
+      btnOpenCreateRoutine.addEventListener('click', () => {
+        document.getElementById('routine-edit-id').value = '';
+        document.getElementById('form-create-routine').reset();
+        document.getElementById('modal-routine-title-text').textContent = 'Crear Nueva Rutina';
+        modalCreateRoutine.classList.add('active');
+      });
     }
     if (btnCloseCreateRoutine) {
       btnCloseCreateRoutine.addEventListener('click', () => modalCreateRoutine.classList.remove('active'));
@@ -267,21 +313,30 @@ window.WorkoutModule = {
     if (formCreateRoutine) {
       formCreateRoutine.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const editId = document.getElementById('routine-edit-id').value;
         const name = document.getElementById('routine-name-input').value;
         const day_of_week = document.getElementById('routine-day-select').value;
         const description = document.getElementById('routine-desc-input').value;
 
         try {
-          await window.apiFetch('api/workout/routines', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, day_of_week, description })
-          });
+          if (editId) {
+            await window.apiFetch(`api/workout/routines/${editId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, day_of_week, description })
+            });
+          } else {
+            await window.apiFetch('api/workout/routines', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, day_of_week, description })
+            });
+          }
           modalCreateRoutine.classList.remove('active');
           formCreateRoutine.reset();
           this.loadRoutines();
         } catch (err) {
-          alert('Error al crear rutina: ' + err.message);
+          alert('Error al guardar rutina: ' + err.message);
         }
       });
     }
@@ -398,7 +453,22 @@ window.WorkoutModule = {
   },
 
   openCreateRoutineModalForDay: function(day) {
+    document.getElementById('routine-edit-id').value = '';
+    document.getElementById('form-create-routine').reset();
     document.getElementById('routine-day-select').value = day;
+    document.getElementById('modal-routine-title-text').textContent = 'Crear Nueva Rutina';
+    document.getElementById('modal-create-routine').classList.add('active');
+  },
+
+  openEditRoutineModal: function(routineId) {
+    const routine = this.currentRoutines.find(r => r.id === routineId);
+    if (!routine) return;
+
+    document.getElementById('routine-edit-id').value = routine.id;
+    document.getElementById('routine-name-input').value = routine.name;
+    document.getElementById('routine-day-select').value = routine.day_of_week || 'lunes';
+    document.getElementById('routine-desc-input').value = routine.description || '';
+    document.getElementById('modal-routine-title-text').textContent = `Editar Rutina: ${routine.name}`;
     document.getElementById('modal-create-routine').classList.add('active');
   },
 
@@ -419,9 +489,14 @@ window.WorkoutModule = {
           <div style="width: 100%; height: 160px; background: #050811; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
             ${this.getAnimationGraphicHtml(ex)}
           </div>
-          <div>
-            <h4 style="font-size: 1rem; font-weight: 800; color: var(--primary);">${ex.name}</h4>
-            <span class="text-muted" style="font-size: 0.75rem;">${ex.muscle_group} | ${ex.equipment}</span>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h4 style="font-size: 1rem; font-weight: 800; color: var(--primary);">${ex.name}</h4>
+              <span class="text-muted" style="font-size: 0.75rem;">${ex.muscle_group} | ${ex.equipment}</span>
+            </div>
+            <button class="btn btn-secondary" onclick="window.WorkoutModule.removeExerciseFromRoutine(${ex.routine_exercise_id})" style="padding: 4px 8px; font-size: 0.75rem; color: var(--accent-red); border-color: rgba(239,68,68,0.2);" title="Quitar de la rutina">
+              <i data-lucide="x" style="width: 12px; height: 12px;"></i> Quitar
+            </button>
           </div>
           <div style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; display: flex; justify-content: space-between;">
             <span>Series: <strong>${ex.sets}</strong></span>
@@ -482,6 +557,9 @@ window.WorkoutModule = {
     try {
       await window.apiFetch(`api/workout/routine-exercise/${routineExerciseId}`, { method: 'DELETE' });
       this.loadRoutines();
+      if (this.selectedRoutineForDetails) {
+        this.openRoutineDetailsModal(this.selectedRoutineForDetails.id);
+      }
     } catch (err) {
       alert('Error al quitar ejercicio: ' + err.message);
     }
