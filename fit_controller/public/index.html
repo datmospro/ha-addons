@@ -745,8 +745,41 @@
           </div>
         </div>
 
+  <!-- MODAL: EDITAR DATOS DE EJERCICIO EN RUTINA (SERIES, REPS, PESO, DESCANSO) -->
+  <div class="trainer-overlay" id="modal-edit-routine-exercise" style="background: rgba(0,0,0,0.8);">
+    <div class="card" style="max-width: 480px; margin: auto; width: 90%;">
+      <div class="card-header">
+        <h3 class="card-title" id="modal-edit-re-title"><i data-lucide="edit-3"></i> Editar Datos de Ejercicio</h3>
+        <button class="btn btn-secondary" id="btn-close-edit-re" style="padding: 6px 10px;"><i data-lucide="x"></i></button>
+      </div>
+
+      <form id="form-edit-routine-exercise" style="display: flex; flex-direction: column; gap: 14px;">
+        <input type="hidden" id="edit-re-id">
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Número de Series</label>
+            <input type="number" id="edit-re-sets" class="input-field" min="1" style="width: 100%;" required>
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Repeticiones / Segundos</label>
+            <input type="number" id="edit-re-reps" class="input-field" min="1" style="width: 100%;" required>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Peso (kg)</label>
+            <input type="number" step="0.5" id="edit-re-weight" class="input-field" style="width: 100%;">
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Descanso (segundos)</label>
+            <input type="number" id="edit-re-rest" class="input-field" min="5" style="width: 100%;" required>
+          </div>
+        </div>
+
         <button type="submit" class="btn btn-primary" style="margin-top: 10px;">
-          <i data-lucide="check"></i> Añadir a Rutina
+          <i data-lucide="save"></i> Guardar Cambios del Ejercicio
         </button>
       </form>
     </div>
@@ -823,11 +856,11 @@
   </div>
 
   <!-- JavaScript Modules -->
-  <script src="js/app.js?v=1.1.6"></script>
-  <script src="js/diet.js?v=1.1.6"></script>
-  <script src="js/recipe_finder.js?v=1.1.6"></script>
-  <script src="js/workout.js?v=1.1.6"></script>
-  <script src="js/trainer.js?v=1.1.6"></script>
-  <script src="js/music.js?v=1.1.6"></script>
+  <script src="js/app.js?v=1.1.7"></script>
+  <script src="js/diet.js?v=1.1.7"></script>
+  <script src="js/recipe_finder.js?v=1.1.7"></script>
+  <script src="js/workout.js?v=1.1.7"></script>
+  <script src="js/trainer.js?v=1.1.7"></script>
+  <script src="js/music.js?v=1.1.7"></script>
 </body>
 </html>

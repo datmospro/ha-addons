@@ -85,7 +85,7 @@ window.WorkoutModule = {
                 ${(routine.exercises || []).slice(0, 4).map(e => `
                   <div style="font-size: 0.78rem; background: rgba(15,23,42,0.7); border: 1px solid rgba(255,255,255,0.05); padding: 6px 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-weight: 600; color: #e2e8f0;">${e.name}</span>
-                    <strong style="color: var(--accent-cyan); font-size: 0.75rem;">${e.sets}x${e.reps}${e.is_isometric ? 's' : ''}</strong>
+                    <strong style="color: var(--accent-cyan); font-size: 0.75rem;">${e.sets}x${e.reps}${e.is_isometric ? 's' : ''} | ${e.rest_sec || 60}s</strong>
                   </div>
                 `).join('')}
                 ${(routine.exercises || []).length > 4 ? `<span class="text-muted" style="font-size: 0.72rem; text-align: center;">+ ${(routine.exercises || []).length - 4} ejercicios más...</span>` : ''}
@@ -383,14 +383,51 @@ window.WorkoutModule = {
             body: JSON.stringify({ routine_id, exercise_id, sets, reps, weight_kg, rest_sec })
           });
           modalAddEx.classList.remove('active');
-          this.loadRoutines();
+          await this.loadRoutines();
+          if (this.selectedRoutineForDetails) {
+            this.openRoutineDetailsModal(this.selectedRoutineForDetails.id);
+          }
         } catch (err) {
           alert('Error al añadir ejercicio: ' + err.message);
         }
       });
     }
 
-    // 4. Create / Edit Exercise Modal
+    // 4. Edit Exercise in Routine Data (Sets, Reps, Weight, Rest)
+    const modalEditRE = document.getElementById('modal-edit-routine-exercise');
+    const btnCloseEditRE = document.getElementById('btn-close-edit-re');
+    if (btnCloseEditRE) {
+      btnCloseEditRE.addEventListener('click', () => modalEditRE.classList.remove('active'));
+    }
+
+    const formEditRE = document.getElementById('form-edit-routine-exercise');
+    if (formEditRE) {
+      formEditRE.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const reId = document.getElementById('edit-re-id').value;
+        const sets = document.getElementById('edit-re-sets').value;
+        const reps = document.getElementById('edit-re-reps').value;
+        const weight_kg = document.getElementById('edit-re-weight').value;
+        const rest_sec = document.getElementById('edit-re-rest').value;
+
+        try {
+          await window.apiFetch(`api/workout/routine-exercise/${reId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sets, reps, weight_kg, rest_sec })
+          });
+          modalEditRE.classList.remove('active');
+          await this.loadRoutines();
+          if (this.selectedRoutineForDetails) {
+            this.openRoutineDetailsModal(this.selectedRoutineForDetails.id);
+          }
+        } catch (err) {
+          alert('Error al actualizar datos del ejercicio: ' + err.message);
+        }
+      });
+    }
+
+    // 5. Create / Edit Exercise Modal in Catalog
     const modalCreateEx = document.getElementById('modal-create-exercise');
     const btnOpenCreateEx = document.getElementById('btn-open-create-exercise-modal');
     const btnCloseCreateEx = document.getElementById('btn-close-create-exercise');
@@ -472,6 +509,17 @@ window.WorkoutModule = {
     document.getElementById('modal-create-routine').classList.add('active');
   },
 
+  openEditRoutineExerciseModal: function(reId, sets, reps, weight, rest, name) {
+    document.getElementById('edit-re-id').value = reId;
+    document.getElementById('edit-re-sets').value = sets;
+    document.getElementById('edit-re-reps').value = reps;
+    document.getElementById('edit-re-weight').value = weight;
+    document.getElementById('edit-re-rest').value = rest;
+    document.getElementById('modal-edit-re-title').innerHTML = `<i data-lucide="edit-3"></i> Editar Datos: ${name}`;
+    document.getElementById('modal-edit-routine-exercise').classList.add('active');
+    if (window.lucide) lucide.createIcons();
+  },
+
   openRoutineDetailsModal: function(routineId) {
     const routine = this.currentRoutines.find(r => r.id === routineId);
     if (!routine) return;
@@ -484,28 +532,34 @@ window.WorkoutModule = {
     if (!routine.exercises || routine.exercises.length === 0) {
       grid.innerHTML = `<p class="text-muted" style="grid-column: 1/-1;">Esta rutina no tiene ejercicios asignados aún.</p>`;
     } else {
-      grid.innerHTML = routine.exercises.map(ex => `
-        <div style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
-          <div style="width: 100%; height: 160px; background: #050811; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-            ${this.getAnimationGraphicHtml(ex)}
-          </div>
-          <div style="display: flex; justify-content: space-between; align-items: center;">
+      grid.innerHTML = routine.exercises.map(ex => {
+        const safeName = (ex.name || '').replace(/'/g, "\\'");
+        return `
+          <div style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="width: 100%; height: 160px; background: #050811; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+              ${this.getAnimationGraphicHtml(ex)}
+            </div>
             <div>
               <h4 style="font-size: 1rem; font-weight: 800; color: var(--primary);">${ex.name}</h4>
               <span class="text-muted" style="font-size: 0.75rem;">${ex.muscle_group} | ${ex.equipment}</span>
             </div>
-            <button class="btn btn-secondary" onclick="window.WorkoutModule.removeExerciseFromRoutine(${ex.routine_exercise_id})" style="padding: 4px 8px; font-size: 0.75rem; color: var(--accent-red); border-color: rgba(239,68,68,0.2);" title="Quitar de la rutina">
-              <i data-lucide="x" style="width: 12px; height: 12px;"></i> Quitar
-            </button>
+            <div style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: 700; display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+              <span>Series: <strong>${ex.sets}</strong></span>
+              <span>Reps: <strong>${ex.reps}${ex.is_isometric ? 's' : ''}</strong></span>
+              <span>Peso: <strong style="color: var(--accent-yellow);">${ex.weight_kg || 0} kg</strong></span>
+              <span>Descanso: <strong style="color: var(--primary);">${ex.rest_sec || 60} s</strong></span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: auto;">
+              <button class="btn btn-secondary" onclick="window.WorkoutModule.openEditRoutineExerciseModal(${ex.routine_exercise_id}, ${ex.sets}, ${ex.reps}, ${ex.weight_kg || 0}, ${ex.rest_sec || 60}, '${safeName}')" style="flex: 1; padding: 6px; font-size: 0.78rem; justify-content: center;">
+                <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i> Editar Datos
+              </button>
+              <button class="btn btn-secondary" onclick="window.WorkoutModule.removeExerciseFromRoutine(${ex.routine_exercise_id})" style="padding: 6px; font-size: 0.78rem; color: var(--accent-red); border-color: rgba(239,68,68,0.2);" title="Quitar de la rutina">
+                <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+              </button>
+            </div>
           </div>
-          <div style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; display: flex; justify-content: space-between;">
-            <span>Series: <strong>${ex.sets}</strong></span>
-            <span>Reps: <strong>${ex.reps}${ex.is_isometric ? 's' : ''}</strong></span>
-            <span>Peso: <strong style="color: var(--accent-yellow);">${ex.weight_kg || 0}kg</strong></span>
-          </div>
-          <p class="text-muted" style="font-size: 0.78rem; margin-top: auto;">${ex.instructions || ''}</p>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     document.getElementById('modal-routine-details').classList.add('active');
@@ -556,7 +610,7 @@ window.WorkoutModule = {
   removeExerciseFromRoutine: async function(routineExerciseId) {
     try {
       await window.apiFetch(`api/workout/routine-exercise/${routineExerciseId}`, { method: 'DELETE' });
-      this.loadRoutines();
+      await this.loadRoutines();
       if (this.selectedRoutineForDetails) {
         this.openRoutineDetailsModal(this.selectedRoutineForDetails.id);
       }

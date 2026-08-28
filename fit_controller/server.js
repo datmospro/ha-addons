@@ -567,6 +567,26 @@ app.post('/api/workout/routine-exercise', (req, res) => {
   }
 });
 
+app.put('/api/workout/routine-exercise/:id', (req, res) => {
+  try {
+    const { sets, reps, weight_kg, rest_sec } = req.body;
+    db.prepare(`
+      UPDATE routine_exercises
+      SET sets = ?, reps = ?, weight_kg = ?, rest_sec = ?
+      WHERE id = ?
+    `).run(
+      parseInt(sets || 3, 10),
+      parseInt(reps || 12, 10),
+      parseFloat(weight_kg || 0),
+      parseInt(rest_sec || 60, 10),
+      req.params.id
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/workout/routine-exercise/:id', (req, res) => {
   try {
     db.prepare(`DELETE FROM routine_exercises WHERE id = ?`).run(req.params.id);
