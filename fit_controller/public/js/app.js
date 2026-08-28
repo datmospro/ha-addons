@@ -36,8 +36,7 @@ window.FitApp = {
 
     const tabMeta = {
       'dashboard': { title: 'Dashboard Fit', subtitle: 'Resumen de déficit calórico, macros y rutina de hoy.' },
-      'diet': { title: 'Planificador Semanal de Dieta', subtitle: 'Control de comidas e ingredientes ajustados a las personas.' },
-      'recipe-finder': { title: 'Buscador de Recetas Saludables', subtitle: 'Filtra por calorías, proteína y carbohidratos en bases abiertas.' },
+      'diet': { title: 'Planificador Semanal de Dieta & Mis Platos', subtitle: 'Control de comidas, catálogo de recetas e ingredientes ajustados a las personas.' },
       'workout': { title: 'Rutinas & Ejercicios', subtitle: 'Planifica tus entrenamientos con animaciones explicativas.' },
       'history': { title: 'Historial de Entrenos', subtitle: 'Registro de tus entrenamientos completados y calorías quemadas.' },
       'settings': { title: 'Configuración & Música', subtitle: 'Administra tus listas de reproducción de música para entrenar y preferencias.' }
@@ -61,7 +60,6 @@ window.FitApp = {
 
         // Trigger tab specific loads
         if (tabKey === 'diet' && window.DietModule) window.DietModule.loadPlanAndRecipes();
-        if (tabKey === 'recipe-finder' && window.RecipeModule) window.RecipeModule.search();
         if (tabKey === 'workout' && window.WorkoutModule) window.WorkoutModule.loadRoutinesAndCatalog();
         if (tabKey === 'history' && window.WorkoutModule) window.WorkoutModule.loadHistory();
       });
