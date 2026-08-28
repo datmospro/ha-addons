@@ -550,20 +550,28 @@ window.TrainerModule = {
   },
 
   finishWorkout: async function() {
+    clearInterval(this.workoutTimerInterval);
+    clearInterval(this.restTimerInterval);
+    clearInterval(this.cadenceTimerInterval);
+    clearInterval(this.prepTimerInterval);
+
     const routineName = this.activeRoutine ? this.activeRoutine.name : 'Entrenamiento';
     const totalSecs = this.workoutSeconds;
     const setsCompleted = this.totalSetsCompleted;
     const kcalBurned = Math.round((totalSecs / 60) * 7.5);
     const routineId = this.activeRoutine ? this.activeRoutine.id : null;
 
-    this.stopWorkout(true);
+    // Pause music playback when workout completes
+    if (window.MusicModule) {
+      window.MusicModule.pauseMusic();
+    }
 
     // Format duration nicely
     const mins = Math.floor(totalSecs / 60);
     const secs = totalSecs % 60;
     const durationTxt = mins > 0 ? `${mins} min ${secs}s` : `${secs}s`;
 
-    // Update Victory Modal UI
+    // Update Victory View UI inside modal-trainer
     const nameEl = document.getElementById('victory-routine-name');
     const durationEl = document.getElementById('victory-duration');
     const setsEl = document.getElementById('victory-sets');
@@ -574,13 +582,13 @@ window.TrainerModule = {
     if (setsEl) setsEl.textContent = setsCompleted;
     if (kcalEl) kcalEl.textContent = `${kcalBurned} kcal`;
 
-    this.playVictoryChime();
+    document.getElementById('view-set-active').style.display = 'none';
+    document.getElementById('view-rest-active').style.display = 'none';
+    const victoryView = document.getElementById('view-victory-active');
+    if (victoryView) victoryView.style.display = 'block';
 
-    const victoryModal = document.getElementById('modal-workout-victory');
-    if (victoryModal) {
-      victoryModal.classList.add('active');
-      if (window.lucide) lucide.createIcons();
-    }
+    this.playVictoryChime();
+    if (window.lucide) lucide.createIcons();
 
     try {
       if (routineId) {
@@ -614,6 +622,11 @@ window.TrainerModule = {
 
     const overlayPause = document.getElementById('trainer-pause-overlay');
     if (overlayPause) overlayPause.style.display = 'none';
+
+    // Stop and reset YouTube music streaming when closing trainer
+    if (window.MusicModule) {
+      window.MusicModule.stopMusic();
+    }
 
     document.getElementById('modal-trainer').classList.remove('active');
   }

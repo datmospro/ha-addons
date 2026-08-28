@@ -120,6 +120,15 @@ window.MusicModule = {
     }
   },
 
+  stopMusic: function() {
+    this.pauseMusic();
+    const iframe = document.getElementById('music-iframe');
+    if (iframe) {
+      iframe.src = 'about:blank';
+      iframe.style.display = 'none';
+    }
+  },
+
   resumeMusic: function() {
     const iframe = document.getElementById('music-iframe');
     if (iframe && iframe.contentWindow) {
