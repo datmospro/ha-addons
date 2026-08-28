@@ -2,6 +2,20 @@
 window.DietModule = {
   currentPlanData: null,
 
+  init: function() {
+    this.bindEvents();
+    this.bindShoppingListEvents();
+  },
+
+  bindEvents: function() {
+    const btnAdd = document.getElementById('btn-add-meal-to-plan');
+    if (btnAdd) {
+      btnAdd.addEventListener('click', () => {
+        document.getElementById('btn-tab-recipe-finder').click();
+      });
+    }
+  },
+
   loadPlan: async function() {
     try {
       const people = window.FitApp.peopleCount || 1;
@@ -167,5 +181,5 @@ window.DietModule = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-  window.DietModule.bindShoppingListEvents();
+  window.DietModule.init();
 });

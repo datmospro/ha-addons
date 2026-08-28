@@ -5,7 +5,7 @@ window.WorkoutModule = {
 
   init: function() {
     this.bindMuscleFilterEvents();
-    this.bindCreateRoutine();
+    this.bindModals();
   },
 
   loadRoutinesAndCatalog: async function() {
@@ -36,7 +36,7 @@ window.WorkoutModule = {
     if (!container) return;
 
     if (this.currentRoutines.length === 0) {
-      container.innerHTML = '<p class="text-muted">No hay rutinas creadas. Crea una nueva rutina para comenzar.</p>';
+      container.innerHTML = '<p class="text-muted">No hay rutinas creadas. Haz clic en "Nueva Rutina" para comenzar.</p>';
       return;
     }
 
@@ -60,15 +60,20 @@ window.WorkoutModule = {
                 <span style="font-weight: 700; color: var(--primary);">${e.name}</span>
                 <span class="text-muted">(${e.muscle_group})</span>
               </div>
-              <div style="font-weight: 600;">
-                ${e.sets} series x ${e.reps} reps ${e.weight_kg > 0 ? `| ${e.weight_kg}kg` : ''}
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-weight: 600;">
+                  ${e.sets} series x ${e.reps} reps ${e.weight_kg > 0 ? `| ${e.weight_kg}kg` : ''}
+                </span>
+                <button onclick="window.WorkoutModule.removeExerciseFromRoutine(${e.routine_exercise_id})" style="background: transparent; border: none; color: var(--accent-red); cursor: pointer;" title="Quitar ejercicio">
+                  <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                </button>
               </div>
             </div>
           `).join('')}
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <button class="btn btn-secondary" onclick="window.WorkoutModule.addExerciseToRoutine(${r.id})" style="font-size: 0.8rem;">
+          <button class="btn btn-secondary" onclick="window.WorkoutModule.openAddExerciseModal(${r.id})" style="font-size: 0.8rem;">
             <i data-lucide="plus"></i> Añadir Ejercicio
           </button>
           <button class="btn btn-secondary" onclick="window.WorkoutModule.deleteRoutine(${r.id})" style="font-size: 0.8rem; color: var(--accent-red); border-color: rgba(239,68,68,0.2);">
@@ -108,22 +113,94 @@ window.WorkoutModule = {
   },
 
   getAnimationGraphicHtml: function(ex) {
-    if (ex.animation_url && ex.animation_url.trim().length > 5) {
-      return `<img src="${ex.animation_url}" alt="${ex.name}" onerror="this.onerror=null; this.parentNode.innerHTML=window.WorkoutModule.getSvgFallbackHtml('${ex.animation_data || 'squat'}');">`;
+    if (ex.animation_url && ex.animation_url.trim().length > 5 && !ex.animation_url.includes('gymvisual.com')) {
+      return `<img src="${ex.animation_url}" alt="${ex.name}" onerror="this.onerror=null; this.parentNode.innerHTML=window.WorkoutModule.getSvgFallbackHtml('${ex.animation_data || ex.muscle_group}');">`;
     }
     return this.getSvgFallbackHtml(ex.animation_data || ex.muscle_group);
   },
 
   getSvgFallbackHtml: function(key) {
-    const svgMap = {
-      squat: `<svg viewBox="0 0 100 100" fill="none" stroke="#10b981" stroke-width="4"><circle cx="50" cy="20" r="10"/><path d="M50 30 v25 L35 75 L20 90 M50 55 L65 75 L80 90 M30 40 h40"/></svg>`,
-      pushup: `<svg viewBox="0 0 100 100" fill="none" stroke="#06b6d4" stroke-width="4"><circle cx="20" cy="40" r="10"/><path d="M25 48 L75 55 L90 75 M35 50 L35 75 M55 52 L55 75"/></svg>`,
-      benchpress: `<svg viewBox="0 0 100 100" fill="none" stroke="#06b6d4" stroke-width="4"><circle cx="30" cy="50" r="10"/><path d="M10 65 h80 M35 58 h35 M40 58 L40 30 M60 58 L60 30 M25 28 h50"/></svg>`,
-      bicepcurl: `<svg viewBox="0 0 100 100" fill="none" stroke="#8b5cf6" stroke-width="4"><circle cx="50" cy="20" r="10"/><path d="M50 30 v30 M50 38 L30 35 M50 38 L70 30 L65 18"/><circle cx="65" cy="18" r="5" fill="#8b5cf6"/></svg>`,
-      plank: `<svg viewBox="0 0 100 100" fill="none" stroke="#f97316" stroke-width="4"><circle cx="20" cy="45" r="10"/><path d="M25 52 L80 52 L90 70 M30 52 L30 70 M45 52 L45 70"/></svg>`,
-      default: `<svg viewBox="0 0 100 100" fill="none" stroke="#10b981" stroke-width="4"><circle cx="50" cy="30" r="12"/><path d="M50 42 v30 L35 90 M50 72 L65 90 M30 55 h40"/></svg>`
-    };
-    return svgMap[key] || svgMap.default;
+    const keyLower = String(key || '').toLowerCase();
+    
+    // Rich SVG Vector Animations with smooth CSS Keyframes
+    if (keyLower.includes('squat') || keyLower.includes('sentadilla') || keyLower.includes('pierna')) {
+      return `
+        <svg viewBox="0 0 100 100" style="width: 100%; height: 100%; max-height: 160px;">
+          <style>
+            @keyframes animSquat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(18px); } }
+            .squat-move { animation: animSquat 1.8s infinite ease-in-out; }
+          </style>
+          <g class="squat-move">
+            <circle cx="50" cy="20" r="8" fill="#10b981"/>
+            <path d="M50 28 v22 M50 36 L34 48 M50 36 L66 48 M50 50 L36 74 L24 88 M50 50 L64 74 L76 88 M25 34 h50" stroke="#10b981" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+          <path d="M10 88 h80" stroke="#334155" stroke-width="3"/>
+        </svg>
+      `;
+    }
+
+    if (keyLower.includes('pushup') || keyLower.includes('flexio') || keyLower.includes('pecho')) {
+      return `
+        <svg viewBox="0 0 100 100" style="width: 100%; height: 100%; max-height: 160px;">
+          <style>
+            @keyframes animPushup { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(12px); } }
+            .pushup-move { animation: animPushup 1.6s infinite ease-in-out; }
+          </style>
+          <g class="pushup-move">
+            <circle cx="22" cy="42" r="8" fill="#06b6d4"/>
+            <path d="M28 48 L78 54 L90 74 M36 52 L36 74 M58 54 L58 74" stroke="#06b6d4" stroke-width="4" stroke-linecap="round"/>
+          </g>
+          <path d="M10 74 h80" stroke="#334155" stroke-width="3"/>
+        </svg>
+      `;
+    }
+
+    if (keyLower.includes('curl') || keyLower.includes('brazo') || keyLower.includes('bicep')) {
+      return `
+        <svg viewBox="0 0 100 100" style="width: 100%; height: 100%; max-height: 160px;">
+          <style>
+            @keyframes animCurl { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-75deg); } }
+            .curl-arm { animation: animCurl 1.5s infinite ease-in-out; transform-origin: 50px 42px; }
+          </style>
+          <circle cx="50" cy="20" r="8" fill="#8b5cf6"/>
+          <path d="M50 28 v32 M50 60 L36 86 M50 60 L64 86" stroke="#8b5cf6" stroke-width="4" stroke-linecap="round"/>
+          <g class="curl-arm">
+            <path d="M50 42 L70 42 L70 20" stroke="#8b5cf6" stroke-width="4" stroke-linecap="round"/>
+            <circle cx="70" cy="20" r="6" fill="#f97316"/>
+          </g>
+        </svg>
+      `;
+    }
+
+    if (keyLower.includes('plank') || keyLower.includes('plancha') || keyLower.includes('core')) {
+      return `
+        <svg viewBox="0 0 100 100" style="width: 100%; height: 100%; max-height: 160px;">
+          <style>
+            @keyframes animPlank { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+            .plank-glow { animation: animPlank 1.2s infinite ease-in-out; }
+          </style>
+          <g class="plank-glow">
+            <circle cx="22" cy="46" r="8" fill="#f97316"/>
+            <path d="M28 52 L80 52 L90 70 M32 52 L32 70 M48 52 L48 70" stroke="#f97316" stroke-width="4" stroke-linecap="round"/>
+          </g>
+          <path d="M10 70 h80" stroke="#334155" stroke-width="3"/>
+        </svg>
+      `;
+    }
+
+    // Default general exercise SVG animation
+    return `
+      <svg viewBox="0 0 100 100" style="width: 100%; height: 100%; max-height: 160px;">
+        <style>
+          @keyframes animGen { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(10px); } }
+          .gen-move { animation: animGen 1.8s infinite ease-in-out; }
+        </style>
+        <g class="gen-move">
+          <circle cx="50" cy="24" r="9" fill="#10b981"/>
+          <path d="M50 33 v28 M50 42 L32 30 M50 42 L68 30 M50 61 L36 86 M50 61 L64 86" stroke="#10b981" stroke-width="4" stroke-linecap="round"/>
+        </g>
+      </svg>
+    `;
   },
 
   bindMuscleFilterEvents: function() {
@@ -138,63 +215,140 @@ window.WorkoutModule = {
     });
   },
 
-  bindCreateRoutine: function() {
-    const btn = document.getElementById('btn-create-new-routine');
-    if (!btn) return;
-    btn.addEventListener('click', async () => {
-      const name = prompt('Nombre de la nueva rutina (ej: Rutina de Espalda y Biceps):');
-      if (!name) return;
-      const day = prompt('Día preferido (lunes, martes, miercoles, etc.):', 'lunes');
+  bindModals: function() {
+    // 1. Create Routine Modal
+    const modalCreateRoutine = document.getElementById('modal-create-routine');
+    const btnOpenCreateRoutine = document.getElementById('btn-open-create-routine-modal');
+    const btnCloseCreateRoutine = document.getElementById('btn-close-create-routine');
 
-      try {
-        await window.apiFetch('api/workout/routines', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, day_of_week: day || 'lunes' })
-        });
-        this.loadRoutines();
-      } catch (err) {
-        alert('Error al crear rutina: ' + err.message);
-      }
-    });
+    if (btnOpenCreateRoutine) {
+      btnOpenCreateRoutine.addEventListener('click', () => modalCreateRoutine.classList.add('active'));
+    }
+    if (btnCloseCreateRoutine) {
+      btnCloseCreateRoutine.addEventListener('click', () => modalCreateRoutine.classList.remove('active'));
+    }
+
+    const formCreateRoutine = document.getElementById('form-create-routine');
+    if (formCreateRoutine) {
+      formCreateRoutine.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('routine-name-input').value;
+        const day_of_week = document.getElementById('routine-day-select').value;
+        const description = document.getElementById('routine-desc-input').value;
+
+        try {
+          await window.apiFetch('api/workout/routines', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, day_of_week, description })
+          });
+          modalCreateRoutine.classList.remove('active');
+          formCreateRoutine.reset();
+          this.loadRoutines();
+        } catch (err) {
+          alert('Error al crear rutina: ' + err.message);
+        }
+      });
+    }
+
+    // 2. Add Exercise to Routine Modal
+    const modalAddEx = document.getElementById('modal-add-exercise-to-routine');
+    const btnCloseAddEx = document.getElementById('btn-close-add-ex-routine');
+    if (btnCloseAddEx) {
+      btnCloseAddEx.addEventListener('click', () => modalAddEx.classList.remove('active'));
+    }
+
+    const formAddEx = document.getElementById('form-add-ex-routine');
+    if (formAddEx) {
+      formAddEx.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const routine_id = document.getElementById('add-ex-routine-id').value;
+        const exercise_id = document.getElementById('add-ex-select').value;
+        const sets = document.getElementById('add-ex-sets').value;
+        const reps = document.getElementById('add-ex-reps').value;
+        const weight_kg = document.getElementById('add-ex-weight').value;
+        const rest_sec = document.getElementById('add-ex-rest').value;
+
+        try {
+          await window.apiFetch('api/workout/routine-exercise', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ routine_id, exercise_id, sets, reps, weight_kg, rest_sec })
+          });
+          modalAddEx.classList.remove('active');
+          this.loadRoutines();
+        } catch (err) {
+          alert('Error al añadir ejercicio: ' + err.message);
+        }
+      });
+    }
+
+    // 3. Create Custom Exercise Modal
+    const modalCreateEx = document.getElementById('modal-create-exercise');
+    const btnOpenCreateEx = document.getElementById('btn-open-create-exercise-modal');
+    const btnCloseCreateEx = document.getElementById('btn-close-create-exercise');
+
+    if (btnOpenCreateEx) {
+      btnOpenCreateEx.addEventListener('click', () => modalCreateEx.classList.add('active'));
+    }
+    if (btnCloseCreateEx) {
+      btnCloseCreateEx.addEventListener('click', () => modalCreateEx.classList.remove('active'));
+    }
+
+    const formCreateEx = document.getElementById('form-create-exercise');
+    if (formCreateEx) {
+      formCreateEx.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const body = {
+          name: document.getElementById('new-ex-name').value,
+          muscle_group: document.getElementById('new-ex-muscle').value,
+          equipment: document.getElementById('new-ex-equipment').value,
+          instructions: document.getElementById('new-ex-instructions').value,
+          animation_url: document.getElementById('new-ex-anim-url').value,
+          default_sets: 3,
+          default_reps: 12,
+          default_rest_sec: 60
+        };
+
+        try {
+          await window.apiFetch('api/workout/exercises', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          modalCreateEx.classList.remove('active');
+          formCreateEx.reset();
+          this.loadExerciseCatalog();
+        } catch (err) {
+          alert('Error al crear ejercicio: ' + err.message);
+        }
+      });
+    }
   },
 
-  addExerciseToRoutine: async function(routineId) {
+  openAddExerciseModal: async function(routineId) {
     if (this.exerciseCatalog.length === 0) await this.loadExerciseCatalog();
+
+    document.getElementById('add-ex-routine-id').value = routineId;
+    const select = document.getElementById('add-ex-select');
     
-    const exNames = this.exerciseCatalog.map((e, idx) => `${idx + 1}. ${e.name} (${e.muscle_group})`).join('\n');
-    const choice = prompt(`Selecciona el número del ejercicio a añadir:\n${exNames}`);
-    const index = parseInt(choice, 10) - 1;
+    select.innerHTML = this.exerciseCatalog.map(e => `
+      <option value="${e.id}">${e.name} (${e.muscle_group} - ${e.equipment})</option>
+    `).join('');
 
-    if (isNaN(index) || !this.exerciseCatalog[index]) return;
+    document.getElementById('modal-add-exercise-to-routine').classList.add('active');
+  },
 
-    const selectedEx = this.exerciseCatalog[index];
-    const sets = prompt('Número de series:', selectedEx.default_sets || 3);
-    const reps = prompt('Repeticiones por serie:', selectedEx.default_reps || 12);
-    const weight = prompt('Peso en kg (0 para peso corporal):', '0');
-    const rest = prompt('Segundos de descanso entre series:', selectedEx.default_rest_sec || 60);
-
+  removeExerciseFromRoutine: async function(routineExerciseId) {
     try {
-      await window.apiFetch('api/workout/routine-exercise', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          routine_id: routineId,
-          exercise_id: selectedEx.id,
-          sets: sets || 3,
-          reps: reps || 12,
-          weight_kg: weight || 0,
-          rest_sec: rest || 60
-        })
-      });
+      await window.apiFetch(`api/workout/routine-exercise/${routineExerciseId}`, { method: 'DELETE' });
       this.loadRoutines();
     } catch (err) {
-      alert('Error al añadir ejercicio: ' + err.message);
+      alert('Error al quitar ejercicio: ' + err.message);
     }
   },
 
   deleteRoutine: async function(id) {
-    if (!confirm('¿Seguro que deseas eliminar esta rutina?')) return;
     try {
       await window.apiFetch(`api/workout/routines/${id}`, { method: 'DELETE' });
       this.loadRoutines();

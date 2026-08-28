@@ -1,10 +1,12 @@
 // Recipe Finder & Macro Filtering Module
 window.RecipeModule = {
-  targetDay: null,
-  targetMealType: null,
+  targetDay: 'lunes',
+  targetMealType: 'almuerzo',
+  selectedRecipe: null,
 
   init: function() {
     this.bindSearchEvents();
+    this.bindAssignModal();
   },
 
   bindSearchEvents: function() {
@@ -17,6 +19,43 @@ window.RecipeModule = {
     if (inputQuery) {
       inputQuery.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') this.search();
+      });
+    }
+  },
+
+  bindAssignModal: function() {
+    const modal = document.getElementById('modal-assign-recipe');
+    const btnClose = document.getElementById('btn-close-assign-recipe');
+    if (btnClose) {
+      btnClose.addEventListener('click', () => modal.classList.remove('active'));
+    }
+
+    const form = document.getElementById('form-assign-recipe');
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const recipe_id = document.getElementById('assign-recipe-id').value;
+        const day_of_week = document.getElementById('assign-day-of-week').value;
+        const meal_type = document.getElementById('assign-meal-type').value;
+
+        try {
+          await window.apiFetch('api/diet/plan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              day_of_week: day_of_week.toLowerCase(),
+              meal_type: meal_type.toLowerCase(),
+              recipe_id: recipe_id,
+              people_count: window.FitApp.peopleCount || 1
+            })
+          });
+
+          modal.classList.remove('active');
+          if (window.DietModule) window.DietModule.loadPlan();
+          document.getElementById('btn-tab-diet').click();
+        } catch (err) {
+          alert('Error al asignar receta: ' + err.message);
+        }
       });
     }
   },
@@ -78,7 +117,7 @@ window.RecipeModule = {
                 <i data-lucide="plus"></i> Importar & Asignar
               </button>
             ` : `
-              <button class="btn btn-primary" onclick="window.RecipeModule.assignToPlan(${r.id})" style="flex: 1; font-size: 0.8rem;">
+              <button class="btn btn-primary" onclick="window.RecipeModule.openAssignModal(${r.id}, '${r.title.replace(/'/g, "\\'")}')" style="flex: 1; font-size: 0.8rem;">
                 <i data-lucide="calendar-plus"></i> Añadir a Plan Semanal
               </button>
             `}
@@ -90,38 +129,13 @@ window.RecipeModule = {
     if (window.lucide) lucide.createIcons();
   },
 
-  assignToPlan: async function(recipeId) {
-    const days = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
-    const day = this.targetDay || 'lunes';
-    const mealType = this.targetMealType || 'almuerzo';
+  openAssignModal: function(recipeId, recipeTitle) {
+    document.getElementById('assign-recipe-id').value = recipeId;
+    document.getElementById('assign-recipe-title').value = recipeTitle;
+    document.getElementById('assign-day-of-week').value = this.targetDay || 'lunes';
+    document.getElementById('assign-meal-type').value = this.targetMealType || 'almuerzo';
 
-    const selectedDay = prompt(`Selecciona el día de la semana (${days.join(', ')}):`, day);
-    if (!selectedDay || !days.includes(selectedDay.toLowerCase())) return;
-
-    const selectedMeal = prompt(`Selecciona el tipo de comida (desayuno, almuerzo, merienda, cena):`, mealType);
-    if (!selectedMeal) return;
-
-    try {
-      await window.apiFetch('api/diet/plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          day_of_week: selectedDay.toLowerCase(),
-          meal_type: selectedMeal.toLowerCase(),
-          recipe_id: recipeId,
-          people_count: window.FitApp.peopleCount || 1
-        })
-      });
-
-      alert('¡Receta añadida con éxito a tu plan semanal!');
-      this.targetDay = null;
-      this.targetMealType = null;
-      
-      // Switch to diet tab
-      document.getElementById('btn-tab-diet').click();
-    } catch (err) {
-      alert('Error al asignar receta: ' + err.message);
-    }
+    document.getElementById('modal-assign-recipe').classList.add('active');
   },
 
   importAndAssign: async function(recipeObj) {
@@ -132,7 +146,7 @@ window.RecipeModule = {
         body: JSON.stringify(recipeObj)
       });
       if (data.id) {
-        await this.assignToPlan(data.id);
+        this.openAssignModal(data.id, recipeObj.title);
       }
     } catch (err) {
       alert('Error al importar receta: ' + err.message);
