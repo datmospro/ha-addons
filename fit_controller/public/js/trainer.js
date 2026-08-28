@@ -160,6 +160,22 @@ window.TrainerModule = {
         }
       });
     }
+
+    const btnVictoryClose = document.getElementById('btn-victory-close');
+    if (btnVictoryClose) {
+      btnVictoryClose.addEventListener('click', () => {
+        document.getElementById('modal-workout-victory').classList.remove('active');
+      });
+    }
+
+    const btnVictoryHistory = document.getElementById('btn-victory-history');
+    if (btnVictoryHistory) {
+      btnVictoryHistory.addEventListener('click', () => {
+        document.getElementById('modal-workout-victory').classList.remove('active');
+        const historyBtn = document.getElementById('btn-tab-history');
+        if (historyBtn) historyBtn.click();
+      });
+    }
   },
 
   startRoutine: async function(routineId) {
@@ -534,24 +550,53 @@ window.TrainerModule = {
   },
 
   finishWorkout: async function() {
+    const routineName = this.activeRoutine ? this.activeRoutine.name : 'Entrenamiento';
+    const totalSecs = this.workoutSeconds;
+    const setsCompleted = this.totalSetsCompleted;
+    const kcalBurned = Math.round((totalSecs / 60) * 7.5);
+    const routineId = this.activeRoutine ? this.activeRoutine.id : null;
+
     this.stopWorkout(true);
 
-    const kcalBurned = Math.round((this.workoutSeconds / 60) * 7.5);
-    alert(`🎉 ¡Entrenamiento Completado con Éxito!\n\nDuración: ${Math.floor(this.workoutSeconds / 60)} min\nSeries totales: ${this.totalSetsCompleted}\nCalorías quemadas est.: ${kcalBurned} kcal`);
+    // Format duration nicely
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+    const durationTxt = mins > 0 ? `${mins} min ${secs}s` : `${secs}s`;
+
+    // Update Victory Modal UI
+    const nameEl = document.getElementById('victory-routine-name');
+    const durationEl = document.getElementById('victory-duration');
+    const setsEl = document.getElementById('victory-sets');
+    const kcalEl = document.getElementById('victory-kcal');
+
+    if (nameEl) nameEl.textContent = routineName;
+    if (durationEl) durationEl.textContent = durationTxt;
+    if (setsEl) setsEl.textContent = setsCompleted;
+    if (kcalEl) kcalEl.textContent = `${kcalBurned} kcal`;
+
+    this.playVictoryChime();
+
+    const victoryModal = document.getElementById('modal-workout-victory');
+    if (victoryModal) {
+      victoryModal.classList.add('active');
+      if (window.lucide) lucide.createIcons();
+    }
 
     try {
-      await window.apiFetch('api/workout/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          routine_id: this.activeRoutine.id,
-          routine_name: this.activeRoutine.name,
-          duration_sec: this.workoutSeconds,
-          sets_completed: this.totalSetsCompleted,
-          kcal_burned: kcalBurned
-        })
-      });
-      if (window.WorkoutModule) window.WorkoutModule.loadHistory();
+      if (routineId) {
+        await window.apiFetch('api/workout/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            routine_id: routineId,
+            routine_name: routineName,
+            duration_sec: totalSecs,
+            sets_completed: setsCompleted,
+            kcal_burned: kcalBurned
+          })
+        });
+        if (window.WorkoutModule) window.WorkoutModule.loadHistory();
+      }
     } catch (err) {
       console.error('Error logging workout:', err);
     }
