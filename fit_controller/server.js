@@ -324,6 +324,12 @@ app.get('/api/diet/shopping-list', (req, res) => {
       };
     });
 
+    res.json(shoppingList);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Import custom recipes and weekly plan from AI JSON
 app.post('/api/diet/import-json', (req, res) => {
   try {
