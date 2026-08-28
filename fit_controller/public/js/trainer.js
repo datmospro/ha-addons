@@ -160,22 +160,6 @@ window.TrainerModule = {
         }
       });
     }
-
-    const btnVictoryClose = document.getElementById('btn-victory-close');
-    if (btnVictoryClose) {
-      btnVictoryClose.addEventListener('click', () => {
-        document.getElementById('modal-workout-victory').classList.remove('active');
-      });
-    }
-
-    const btnVictoryHistory = document.getElementById('btn-victory-history');
-    if (btnVictoryHistory) {
-      btnVictoryHistory.addEventListener('click', () => {
-        document.getElementById('modal-workout-victory').classList.remove('active');
-        const historyBtn = document.getElementById('btn-tab-history');
-        if (historyBtn) historyBtn.click();
-      });
-    }
   },
 
   startRoutine: async function(routineId) {
@@ -550,61 +534,24 @@ window.TrainerModule = {
   },
 
   finishWorkout: async function() {
-    clearInterval(this.workoutTimerInterval);
-    clearInterval(this.restTimerInterval);
-    clearInterval(this.cadenceTimerInterval);
-    clearInterval(this.prepTimerInterval);
+    this.stopWorkout(true);
 
-    const routineName = this.activeRoutine ? this.activeRoutine.name : 'Entrenamiento';
-    const totalSecs = this.workoutSeconds;
-    const setsCompleted = this.totalSetsCompleted;
-    const kcalBurned = Math.round((totalSecs / 60) * 7.5);
-    const routineId = this.activeRoutine ? this.activeRoutine.id : null;
-
-    // Pause music playback when workout completes
-    if (window.MusicModule) {
-      window.MusicModule.pauseMusic();
-    }
-
-    // Format duration nicely
-    const mins = Math.floor(totalSecs / 60);
-    const secs = totalSecs % 60;
-    const durationTxt = mins > 0 ? `${mins} min ${secs}s` : `${secs}s`;
-
-    // Update Victory View UI inside modal-trainer
-    const nameEl = document.getElementById('victory-routine-name');
-    const durationEl = document.getElementById('victory-duration');
-    const setsEl = document.getElementById('victory-sets');
-    const kcalEl = document.getElementById('victory-kcal');
-
-    if (nameEl) nameEl.textContent = routineName;
-    if (durationEl) durationEl.textContent = durationTxt;
-    if (setsEl) setsEl.textContent = setsCompleted;
-    if (kcalEl) kcalEl.textContent = `${kcalBurned} kcal`;
-
-    document.getElementById('view-set-active').style.display = 'none';
-    document.getElementById('view-rest-active').style.display = 'none';
-    const victoryView = document.getElementById('view-victory-active');
-    if (victoryView) victoryView.style.display = 'block';
-
-    this.playVictoryChime();
-    if (window.lucide) lucide.createIcons();
+    const kcalBurned = Math.round((this.workoutSeconds / 60) * 7.5);
+    alert(`🎉 ¡Entrenamiento Completado con Éxito!\n\nDuración: ${Math.floor(this.workoutSeconds / 60)} min\nSeries totales: ${this.totalSetsCompleted}\nCalorías quemadas est.: ${kcalBurned} kcal`);
 
     try {
-      if (routineId) {
-        await window.apiFetch('api/workout/log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            routine_id: routineId,
-            routine_name: routineName,
-            duration_sec: totalSecs,
-            sets_completed: setsCompleted,
-            kcal_burned: kcalBurned
-          })
-        });
-        if (window.WorkoutModule) window.WorkoutModule.loadHistory();
-      }
+      await window.apiFetch('api/workout/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          routine_id: this.activeRoutine.id,
+          routine_name: this.activeRoutine.name,
+          duration_sec: this.workoutSeconds,
+          sets_completed: this.totalSetsCompleted,
+          kcal_burned: kcalBurned
+        })
+      });
+      if (window.WorkoutModule) window.WorkoutModule.loadHistory();
     } catch (err) {
       console.error('Error logging workout:', err);
     }
@@ -623,12 +570,15 @@ window.TrainerModule = {
     const overlayPause = document.getElementById('trainer-pause-overlay');
     if (overlayPause) overlayPause.style.display = 'none';
 
-    // Stop and reset YouTube music streaming when closing trainer
+    const animContainer = document.getElementById('trainer-anim-container');
+    if (animContainer) animContainer.innerHTML = '';
+
+    document.getElementById('modal-trainer').classList.remove('active');
+
+    // Stop music playback completely when exiting workout modal!
     if (window.MusicModule) {
       window.MusicModule.stopMusic();
     }
-
-    document.getElementById('modal-trainer').classList.remove('active');
   }
 };
 
