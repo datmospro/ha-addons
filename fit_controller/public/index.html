@@ -680,6 +680,20 @@
           <input type="text" id="new-ex-instructions" class="input-field" placeholder="ej: Espalda recta, tracciona hasta mentón..." style="width: 100%;">
         </div>
 
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Cadencia / Ritmo Sonoro (seg/rep)</label>
+            <input type="number" id="new-ex-cadence" class="input-field" placeholder="ej: 3 (pitido cada 3s)" min="0" value="3" style="width: 100%;">
+          </div>
+          <div style="display: flex; flex-direction: column; justify-content: center;">
+            <label style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">Tipo Ejercicio</label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; color: var(--accent-orange);">
+              <input type="checkbox" id="new-ex-isometric">
+              <span>Isométrico (Por tiempo / Plank)</span>
+            </label>
+          </div>
+        </div>
+
         <div>
           <label style="font-size: 0.8rem; color: var(--text-muted);">URL de Animación / Vídeo MP4 o GIF (GymVisual / Directo)</label>
           <input type="url" id="new-ex-anim-url" class="input-field" placeholder="https://gymvisual.com/img/vid/..." style="width: 100%;">

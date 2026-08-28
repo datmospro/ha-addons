@@ -33,7 +33,6 @@ function initDb() {
     )
   `);
 
-  // Ensure 1 default profile exists
   const profileCount = db.prepare(`SELECT COUNT(*) as count FROM user_profile`).get().count;
   if (profileCount === 0) {
     db.prepare(`
@@ -77,7 +76,7 @@ function initDb() {
     )
   `);
 
-  // 4. Exercises table
+  // 4. Exercises table (With cadence_sec and is_isometric columns)
   db.exec(`
     CREATE TABLE IF NOT EXISTS exercises (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,9 +90,19 @@ function initDb() {
       animation_url TEXT,
       default_sets INTEGER DEFAULT 3,
       default_reps INTEGER DEFAULT 12,
-      default_rest_sec INTEGER DEFAULT 60
+      default_rest_sec INTEGER DEFAULT 60,
+      cadence_sec INTEGER DEFAULT 0,
+      is_isometric INTEGER DEFAULT 0
     )
   `);
+
+  // Ensure cadence columns exist for existing databases
+  try {
+    db.exec(`ALTER TABLE exercises ADD COLUMN cadence_sec INTEGER DEFAULT 0`);
+  } catch (e) {}
+  try {
+    db.exec(`ALTER TABLE exercises ADD COLUMN is_isometric INTEGER DEFAULT 0`);
+  } catch (e) {}
 
   // 5. Routines table
   db.exec(`
@@ -140,7 +149,6 @@ function initDb() {
 }
 
 function seedDefaultData() {
-  // Seed Recipes if table is empty
   const recipeCount = db.prepare(`SELECT COUNT(*) as count FROM recipes`).get().count;
   if (recipeCount === 0) {
     const defaultRecipes = [
@@ -228,59 +236,6 @@ function seedDefaultData() {
         ]),
         image_url: "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=500&auto=format&fit=crop&q=80",
         is_custom: 0
-      },
-      {
-        title: "Batido Saciante Proteico de Frutos Rojos",
-        description: "Merienda exprés baja en calorías, perfecta para calmar la ansiedad entre comidas.",
-        category: "merienda",
-        prep_time_min: 5,
-        servings: 1,
-        kcal: 190,
-        protein: 24,
-        carbs: 18,
-        fat: 2,
-        fiber: 5,
-        ingredients_json: JSON.stringify([
-          { name: "Proteína de suero (Whey) sabor vainilla", amount: 25, unit: "g" },
-          { name: "Frutos rojos congelados", amount: 100, unit: "g" },
-          { name: "Bebida de almendras sin azúcar", amount: 250, unit: "ml" },
-          { name: "Semillas de chía", amount: 10, unit: "g" }
-        ]),
-        instructions_json: JSON.stringify([
-          "Añadir la bebida de almendras, los frutos rojos y la proteína en la batidora.",
-          "Triturar durante 45 segundos hasta obtener una textura suave y cremosa.",
-          "Servir en un vaso alto y espolvorear las semillas de chía por encima."
-        ]),
-        image_url: "https://images.unsplash.com/photo-1553530666-ba11a7da3888?w=500&auto=format&fit=crop&q=80",
-        is_custom: 0
-      },
-      {
-        title: "Pavo Salteado con Verduras y Champiñones",
-        description: "Cena ligera, proteica y súper baja en carbohidratos.",
-        category: "cena",
-        prep_time_min: 15,
-        servings: 1,
-        kcal: 310,
-        protein: 38,
-        carbs: 12,
-        fat: 10,
-        fiber: 5,
-        ingredients_json: JSON.stringify([
-          { name: "Solomillo o pechuga de pavo", amount: 180, unit: "g" },
-          { name: "Champiñones laminados", amount: 100, unit: "g" },
-          { name: "Calabacín en dados", amount: 100, unit: "g" },
-          { name: "Pimiento rojo y verde", amount: 80, unit: "g" },
-          { name: "Salsa de soja baja en sodio", amount: 15, unit: "ml" }
-        ]),
-        instructions_json: JSON.stringify([
-          "Cortar el pavo en tiras finas.",
-          "En una sartén bien caliente o wok, saltear las tiras de pavo con 3ml de aceite durante 4-5 minutos.",
-          "Añadir el pimiento, calabacín y champiñones.",
-          "Verter la salsa de soja y cocinar 5 minutos más a fuego vivo removiendo constantemente.",
-          "Servir caliente."
-        ]),
-        image_url: "https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=500&auto=format&fit=crop&q=80",
-        is_custom: 0
       }
     ];
 
@@ -294,29 +249,17 @@ function seedDefaultData() {
     }
   }
 
-  // Seed Meal Plans if empty
   const mealPlanCount = db.prepare(`SELECT COUNT(*) as count FROM meal_plans`).get().count;
   if (mealPlanCount === 0) {
     const stmtMeal = db.prepare(`
       INSERT INTO meal_plans (day_of_week, meal_type, recipe_id, people_count)
       VALUES (?, ?, ?, 1)
     `);
-    // Seed Monday to Friday with initial plan
     stmtMeal.run('lunes', 'desayuno', 1);
     stmtMeal.run('lunes', 'almuerzo', 2);
-    stmtMeal.run('lunes', 'merienda', 4);
     stmtMeal.run('lunes', 'cena', 3);
-
-    stmtMeal.run('martes', 'desayuno', 1);
-    stmtMeal.run('martes', 'almuerzo', 2);
-    stmtMeal.run('martes', 'cena', 5);
-
-    stmtMeal.run('miercoles', 'desayuno', 1);
-    stmtMeal.run('miercoles', 'almuerzo', 2);
-    stmtMeal.run('miercoles', 'cena', 3);
   }
 
-  // Seed Exercises if empty
   const exerciseCount = db.prepare(`SELECT COUNT(*) as count FROM exercises`).get().count;
   if (exerciseCount === 0) {
     const defaultExercises = [
@@ -328,10 +271,12 @@ function seedDefaultData() {
         instructions: "Mantén la espalda recta, desciende flexionando rodillas y cadera hasta romper el paralelo de 90°. Empuja con los talones al subir.",
         animation_type: "svg",
         animation_data: "squat",
-        animation_url: "https://gymvisual.com/img/p/2/0/8/8/2088.gif",
+        animation_url: "",
         default_sets: 4,
         default_reps: 12,
-        default_rest_sec: 60
+        default_rest_sec: 60,
+        cadence_sec: 3,
+        is_isometric: 0
       },
       {
         name: "Flexiones de Pecho (Push-ups)",
@@ -341,62 +286,12 @@ function seedDefaultData() {
         instructions: "Manos a la anchura de los hombros, cuerpo en línea recta desde la cabeza hasta los pies. Baja el pecho casi a tocar el suelo y empuja explosivo.",
         animation_type: "svg",
         animation_data: "pushup",
-        animation_url: "https://gymvisual.com/img/p/2/7/2/6/2726.gif",
+        animation_url: "",
         default_sets: 3,
         default_reps: 15,
-        default_rest_sec: 45
-      },
-      {
-        name: "Press de Banca con Mancuernas",
-        muscle_group: "pecho",
-        equipment: "Mancuernas + Banco",
-        difficulty: "Intermedio",
-        instructions: "Tumbado en banco horizontal, baja las mancuernas hasta el nivel del pecho sintiendo el estiramiento y empuja arriba sin bloquear codos.",
-        animation_type: "svg",
-        animation_data: "benchpress",
-        animation_url: "https://gymvisual.com/img/p/2/4/9/4/2494.gif",
-        default_sets: 4,
-        default_reps: 10,
-        default_rest_sec: 75
-      },
-      {
-        name: "Remo con Mancuerna a una mano",
-        muscle_group: "espalda",
-        equipment: "Mancuerna + Banco",
-        difficulty: "Intermedio",
-        instructions: "Apoya rodilla y mano en banco. Tracciona la mancuerna hacia la cadera llevando el codo bien pegado al cuerpo.",
-        animation_type: "svg",
-        animation_data: "row",
-        animation_url: "https://gymvisual.com/img/p/1/7/8/9/1789.gif",
-        default_sets: 4,
-        default_reps: 12,
-        default_rest_sec: 60
-      },
-      {
-        name: "Press Militar de Hombros",
-        muscle_group: "hombros",
-        equipment: "Mancuernas",
-        difficulty: "Intermedio",
-        instructions: "Sentado o de pie, eleva las mancuernas desde la altura de las orejas hacia arriba sobre la cabeza con control.",
-        animation_type: "svg",
-        animation_data: "shoulderpress",
-        animation_url: "https://gymvisual.com/img/p/2/1/1/2/2112.gif",
-        default_sets: 3,
-        default_reps: 12,
-        default_rest_sec: 60
-      },
-      {
-        name: "Curl de Bíceps con Mancuernas",
-        muscle_group: "brazos",
-        equipment: "Mancuernas",
-        difficulty: "Principiante",
-        instructions: "Mantén codos fijos a los lados del torso. Flexiona los antebrazos contrayendo el bíceps arriba y baja lentamente.",
-        animation_type: "svg",
-        animation_data: "bicepcurl",
-        animation_url: "https://gymvisual.com/img/p/2/1/6/7/2167.gif",
-        default_sets: 3,
-        default_reps: 12,
-        default_rest_sec: 45
+        default_rest_sec: 45,
+        cadence_sec: 3,
+        is_isometric: 0
       },
       {
         name: "Extensión de Tríceps con Barra (Pullover)",
@@ -409,20 +304,24 @@ function seedDefaultData() {
         animation_url: "https://gymvisual.com/img/vid/11000/119101201-barbell-triceps-extension-bent-arms-pullover-back-view.mp4",
         default_sets: 4,
         default_reps: 10,
-        default_rest_sec: 60
+        default_rest_sec: 60,
+        cadence_sec: 3,
+        is_isometric: 0
       },
       {
-        name: "Fondos de Tríceps en Banco",
+        name: "Curl de Bíceps con Mancuernas",
         muscle_group: "brazos",
-        equipment: "Banco / Silla",
+        equipment: "Mancuernas",
         difficulty: "Principiante",
-        instructions: "Manos apoyadas en borde del banco. Flexiona codos a 90° bajando la cadera y empuja para volver a la posición inicial.",
+        instructions: "Mantén codos fijos a los lados del torso. Flexiona los antebrazos contrayendo el bíceps arriba y baja lentamente.",
         animation_type: "svg",
-        animation_data: "tricepdip",
-        animation_url: "https://gymvisual.com/img/p/2/3/8/5/2385.gif",
+        animation_data: "bicepcurl",
+        animation_url: "",
         default_sets: 3,
-        default_reps: 15,
-        default_rest_sec: 45
+        default_reps: 12,
+        default_rest_sec: 45,
+        cadence_sec: 3,
+        is_isometric: 0
       },
       {
         name: "Plancha Abdominal Isometrica",
@@ -432,79 +331,39 @@ function seedDefaultData() {
         instructions: "Apoyo en antebrazos y puntas de los pies. Mantén espalda y glúteos totalmente alineados sin dejar caer la cadera.",
         animation_type: "svg",
         animation_data: "plank",
-        animation_url: "https://gymvisual.com/img/p/2/6/4/9/2649.gif",
+        animation_url: "",
         default_sets: 3,
-        default_reps: 45, // seconds for plank
-        default_rest_sec: 45
-      },
-      {
-        name: "Zancadas / Lunges Alternadas",
-        muscle_group: "piernas",
-        equipment: "Peso corporal / Mancuernas",
-        difficulty: "Principiante",
-        instructions: "Da un paso amplio adelante flexionado ambas rodillas a 90°. La rodilla trasera no toca el suelo. Vuelve e intercambia pierna.",
-        animation_type: "svg",
-        animation_data: "lunge",
-        animation_url: "https://gymvisual.com/img/p/2/2/3/1/2231.gif",
-        default_sets: 3,
-        default_reps: 12,
-        default_rest_sec: 60
-      },
-      {
-        name: "Jumping Jacks (Cardio Quemagrasa)",
-        muscle_group: "cardio",
-        equipment: "Ninguno",
-        difficulty: "Principiante",
-        instructions: "Salto abriendo piernas y dando palmada arriba con las manos, vuelve cerrando pies y brazos. Mantén un ritmo ágil.",
-        animation_type: "svg",
-        animation_data: "jumpingjacks",
-        animation_url: "https://gymvisual.com/img/p/2/5/9/0/2590.gif",
-        default_sets: 3,
-        default_reps: 30,
-        default_rest_sec: 30
+        default_reps: 45,
+        default_rest_sec: 45,
+        cadence_sec: 0,
+        is_isometric: 1
       }
     ];
 
     const stmtEx = db.prepare(`
-      INSERT INTO exercises (name, muscle_group, equipment, difficulty, instructions, animation_type, animation_data, animation_url, default_sets, default_reps, default_rest_sec)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO exercises (name, muscle_group, equipment, difficulty, instructions, animation_type, animation_data, animation_url, default_sets, default_reps, default_rest_sec, cadence_sec, is_isometric)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     for (const ex of defaultExercises) {
-      stmtEx.run(ex.name, ex.muscle_group, ex.equipment, ex.difficulty, ex.instructions, ex.animation_type, ex.animation_data, ex.animation_url, ex.default_sets, ex.default_reps, ex.default_rest_sec);
+      stmtEx.run(ex.name, ex.muscle_group, ex.equipment, ex.difficulty, ex.instructions, ex.animation_type, ex.animation_data, ex.animation_url, ex.default_sets, ex.default_reps, ex.default_rest_sec, ex.cadence_sec || 0, ex.is_isometric || 0);
     }
   }
 
-  // Seed default routine if empty
   const routineCount = db.prepare(`SELECT COUNT(*) as count FROM routines`).get().count;
   if (routineCount === 0) {
     const routineStmt = db.prepare(`INSERT INTO routines (name, day_of_week, description) VALUES (?, ?, ?)`);
-    const r1 = routineStmt.run('Rutina Fullbody Quemagrasa', 'lunes', 'Entrenamiento completo para activar el metabolismo y tonificar músculo.');
-    const r2 = routineStmt.run('Torso & Core Quemacalorías', 'miercoles', 'Trabajo de pecho, espalda, hombros y abdominales.');
-    const r3 = routineStmt.run('Pierna & Cardio HIIT', 'viernes', 'Rutina intesa de piernas y aceleración metabólica.');
+    const r1 = routineStmt.run('Rutina Fullbody Quemagrasa', 'lunes', 'Entrenamiento completo para activar el metabolismo.');
 
     const reStmt = db.prepare(`
       INSERT INTO routine_exercises (routine_id, exercise_id, order_index, sets, reps, weight_kg, rest_sec)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
-    // Assign to r1 (Fullbody)
-    reStmt.run(r1.lastInsertRowid, 1, 1, 4, 12, 0, 60); // Squat
-    reStmt.run(r1.lastInsertRowid, 2, 2, 3, 12, 0, 45); // Pushups
-    reStmt.run(r1.lastInsertRowid, 4, 3, 3, 12, 10, 60); // Row
-    reStmt.run(r1.lastInsertRowid, 8, 4, 3, 40, 0, 45); // Plank
-
-    // Assign to r2 (Torso)
-    reStmt.run(r2.lastInsertRowid, 3, 1, 4, 10, 14, 75); // Bench press
-    reStmt.run(r2.lastInsertRowid, 4, 2, 4, 12, 12, 60); // Row
-    reStmt.run(r2.lastInsertRowid, 5, 3, 3, 12, 8, 60); // Shoulder press
-    reStmt.run(r2.lastInsertRowid, 6, 4, 3, 12, 8, 45); // Bicep curl
-
-    // Assign to r3 (Pierna & Cardio)
-    reStmt.run(r3.lastInsertRowid, 1, 1, 4, 15, 0, 60); // Squat
-    reStmt.run(r3.lastInsertRowid, 9, 2, 3, 12, 0, 60); // Lunges
-    reStmt.run(r3.lastInsertRowid, 10, 3, 4, 40, 0, 30); // Jumping jacks
-    reStmt.run(r3.lastInsertRowid, 8, 4, 3, 45, 0, 45); // Plank
+    reStmt.run(r1.lastInsertRowid, 1, 1, 4, 12, 0, 60);
+    reStmt.run(r1.lastInsertRowid, 2, 2, 3, 12, 0, 45);
+    reStmt.run(r1.lastInsertRowid, 3, 3, 4, 10, 10, 60);
+    reStmt.run(r1.lastInsertRowid, 5, 4, 3, 45, 0, 45);
   }
 }
 

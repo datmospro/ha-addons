@@ -8,7 +8,11 @@ window.TrainerModule = {
   workoutTimerInterval: null,
   restSeconds: 0,
   restTimerInterval: null,
+  cadenceTimerInterval: null,
+  repCounter: 0,
   audioCtx: null,
+  soundEnabled: true,
+  onRestCompleteCallback: null,
 
   init: function() {
     this.bindEvents();
@@ -42,7 +46,7 @@ window.TrainerModule = {
 
     const btnSkipRest = document.getElementById('btn-skip-rest');
     if (btnSkipRest) {
-      btnSkipRest.addEventListener('click', () => this.endRest());
+      btnSkipRest.addEventListener('click', () => this.endRest(true));
     }
 
     const btnToday = document.getElementById('btn-start-today-routine');
@@ -76,7 +80,7 @@ window.TrainerModule = {
     document.getElementById('trainer-routine-name').textContent = routine.name;
     document.getElementById('modal-trainer').classList.add('active');
 
-    // Start workout clock
+    // Start main workout clock
     clearInterval(this.workoutTimerInterval);
     this.workoutTimerInterval = setInterval(() => {
       this.workoutSeconds++;
@@ -90,6 +94,7 @@ window.TrainerModule = {
   },
 
   renderCurrentExercise: function() {
+    clearInterval(this.cadenceTimerInterval);
     const ex = this.activeRoutine.exercises[this.currentExerciseIndex];
     if (!ex) return;
 
@@ -103,7 +108,7 @@ window.TrainerModule = {
     document.getElementById('trainer-target-reps').textContent = ex.reps;
     document.getElementById('trainer-weight-kg').textContent = ex.weight_kg || 0;
 
-    // Render animation graphic
+    // Render animation graphic (video MP4 or SVG)
     const animBox = document.getElementById('trainer-anim-container');
     animBox.innerHTML = window.WorkoutModule.getAnimationGraphicHtml(ex);
 
@@ -111,7 +116,55 @@ window.TrainerModule = {
     document.getElementById('view-set-active').style.display = 'block';
     document.getElementById('view-rest-active').style.display = 'none';
 
+    // Start Audio Cadence Pacer or Isometric Hold Timer
+    this.startCadenceOrIsometricPacer(ex);
+
     if (window.lucide) lucide.createIcons();
+  },
+
+  startCadenceOrIsometricPacer: function(ex) {
+    clearInterval(this.cadenceTimerInterval);
+    this.playAudioBeep(880, 0.2); // Start set chime
+
+    const cadenceSec = parseInt(ex.cadence_sec || 3, 10);
+
+    if (ex.is_isometric) {
+      // Isometric Hold Exercise (e.g. Plank for X seconds)
+      let secondsLeft = parseInt(ex.reps || 45, 10);
+      document.getElementById('trainer-target-reps').textContent = `${secondsLeft}s`;
+
+      this.cadenceTimerInterval = setInterval(() => {
+        secondsLeft--;
+        if (secondsLeft > 0) {
+          document.getElementById('trainer-target-reps').textContent = `${secondsLeft}s`;
+          if (secondsLeft <= 3) this.playAudioBeep(600, 0.15); // Countdown warning
+        } else {
+          document.getElementById('trainer-target-reps').textContent = `0s ¡Listo!`;
+          clearInterval(this.cadenceTimerInterval);
+          this.playAudioBeep(1046, 0.4); // Double success chime
+        }
+      }, 1000);
+
+    } else if (cadenceSec > 0) {
+      // Rep Cadence Pacer (Beeps on every rep cycle)
+      this.repCounter = 0;
+      const targetReps = parseInt(ex.reps || 12, 10);
+      let stepInCadence = cadenceSec;
+
+      this.cadenceTimerInterval = setInterval(() => {
+        stepInCadence--;
+        if (stepInCadence <= 0) {
+          stepInCadence = cadenceSec;
+          this.repCounter++;
+          this.playAudioBeep(880, 0.2); // Rep cadence beep
+
+          if (this.repCounter >= targetReps) {
+            clearInterval(this.cadenceTimerInterval);
+            this.playAudioBeep(1046, 0.4); // Series finish chime
+          }
+        }
+      }, 1000);
+    }
   },
 
   renderUpcomingExercisesList: function() {
@@ -125,13 +178,14 @@ window.TrainerModule = {
       return `
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: ${isCurrent ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.03)'}; border-radius: 8px; border-left: 3px solid ${isCurrent ? 'var(--primary)' : isDone ? 'var(--text-muted)' : 'transparent'};">
           <span style="font-size: 0.85rem; font-weight: ${isCurrent ? '700' : '400'}; color: ${isCurrent ? 'var(--primary)' : '#fff'};">${ex.name}</span>
-          <span style="font-size: 0.75rem;" class="text-muted">${ex.sets}x${ex.reps}</span>
+          <span style="font-size: 0.75rem;" class="text-muted">${ex.sets}x${ex.reps}${ex.is_isometric ? 's' : ''}</span>
         </div>
       `;
     }).join('');
   },
 
   handleSetCompleted: function() {
+    clearInterval(this.cadenceTimerInterval);
     const ex = this.activeRoutine.exercises[this.currentExerciseIndex];
     this.totalSetsCompleted++;
 
@@ -159,6 +213,8 @@ window.TrainerModule = {
 
   startRest: function(seconds, onComplete) {
     this.restSeconds = seconds;
+    this.onRestCompleteCallback = onComplete;
+
     document.getElementById('view-set-active').style.display = 'none';
     document.getElementById('view-rest-active').style.display = 'block';
     document.getElementById('trainer-rest-seconds').textContent = `${this.restSeconds}s`;
@@ -169,30 +225,40 @@ window.TrainerModule = {
       document.getElementById('trainer-rest-seconds').textContent = `${this.restSeconds}s`;
 
       if (this.restSeconds <= 0) {
-        this.playAudioBeep();
-        this.endRest();
-        if (onComplete) onComplete();
+        this.playAudioBeep(1046, 0.3);
+        this.endRest(true);
       }
     }, 1000);
   },
 
-  endRest: function() {
+  endRest: function(shouldAdvance = true) {
     clearInterval(this.restTimerInterval);
     document.getElementById('view-set-active').style.display = 'block';
     document.getElementById('view-rest-active').style.display = 'none';
+
+    if (shouldAdvance && this.onRestCompleteCallback) {
+      const cb = this.onRestCompleteCallback;
+      this.onRestCompleteCallback = null;
+      cb();
+    }
   },
 
-  playAudioBeep: function() {
+  playAudioBeep: function(freq = 880, duration = 0.2) {
+    if (!this.soundEnabled) return;
     try {
       if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume();
+      }
       const osc = this.audioCtx.createOscillator();
       const gain = this.audioCtx.createGain();
       osc.connect(gain);
       gain.connect(this.audioCtx.destination);
-      osc.frequency.value = 880; // A5 tone
-      gain.gain.setValueAtTime(0.3, this.audioCtx.currentTime);
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.25, this.audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + duration);
       osc.start();
-      osc.stop(this.audioCtx.currentTime + 0.3);
+      osc.stop(this.audioCtx.currentTime + duration);
     } catch (e) {
       console.log('Audio beep fallback');
     }
@@ -225,6 +291,7 @@ window.TrainerModule = {
   stopWorkout: function(isFinished = false) {
     clearInterval(this.workoutTimerInterval);
     clearInterval(this.restTimerInterval);
+    clearInterval(this.cadenceTimerInterval);
     document.getElementById('modal-trainer').classList.remove('active');
   }
 };

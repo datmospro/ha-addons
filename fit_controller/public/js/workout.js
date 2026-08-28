@@ -364,6 +364,8 @@ window.WorkoutModule = {
           equipment: document.getElementById('new-ex-equipment').value,
           instructions: document.getElementById('new-ex-instructions').value,
           animation_url: document.getElementById('new-ex-anim-url').value,
+          cadence_sec: document.getElementById('new-ex-cadence').value || 3,
+          is_isometric: document.getElementById('new-ex-isometric').checked ? 1 : 0,
           default_sets: 3,
           default_reps: 12,
           default_rest_sec: 60
@@ -422,7 +424,7 @@ window.WorkoutModule = {
           </div>
           <div style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; display: flex; justify-content: space-between;">
             <span>Series: <strong>${ex.sets}</strong></span>
-            <span>Reps: <strong>${ex.reps}</strong></span>
+            <span>Reps: <strong>${ex.reps}${ex.is_isometric ? 's' : ''}</strong></span>
             <span>Peso: <strong style="color: var(--accent-yellow);">${ex.weight_kg || 0}kg</strong></span>
           </div>
           <p class="text-muted" style="font-size: 0.78rem; margin-top: auto;">${ex.instructions || ''}</p>
@@ -457,6 +459,8 @@ window.WorkoutModule = {
     document.getElementById('new-ex-equipment').value = ex.equipment || '';
     document.getElementById('new-ex-instructions').value = ex.instructions || '';
     document.getElementById('new-ex-anim-url').value = ex.animation_url || '';
+    document.getElementById('new-ex-cadence').value = ex.cadence_sec !== undefined ? ex.cadence_sec : 3;
+    document.getElementById('new-ex-isometric').checked = !!ex.is_isometric;
 
     document.getElementById('modal-create-exercise-title').innerHTML = `<i data-lucide="edit-3"></i> Editar Ejercicio: ${ex.name}`;
     document.getElementById('modal-create-exercise').classList.add('active');
