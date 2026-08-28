@@ -17,7 +17,7 @@ window.TrainerModule = {
   init: function() {
     this.bindEvents();
 
-    // Global listener to unlock AudioContext on initial user gesture in browser/webview
+    // Unlock AudioContext on user interaction in browser/webview
     document.addEventListener('click', () => {
       this.initAudio();
     }, { once: false });
@@ -103,31 +103,6 @@ window.TrainerModule = {
       });
     }
 
-    const btnNextEx = document.getElementById('btn-next-exercise');
-    if (btnNextEx) {
-      btnNextEx.addEventListener('click', () => {
-        this.initAudio();
-        this.nextExercise();
-      });
-    }
-
-    const btnPrevEx = document.getElementById('btn-prev-exercise');
-    if (btnPrevEx) {
-      btnPrevEx.addEventListener('click', () => {
-        this.initAudio();
-        this.prevExercise();
-      });
-    }
-
-    const btnSoundToggle = document.getElementById('btn-sound-toggle');
-    if (btnSoundToggle) {
-      btnSoundToggle.addEventListener('click', () => {
-        this.initAudio();
-        this.playAudioBeep(1046, 0.4);
-        alert('🔔 Sonido probado: ¡El metrónomo sonoro está activado y funcionando!');
-      });
-    }
-
     const btnToday = document.getElementById('btn-start-today-routine');
     if (btnToday) {
       btnToday.addEventListener('click', () => {
@@ -176,6 +151,8 @@ window.TrainerModule = {
 
   renderCurrentExercise: function() {
     clearInterval(this.cadenceTimerInterval);
+    clearInterval(this.restTimerInterval);
+
     const ex = this.activeRoutine.exercises[this.currentExerciseIndex];
     if (!ex) return;
 
@@ -252,7 +229,9 @@ window.TrainerModule = {
   },
 
   handleSetCompleted: function() {
+    this.initAudio();
     clearInterval(this.cadenceTimerInterval);
+
     const ex = this.activeRoutine.exercises[this.currentExerciseIndex];
     if (!ex) return;
 
@@ -272,17 +251,17 @@ window.TrainerModule = {
   },
 
   nextExercise: function() {
+    this.initAudio();
     clearInterval(this.cadenceTimerInterval);
     clearInterval(this.restTimerInterval);
 
+    if (!this.activeRoutine || !this.activeRoutine.exercises) return;
+
     if (this.currentExerciseIndex < this.activeRoutine.exercises.length - 1) {
-      const ex = this.activeRoutine.exercises[this.currentExerciseIndex];
-      this.startRest(ex ? (ex.rest_sec || 60) : 60, () => {
-        this.currentExerciseIndex++;
-        this.currentSetIndex = 1;
-        this.renderCurrentExercise();
-        this.renderUpcomingExercisesList();
-      });
+      this.currentExerciseIndex++;
+      this.currentSetIndex = 1;
+      this.renderCurrentExercise();
+      this.renderUpcomingExercisesList();
     } else {
       // Final exercise complete!
       this.finishWorkout();
@@ -290,11 +269,44 @@ window.TrainerModule = {
   },
 
   prevExercise: function() {
+    this.initAudio();
     clearInterval(this.cadenceTimerInterval);
     clearInterval(this.restTimerInterval);
 
+    if (!this.activeRoutine || !this.activeRoutine.exercises) return;
+
     if (this.currentExerciseIndex > 0) {
       this.currentExerciseIndex--;
+      this.currentSetIndex = 1;
+      this.renderCurrentExercise();
+      this.renderUpcomingExercisesList();
+    }
+  },
+
+  renderUpcomingExercisesList: function() {
+    const container = document.getElementById('trainer-exercise-list');
+    if (!container || !this.activeRoutine) return;
+
+    container.innerHTML = this.activeRoutine.exercises.map((ex, idx) => {
+      const isCurrent = idx === this.currentExerciseIndex;
+      const isDone = idx < this.currentExerciseIndex;
+
+      return `
+        <div onclick="window.TrainerModule.jumpToExercise(${idx})" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: ${isCurrent ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.03)'}; border-radius: 8px; border-left: 3px solid ${isCurrent ? 'var(--primary)' : isDone ? 'var(--text-muted)' : 'transparent'};">
+          <span style="font-size: 0.85rem; font-weight: ${isCurrent ? '700' : '400'}; color: ${isCurrent ? 'var(--primary)' : '#fff'};">${ex.name}</span>
+          <span style="font-size: 0.75rem;" class="text-muted">${ex.sets}x${ex.reps}${ex.is_isometric ? 's' : ''}</span>
+        </div>
+      `;
+    }).join('');
+  },
+
+  jumpToExercise: function(index) {
+    this.initAudio();
+    clearInterval(this.cadenceTimerInterval);
+    clearInterval(this.restTimerInterval);
+
+    if (index >= 0 && index < this.activeRoutine.exercises.length) {
+      this.currentExerciseIndex = index;
       this.currentSetIndex = 1;
       this.renderCurrentExercise();
       this.renderUpcomingExercisesList();

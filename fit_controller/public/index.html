@@ -367,14 +367,11 @@
               <i data-lucide="check-circle"></i> COMPLETAR SERIE & INICIAR DESCANSO
             </button>
 
-            <div style="display: flex; gap: 8px;">
-              <button class="btn btn-secondary" id="btn-prev-exercise" style="flex: 1; font-size: 0.78rem;">
+            <div style="display: flex; gap: 10px;">
+              <button class="btn btn-secondary" id="btn-prev-exercise" onclick="window.TrainerModule.prevExercise()" style="flex: 1; font-size: 0.85rem; padding: 10px;">
                 <i data-lucide="chevron-left"></i> Anterior Ejercicio
               </button>
-              <button class="btn btn-secondary" id="btn-sound-toggle" style="font-size: 0.78rem;" title="Activar/Desactivar Sonido de Pitidos">
-                <i data-lucide="volume-2"></i> Sound Test 🔔
-              </button>
-              <button class="btn btn-secondary" id="btn-next-exercise" style="flex: 1; font-size: 0.78rem; color: var(--accent-orange); border-color: rgba(249,115,22,0.3);">
+              <button class="btn btn-secondary" id="btn-next-exercise" onclick="window.TrainerModule.nextExercise()" style="flex: 1; font-size: 0.85rem; padding: 10px; color: var(--accent-orange); border-color: rgba(249,115,22,0.4);">
                 Siguiente Ejercicio <i data-lucide="chevron-right"></i>
               </button>
             </div>
