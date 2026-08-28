@@ -509,12 +509,8 @@ window.WorkoutModule = {
   },
 
   openCreateRoutineModal: function() {
-    if (window.debugLog) window.debugLog('▶️ Ejecutando WorkoutModule.openCreateRoutineModal()');
     const modal = document.getElementById('modal-create-routine');
-    if (!modal) {
-      if (window.debugLog) window.debugLog('❌ ERROR: #modal-create-routine NO encontrado');
-      return;
-    }
+    if (!modal) return;
     const editId = document.getElementById('routine-edit-id');
     if (editId) editId.value = '';
     const form = document.getElementById('form-create-routine');
@@ -525,17 +521,12 @@ window.WorkoutModule = {
     modal.style.display = 'flex';
     modal.style.zIndex = '99999';
     modal.classList.add('active');
-    if (window.debugLog) window.debugLog('✅ Modal #modal-create-routine desplegado con display: flex y zIndex: 99999');
     if (window.lucide) lucide.createIcons();
   },
 
   openCreateExerciseModal: function() {
-    if (window.debugLog) window.debugLog('▶️ Ejecutando WorkoutModule.openCreateExerciseModal()');
     const modal = document.getElementById('modal-create-exercise');
-    if (!modal) {
-      if (window.debugLog) window.debugLog('❌ ERROR: #modal-create-exercise NO encontrado');
-      return;
-    }
+    if (!modal) return;
     const editExId = document.getElementById('edit-ex-id');
     if (editExId) editExId.value = '';
     const form = document.getElementById('form-create-exercise');
@@ -546,7 +537,6 @@ window.WorkoutModule = {
     modal.style.display = 'flex';
     modal.style.zIndex = '99999';
     modal.classList.add('active');
-    if (window.debugLog) window.debugLog('✅ Modal #modal-create-exercise desplegado con display: flex y zIndex: 99999');
     if (window.lucide) lucide.createIcons();
   },
 

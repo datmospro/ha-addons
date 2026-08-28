@@ -1,27 +1,4 @@
-// Global Debug Logger & Visual Toast System
-window.debugLog = function(msg) {
-  console.log(`[FIT LOG]: ${msg}`);
-  const container = document.getElementById('debug-toast-logs');
-  if (container) {
-    const time = new Date().toLocaleTimeString();
-    const div = document.createElement('div');
-    div.style.borderBottom = '1px solid rgba(255,255,255,0.08)';
-    div.style.padding = '2px 0';
-    div.innerHTML = `<span style="color:var(--text-muted); font-size:0.68rem;">[${time}]</span> ${msg}`;
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
-  }
-};
-
-// Global click listener to track mouse clicks
-document.addEventListener('click', (e) => {
-  const target = e.target;
-  const tag = target.tagName ? target.tagName.toLowerCase() : '';
-  const id = target.id ? `#${target.id}` : '';
-  const cls = target.className && typeof target.className === 'string' ? `.${target.className.split(' ').join('.')}` : '';
-  const text = (target.textContent || '').trim().substring(0, 20);
-  window.debugLog(`🖱️ Click -> <${tag}${id}${cls}> "${text}"`);
-}, true);
+// Core Application State & Global Helper Module
 
 // Robust fetch helper for HA Ingress relative routing
 window.apiFetch = async function(endpoint, options = {}) {
