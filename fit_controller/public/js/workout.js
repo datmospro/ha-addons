@@ -509,14 +509,23 @@ window.WorkoutModule = {
     document.getElementById('modal-create-routine').classList.add('active');
   },
 
-  openEditRoutineExerciseModal: function(reId, sets, reps, weight, rest, name) {
-    document.getElementById('edit-re-id').value = reId;
-    document.getElementById('edit-re-sets').value = sets;
-    document.getElementById('edit-re-reps').value = reps;
-    document.getElementById('edit-re-weight').value = weight;
-    document.getElementById('edit-re-rest').value = rest;
-    document.getElementById('modal-edit-re-title').innerHTML = `<i data-lucide="edit-3"></i> Editar Datos: ${name}`;
-    document.getElementById('modal-edit-routine-exercise').classList.add('active');
+  openEditRoutineExerciseModal: function(reId) {
+    if (!this.selectedRoutineForDetails || !this.selectedRoutineForDetails.exercises) return;
+    const ex = this.selectedRoutineForDetails.exercises.find(e => e.routine_exercise_id === reId);
+    if (!ex) return;
+
+    document.getElementById('edit-re-id').value = ex.routine_exercise_id;
+    document.getElementById('edit-re-sets').value = ex.sets;
+    document.getElementById('edit-re-reps').value = ex.reps;
+    document.getElementById('edit-re-weight').value = ex.weight_kg || 0;
+    document.getElementById('edit-re-rest').value = ex.rest_sec || 60;
+    document.getElementById('modal-edit-re-title').innerHTML = `<i data-lucide="edit-3"></i> Editar Datos: ${ex.name}`;
+
+    const modal = document.getElementById('modal-edit-routine-exercise');
+    if (modal) {
+      modal.style.zIndex = '2500';
+      modal.classList.add('active');
+    }
     if (window.lucide) lucide.createIcons();
   },
 
@@ -533,7 +542,6 @@ window.WorkoutModule = {
       grid.innerHTML = `<p class="text-muted" style="grid-column: 1/-1;">Esta rutina no tiene ejercicios asignados aún.</p>`;
     } else {
       grid.innerHTML = routine.exercises.map(ex => {
-        const safeName = (ex.name || '').replace(/'/g, "\\'");
         return `
           <div style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
             <div style="width: 100%; height: 160px; background: #050811; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
@@ -550,7 +558,7 @@ window.WorkoutModule = {
               <span>Descanso: <strong style="color: var(--primary);">${ex.rest_sec || 60} s</strong></span>
             </div>
             <div style="display: flex; gap: 8px; margin-top: auto;">
-              <button class="btn btn-secondary" onclick="window.WorkoutModule.openEditRoutineExerciseModal(${ex.routine_exercise_id}, ${ex.sets}, ${ex.reps}, ${ex.weight_kg || 0}, ${ex.rest_sec || 60}, '${safeName}')" style="flex: 1; padding: 6px; font-size: 0.78rem; justify-content: center;">
+              <button class="btn btn-secondary" onclick="window.WorkoutModule.openEditRoutineExerciseModal(${ex.routine_exercise_id})" style="flex: 1; padding: 6px; font-size: 0.78rem; justify-content: center;">
                 <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i> Editar Datos
               </button>
               <button class="btn btn-secondary" onclick="window.WorkoutModule.removeExerciseFromRoutine(${ex.routine_exercise_id})" style="padding: 6px; font-size: 0.78rem; color: var(--accent-red); border-color: rgba(239,68,68,0.2);" title="Quitar de la rutina">
@@ -576,7 +584,11 @@ window.WorkoutModule = {
       <option value="${e.id}">${e.name} (${e.muscle_group} - ${e.equipment})</option>
     `).join('');
 
-    document.getElementById('modal-add-exercise-to-routine').classList.add('active');
+    const modal = document.getElementById('modal-add-exercise-to-routine');
+    if (modal) {
+      modal.style.zIndex = '2500';
+      modal.classList.add('active');
+    }
   },
 
   openEditExerciseModal: function(exerciseId) {
