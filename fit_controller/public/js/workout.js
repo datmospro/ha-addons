@@ -305,8 +305,11 @@ window.WorkoutModule = {
         modalCreateRoutine.classList.add('active');
       });
     }
-    if (btnCloseCreateRoutine) {
-      btnCloseCreateRoutine.addEventListener('click', () => modalCreateRoutine.classList.remove('active'));
+    if (btnCloseCreateRoutine && modalCreateRoutine) {
+      btnCloseCreateRoutine.addEventListener('click', () => {
+        modalCreateRoutine.style.display = 'none';
+        modalCreateRoutine.classList.remove('active');
+      });
     }
 
     const formCreateRoutine = document.getElementById('form-create-routine');
@@ -332,7 +335,10 @@ window.WorkoutModule = {
               body: JSON.stringify({ name, day_of_week, description })
             });
           }
-          modalCreateRoutine.classList.remove('active');
+          if (modalCreateRoutine) {
+            modalCreateRoutine.style.display = 'none';
+            modalCreateRoutine.classList.remove('active');
+          }
           formCreateRoutine.reset();
           this.loadRoutines();
         } catch (err) {
@@ -344,14 +350,18 @@ window.WorkoutModule = {
     // 2. Routine Details Modal (Previews exercise videos at a glance)
     const modalDetails = document.getElementById('modal-routine-details');
     const btnCloseDetails = document.getElementById('btn-close-routine-details');
-    if (btnCloseDetails) {
-      btnCloseDetails.addEventListener('click', () => modalDetails.classList.remove('active'));
+    if (btnCloseDetails && modalDetails) {
+      btnCloseDetails.addEventListener('click', () => {
+        modalDetails.style.display = 'none';
+        modalDetails.classList.remove('active');
+      });
     }
 
     const btnStartFromDetails = document.getElementById('btn-start-from-details');
     if (btnStartFromDetails) {
       btnStartFromDetails.addEventListener('click', () => {
-        if (this.selectedRoutineForDetails) {
+        if (this.selectedRoutineForDetails && modalDetails) {
+          modalDetails.style.display = 'none';
           modalDetails.classList.remove('active');
           window.TrainerModule.startRoutine(this.selectedRoutineForDetails.id);
         }
@@ -361,8 +371,11 @@ window.WorkoutModule = {
     // 3. Add Exercise to Routine Modal
     const modalAddEx = document.getElementById('modal-add-exercise-to-routine');
     const btnCloseAddEx = document.getElementById('btn-close-add-ex-routine');
-    if (btnCloseAddEx) {
-      btnCloseAddEx.addEventListener('click', () => modalAddEx.classList.remove('active'));
+    if (btnCloseAddEx && modalAddEx) {
+      btnCloseAddEx.addEventListener('click', () => {
+        modalAddEx.style.display = 'none';
+        modalAddEx.classList.remove('active');
+      });
     }
 
     const formAddEx = document.getElementById('form-add-ex-routine');
@@ -382,7 +395,10 @@ window.WorkoutModule = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ routine_id, exercise_id, sets, reps, weight_kg, rest_sec })
           });
-          modalAddEx.classList.remove('active');
+          if (modalAddEx) {
+            modalAddEx.style.display = 'none';
+            modalAddEx.classList.remove('active');
+          }
           await this.loadRoutines();
           if (this.selectedRoutineForDetails) {
             this.openRoutineDetailsModal(this.selectedRoutineForDetails.id);
@@ -396,8 +412,11 @@ window.WorkoutModule = {
     // 4. Edit Exercise in Routine Data (Sets, Reps, Weight, Rest)
     const modalEditRE = document.getElementById('modal-edit-routine-exercise');
     const btnCloseEditRE = document.getElementById('btn-close-edit-re');
-    if (btnCloseEditRE) {
-      btnCloseEditRE.addEventListener('click', () => modalEditRE.classList.remove('active'));
+    if (btnCloseEditRE && modalEditRE) {
+      btnCloseEditRE.addEventListener('click', () => {
+        modalEditRE.style.display = 'none';
+        modalEditRE.classList.remove('active');
+      });
     }
 
     const formEditRE = document.getElementById('form-edit-routine-exercise');
@@ -416,7 +435,10 @@ window.WorkoutModule = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sets, reps, weight_kg, rest_sec })
           });
-          modalEditRE.classList.remove('active');
+          if (modalEditRE) {
+            modalEditRE.style.display = 'none';
+            modalEditRE.classList.remove('active');
+          }
           await this.loadRoutines();
           if (this.selectedRoutineForDetails) {
             this.openRoutineDetailsModal(this.selectedRoutineForDetails.id);
@@ -429,19 +451,13 @@ window.WorkoutModule = {
 
     // 5. Create / Edit Exercise Modal in Catalog
     const modalCreateEx = document.getElementById('modal-create-exercise');
-    const btnOpenCreateEx = document.getElementById('btn-open-create-exercise-modal');
     const btnCloseCreateEx = document.getElementById('btn-close-create-exercise');
 
-    if (btnOpenCreateEx) {
-      btnOpenCreateEx.addEventListener('click', () => {
-        document.getElementById('edit-ex-id').value = '';
-        document.getElementById('form-create-exercise').reset();
-        document.getElementById('modal-create-exercise-title').innerHTML = `<i data-lucide="dumbbell"></i> Crear Ejercicio Personalizado`;
-        modalCreateEx.classList.add('active');
+    if (btnCloseCreateEx && modalCreateEx) {
+      btnCloseCreateEx.addEventListener('click', () => {
+        modalCreateEx.style.display = 'none';
+        modalCreateEx.classList.remove('active');
       });
-    }
-    if (btnCloseCreateEx) {
-      btnCloseCreateEx.addEventListener('click', () => modalCreateEx.classList.remove('active'));
     }
 
     const formCreateEx = document.getElementById('form-create-exercise');
@@ -478,7 +494,10 @@ window.WorkoutModule = {
               body: JSON.stringify(body)
             });
           }
-          modalCreateEx.classList.remove('active');
+          if (modalCreateEx) {
+            modalCreateEx.style.display = 'none';
+            modalCreateEx.classList.remove('active');
+          }
           formCreateEx.reset();
           this.loadExerciseCatalog();
           this.loadRoutines();
@@ -489,15 +508,46 @@ window.WorkoutModule = {
     }
   },
 
-  openCreateRoutineModalForDay: function(day) {
+  openCreateRoutineModal: function() {
+    const modal = document.getElementById('modal-create-routine');
+    if (!modal) return;
     document.getElementById('routine-edit-id').value = '';
-    document.getElementById('form-create-routine').reset();
+    const form = document.getElementById('form-create-routine');
+    if (form) form.reset();
+    document.getElementById('modal-routine-title-text').textContent = 'Crear Nueva Rutina';
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+    if (window.lucide) lucide.createIcons();
+  },
+
+  openCreateExerciseModal: function() {
+    const modal = document.getElementById('modal-create-exercise');
+    if (!modal) return;
+    document.getElementById('edit-ex-id').value = '';
+    const form = document.getElementById('form-create-exercise');
+    if (form) form.reset();
+    document.getElementById('modal-create-exercise-title').innerHTML = `<i data-lucide="dumbbell"></i> Crear Ejercicio Personalizado`;
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+    if (window.lucide) lucide.createIcons();
+  },
+
+  openCreateRoutineModalForDay: function(day) {
+    const modal = document.getElementById('modal-create-routine');
+    if (!modal) return;
+    document.getElementById('routine-edit-id').value = '';
+    const form = document.getElementById('form-create-routine');
+    if (form) form.reset();
     document.getElementById('routine-day-select').value = day;
     document.getElementById('modal-routine-title-text').textContent = 'Crear Nueva Rutina';
-    document.getElementById('modal-create-routine').classList.add('active');
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+    if (window.lucide) lucide.createIcons();
   },
 
   openEditRoutineModal: function(routineId) {
+    const modal = document.getElementById('modal-create-routine');
+    if (!modal) return;
     const routine = this.currentRoutines.find(r => Number(r.id) === Number(routineId));
     if (!routine) return;
 
@@ -506,7 +556,9 @@ window.WorkoutModule = {
     document.getElementById('routine-day-select').value = routine.day_of_week || 'lunes';
     document.getElementById('routine-desc-input').value = routine.description || '';
     document.getElementById('modal-routine-title-text').textContent = `Editar Rutina: ${routine.name}`;
-    document.getElementById('modal-create-routine').classList.add('active');
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+    if (window.lucide) lucide.createIcons();
   },
 
   toggleInlineEdit: function(reId, isEditing) {
@@ -628,7 +680,11 @@ window.WorkoutModule = {
       }).join('');
     }
 
-    document.getElementById('modal-routine-details').classList.add('active');
+    const modalDetails = document.getElementById('modal-routine-details');
+    if (modalDetails) {
+      modalDetails.style.display = 'flex';
+      modalDetails.classList.add('active');
+    }
     if (window.lucide) lucide.createIcons();
   },
 
@@ -645,6 +701,7 @@ window.WorkoutModule = {
     const modal = document.getElementById('modal-add-exercise-to-routine');
     if (modal) {
       modal.style.zIndex = '2500';
+      modal.style.display = 'flex';
       modal.classList.add('active');
     }
   },
@@ -664,7 +721,11 @@ window.WorkoutModule = {
     document.getElementById('new-ex-prep').value = ex.prep_sec !== undefined ? ex.prep_sec : 5;
 
     document.getElementById('modal-create-exercise-title').innerHTML = `<i data-lucide="edit-3"></i> Editar Ejercicio: ${ex.name}`;
-    document.getElementById('modal-create-exercise').classList.add('active');
+    const modalCreateEx = document.getElementById('modal-create-exercise');
+    if (modalCreateEx) {
+      modalCreateEx.style.display = 'flex';
+      modalCreateEx.classList.add('active');
+    }
   },
 
   deleteExerciseFromCatalog: async function(exerciseId) {

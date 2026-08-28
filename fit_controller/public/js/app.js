@@ -126,8 +126,20 @@ window.FitApp = {
 
   bindProfileEvents: function() {
     const modal = document.getElementById('modal-profile');
-    document.getElementById('btn-open-profile-modal').addEventListener('click', () => modal.classList.add('active'));
-    document.getElementById('btn-close-profile').addEventListener('click', () => modal.classList.remove('active'));
+    const btnOpen = document.getElementById('btn-open-profile-modal');
+    if (btnOpen && modal) {
+      btnOpen.addEventListener('click', () => {
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+      });
+    }
+    const btnClose = document.getElementById('btn-close-profile');
+    if (btnClose && modal) {
+      btnClose.addEventListener('click', () => {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+      });
+    }
 
     document.getElementById('form-profile-settings').addEventListener('submit', async (e) => {
       e.preventDefault();
