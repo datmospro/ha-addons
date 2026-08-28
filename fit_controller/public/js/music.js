@@ -1,6 +1,7 @@
-// Workout Music Player & Playlist Manager Module
+// Workout Music Player & Playlist Manager Module (With YouTube postMessage Volume Control)
 window.MusicModule = {
   playlists: [],
+  videoVolume: 80,
 
   init: function() {
     this.bindWidgetEvents();
@@ -73,7 +74,7 @@ window.MusicModule = {
       });
     }
 
-    // 2. Video Music Volume Slider
+    // 2. Video Music Volume Slider (Using YouTube Iframe postMessage API)
     const musicSlider = document.getElementById('volume-music-slider');
     const musicVal = document.getElementById('volume-music-val');
 
@@ -81,7 +82,32 @@ window.MusicModule = {
       musicSlider.addEventListener('input', (e) => {
         const val = parseInt(e.target.value, 10);
         musicVal.textContent = `${val}%`;
+        this.videoVolume = val;
+        this.applyVideoVolume(val);
       });
+    }
+  },
+
+  applyVideoVolume: function(volumeLevel) {
+    const iframe = document.getElementById('music-iframe');
+    if (!iframe || !iframe.contentWindow) return;
+
+    try {
+      // Send setVolume command to YouTube iframe postMessage API
+      const msg = JSON.stringify({
+        event: 'command',
+        func: 'setVolume',
+        args: [volumeLevel]
+      });
+      iframe.contentWindow.postMessage(msg, '*');
+
+      if (volumeLevel === 0) {
+        iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*');
+      } else {
+        iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
+      }
+    } catch (err) {
+      console.log('PostMessage volume control fallback', err);
     }
   },
 
@@ -180,18 +206,23 @@ window.MusicModule = {
     if (url.includes('youtube.com/playlist') || url.includes('music.youtube.com/playlist')) {
       const match = url.match(/[?&]list=([^&]+)/);
       if (match && match[1]) {
-        return `https://www.youtube-nocookie.com/embed/videoseries?list=${match[1]}`;
+        return `https://www.youtube-nocookie.com/embed/videoseries?list=${match[1]}&enablejsapi=1`;
       }
     } else if (url.includes('youtu.be/')) {
       const id = url.split('youtu.be/')[1].split('?')[0];
-      return `https://www.youtube-nocookie.com/embed/${id}`;
+      return `https://www.youtube-nocookie.com/embed/${id}?enablejsapi=1`;
     } else if (url.includes('youtube.com/watch') || url.includes('music.youtube.com/watch')) {
       const match = url.match(/[?&]v=([^&]+)/);
       if (match && match[1]) {
-        return `https://www.youtube-nocookie.com/embed/${match[1]}`;
+        return `https://www.youtube-nocookie.com/embed/${match[1]}?enablejsapi=1`;
       }
     } else if (url.includes('youtube.com/embed/') || url.includes('youtube-nocookie.com/embed/')) {
-      return url.replace('youtube.com', 'youtube-nocookie.com');
+      let base = url.replace('youtube.com', 'youtube-nocookie.com');
+      if (!base.includes('enablejsapi=1')) {
+        const sep = base.includes('?') ? '&' : '?';
+        base += `${sep}enablejsapi=1`;
+      }
+      return base;
     }
 
     return url;
@@ -203,12 +234,25 @@ window.MusicModule = {
 
     let formatted = this.formatEmbedUrl(url);
     if (formatted) {
-      if (autoplay && !formatted.includes('autoplay=')) {
+      if (autoplay && !formatted.includes('autoplay=1')) {
         const separator = formatted.includes('?') ? '&' : '?';
-        formatted += `${separator}autoplay=1&enablejsapi=1`;
+        formatted += `${separator}autoplay=1`;
       }
+      if (!formatted.includes('enablejsapi=1')) {
+        const separator = formatted.includes('?') ? '&' : '?';
+        formatted += `${separator}enablejsapi=1`;
+      }
+
       iframe.src = formatted;
       iframe.style.display = 'block';
+
+      // Apply current volume setting after video loads
+      setTimeout(() => {
+        this.applyVideoVolume(this.videoVolume);
+      }, 1000);
+      setTimeout(() => {
+        this.applyVideoVolume(this.videoVolume);
+      }, 2500);
     } else {
       iframe.src = 'about:blank';
       iframe.style.display = 'none';
