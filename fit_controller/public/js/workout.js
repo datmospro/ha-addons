@@ -510,15 +510,31 @@ window.WorkoutModule = {
   },
 
   openEditRoutineExerciseModal: function(reId) {
-    if (!this.selectedRoutineForDetails || !this.selectedRoutineForDetails.exercises) return;
-    const ex = this.selectedRoutineForDetails.exercises.find(e => e.routine_exercise_id === reId);
-    if (!ex) return;
+    let ex = null;
 
-    document.getElementById('edit-re-id').value = ex.routine_exercise_id;
-    document.getElementById('edit-re-sets').value = ex.sets;
-    document.getElementById('edit-re-reps').value = ex.reps;
-    document.getElementById('edit-re-weight').value = ex.weight_kg || 0;
-    document.getElementById('edit-re-rest').value = ex.rest_sec || 60;
+    if (this.selectedRoutineForDetails && this.selectedRoutineForDetails.exercises) {
+      ex = this.selectedRoutineForDetails.exercises.find(e => Number(e.routine_exercise_id) === Number(reId) || Number(e.id) === Number(reId));
+    }
+
+    if (!ex) {
+      for (const r of this.currentRoutines) {
+        if (r.exercises) {
+          const found = r.exercises.find(e => Number(e.routine_exercise_id) === Number(reId) || Number(e.id) === Number(reId));
+          if (found) { ex = found; break; }
+        }
+      }
+    }
+
+    if (!ex) {
+      console.error('No se pudo encontrar el ejercicio para ID:', reId);
+      return;
+    }
+
+    document.getElementById('edit-re-id').value = ex.routine_exercise_id || ex.id;
+    document.getElementById('edit-re-sets').value = ex.sets || 3;
+    document.getElementById('edit-re-reps').value = ex.reps || 12;
+    document.getElementById('edit-re-weight').value = ex.weight_kg !== undefined ? ex.weight_kg : 0;
+    document.getElementById('edit-re-rest').value = ex.rest_sec !== undefined ? ex.rest_sec : 60;
     document.getElementById('modal-edit-re-title').innerHTML = `<i data-lucide="edit-3"></i> Editar Datos: ${ex.name}`;
 
     const modal = document.getElementById('modal-edit-routine-exercise');
@@ -530,7 +546,7 @@ window.WorkoutModule = {
   },
 
   openRoutineDetailsModal: function(routineId) {
-    const routine = this.currentRoutines.find(r => r.id === routineId);
+    const routine = this.currentRoutines.find(r => Number(r.id) === Number(routineId));
     if (!routine) return;
 
     this.selectedRoutineForDetails = routine;
@@ -542,6 +558,7 @@ window.WorkoutModule = {
       grid.innerHTML = `<p class="text-muted" style="grid-column: 1/-1;">Esta rutina no tiene ejercicios asignados aún.</p>`;
     } else {
       grid.innerHTML = routine.exercises.map(ex => {
+        const reId = ex.routine_exercise_id || ex.id;
         return `
           <div style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
             <div style="width: 100%; height: 160px; background: #050811; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
@@ -558,10 +575,10 @@ window.WorkoutModule = {
               <span>Descanso: <strong style="color: var(--primary);">${ex.rest_sec || 60} s</strong></span>
             </div>
             <div style="display: flex; gap: 8px; margin-top: auto;">
-              <button class="btn btn-secondary" onclick="window.WorkoutModule.openEditRoutineExerciseModal(${ex.routine_exercise_id})" style="flex: 1; padding: 6px; font-size: 0.78rem; justify-content: center;">
+              <button class="btn btn-secondary" onclick="window.WorkoutModule.openEditRoutineExerciseModal(${reId})" style="flex: 1; padding: 6px; font-size: 0.78rem; justify-content: center;">
                 <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i> Editar Datos
               </button>
-              <button class="btn btn-secondary" onclick="window.WorkoutModule.removeExerciseFromRoutine(${ex.routine_exercise_id})" style="padding: 6px; font-size: 0.78rem; color: var(--accent-red); border-color: rgba(239,68,68,0.2);" title="Quitar de la rutina">
+              <button class="btn btn-secondary" onclick="window.WorkoutModule.removeExerciseFromRoutine(${reId})" style="padding: 6px; font-size: 0.78rem; color: var(--accent-red); border-color: rgba(239,68,68,0.2);" title="Quitar de la rutina">
                 <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
               </button>
             </div>
@@ -592,7 +609,7 @@ window.WorkoutModule = {
   },
 
   openEditExerciseModal: function(exerciseId) {
-    const ex = this.exerciseCatalog.find(e => e.id === exerciseId);
+    const ex = this.exerciseCatalog.find(e => Number(e.id) === Number(exerciseId));
     if (!ex) return;
 
     document.getElementById('edit-ex-id').value = ex.id;
