@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fit Controller - Dieta, Macros & Entrenamientos Guiados</title>
+  <!-- Google Fonts Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/style.css?v=1.0.0">
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- SIDEBAR NAVIGATION -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">
+          <i data-lucide="dumbell"></i>
+        </div>
+        <div class="brand-name">
+          <h1>FitController</h1>
+          <span>Dieta & Workout</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-btn active" data-tab="dashboard" id="btn-tab-dashboard">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Dashboard</span>
+        </button>
+        <button class="nav-btn" data-tab="diet" id="btn-tab-diet">
+          <i data-lucide="utensils"></i>
+          <span>Plan de Dieta</span>
+        </button>
+        <button class="nav-btn" data-tab="recipe-finder" id="btn-tab-recipe-finder">
+          <i data-lucide="search"></i>
+          <span>Buscador Recetas</span>
+        </button>
+        <button class="nav-btn" data-tab="workout" id="btn-tab-workout">
+          <i data-lucide="activity"></i>
+          <span>Rutinas & Ejercicios</span>
+        </button>
+        <button class="nav-btn" data-tab="history" id="btn-tab-history">
+          <i data-lucide="history"></i>
+          <span>Historial Entrenos</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="start-workout-sidebar-btn" id="btn-quick-start-workout">
+          <i data-lucide="play-circle"></i>
+          <span>Empezar Entrenamiento</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="main-content">
+      
+      <!-- TOP BAR -->
+      <header class="top-bar">
+        <div class="page-title">
+          <h2 id="tab-title">Dashboard Fit</h2>
+          <p id="tab-subtitle" class="text-muted">Resumen de déficit calórico, macros y rutina de hoy.</p>
+        </div>
+
+        <div class="top-bar-actions">
+          <div class="people-selector-badge" title="Multiplicador global de porciones e ingredientes para la familia o pareja">
+            <i data-lucide="users" style="color: var(--primary);"></i>
+            <span>Personas:</span>
+            <select id="global-people-scaler">
+              <option value="1">1 Persona (Individual)</option>
+              <option value="2">2 Personas (Pareja)</option>
+              <option value="3">3 Personas</option>
+              <option value="4">4 Personas (Familia)</option>
+              <option value="5">5 Personas</option>
+            </select>
+          </div>
+
+          <button class="btn btn-secondary" id="btn-open-shopping-list">
+            <i data-lucide="shopping-bag"></i>
+            <span>Lista Compra</span>
+          </button>
+
+          <button class="btn btn-secondary" id="btn-open-profile-modal">
+            <i data-lucide="user-cog"></i>
+            <span>Mi Perfil / Metas</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- 1. DASHBOARD TAB -->
+      <section class="tab-panel active" id="panel-dashboard">
+        <!-- Target Overview Cards -->
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title"><i data-lucide="target"></i> Meta Calórica Diaria</span>
+              <span class="badge" id="dash-weight-status" style="background: rgba(16,185,129,0.15); color: var(--primary); padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700;">Déficit Quemagrasa</span>
+            </div>
+            <div style="font-size: 2.2rem; font-weight: 800; color: var(--accent-orange);" id="dash-kcal-target">1,850 kcal</div>
+            <p class="text-muted" style="font-size: 0.85rem; margin-top: 4px;" id="dash-tdee-info">TDEE estimado: 2,350 kcal/día (-500 kcal déficit)</p>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title"><i data-lucide="scale"></i> Peso & Objetivo</span>
+            </div>
+            <div style="display: flex; align-items: baseline; gap: 8px;">
+              <span style="font-size: 2rem; font-weight: 800;" id="dash-current-weight">80.0 kg</span>
+              <span class="text-muted" style="font-size: 0.9rem;" id="dash-target-weight">→ Meta: 72.0 kg</span>
+            </div>
+            <p class="text-muted" style="font-size: 0.85rem; margin-top: 4px;" id="dash-weekly-rate">Ritmo: -0.5 kg por semana</p>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title"><i data-lucide="flame"></i> Rutina de Hoy</span>
+            </div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: var(--primary);" id="dash-today-routine">Rutina Fullbody Quemagrasa</div>
+            <button class="btn btn-primary" style="margin-top: 12px; width: 100%;" id="btn-start-today-routine">
+              <i data-lucide="play"></i> Empezar Rutina de Hoy
+            </button>
+          </div>
+        </div>
+
+        <!-- Macro Progress Bars -->
+        <div class="card" style="margin-bottom: 24px;">
+          <div class="card-header">
+            <span class="card-title"><i data-lucide="pie-chart"></i> Distribución Diaria de Macronutrientes (Planificado vs Objetivo por Persona)</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
+            
+            <div class="macro-stat-box">
+              <div class="macro-header">
+                <span>Calorías Total</span>
+                <span id="macro-txt-kcal">0 / 1850 kcal</span>
+              </div>
+              <div class="macro-bar-bg">
+                <div class="macro-bar-fill fill-kcal" id="bar-fill-kcal" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <div class="macro-stat-box">
+              <div class="macro-header">
+                <span>Proteínas (Músculo & Saciante)</span>
+                <span id="macro-txt-protein">0 / 140 g</span>
+              </div>
+              <div class="macro-bar-bg">
+                <div class="macro-bar-fill fill-protein" id="bar-fill-protein" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <div class="macro-stat-box">
+              <div class="macro-header">
+                <span>Carbohidratos</span>
+                <span id="macro-txt-carbs">0 / 160 g</span>
+              </div>
+              <div class="macro-bar-bg">
+                <div class="macro-bar-fill fill-carbs" id="bar-fill-carbs" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <div class="macro-stat-box">
+              <div class="macro-header">
+                <span>Grasas Saludables</span>
+                <span id="macro-txt-fat">0 / 55 g</span>
+              </div>
+              <div class="macro-bar-bg">
+                <div class="macro-bar-fill fill-fat" id="bar-fill-fat" style="width: 0%;"></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. DIET & MEAL PLANNER TAB -->
+      <section class="tab-panel" id="panel-diet">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 style="font-size: 1.2rem; font-weight: 700;">Plan Semanal de Comidas</h3>
+            <p class="text-muted" style="font-size: 0.85rem;">Las cantidades e ingredientes se multiplican automáticamente según el selector de personas.</p>
+          </div>
+          <button class="btn btn-accent" id="btn-add-meal-to-plan">
+            <i data-lucide="plus-circle"></i> Asignar Receta al Plan
+          </button>
+        </div>
+
+        <div class="weekly-grid" id="weekly-meal-container">
+          <!-- Populated dynamically via diet.js -->
+        </div>
+      </section>
+
+      <!-- 3. RECIPE FINDER TAB -->
+      <section class="tab-panel" id="panel-recipe-finder">
+        <div class="card" style="margin-bottom: 24px;">
+          <h3 class="card-title" style="margin-bottom: 14px;"><i data-lucide="filter"></i> Buscador de Recetas Saludables & Filtro de Macros</h3>
+          <div class="recipe-search-bar">
+            <input type="text" id="search-recipe-query" class="input-field" placeholder="Buscar por nombre o ingrediente (ej: pollo, salmón, avena)..." style="flex: 1; min-width: 240px;">
+            
+            <select id="search-recipe-category" class="input-field">
+              <option value="all">Todas las comidas</option>
+              <option value="desayuno">Desayuno</option>
+              <option value="almuerzo">Almuerzo</option>
+              <option value="merienda">Merienda</option>
+              <option value="cena">Cena</option>
+              <option value="snack">Snacks</option>
+            </select>
+
+            <input type="number" id="search-max-kcal" class="input-field" placeholder="Máx Kcal (ej: 500)" style="width: 140px;">
+            <input type="number" id="search-min-protein" class="input-field" placeholder="Mín Proteína (g)" style="width: 140px;">
+            <input type="number" id="search-max-carbs" class="input-field" placeholder="Máx Carbos (g)" style="width: 140px;">
+
+            <button class="btn btn-primary" id="btn-execute-recipe-search">
+              <i data-lucide="search"></i> Buscar
+            </button>
+            <button class="btn btn-secondary" id="btn-open-create-recipe-modal">
+              <i data-lucide="plus"></i> Crear Mi Receta
+            </button>
+          </div>
+        </div>
+
+        <div class="recipe-card-grid" id="recipe-results-grid">
+          <!-- Populated dynamically via recipe_finder.js -->
+        </div>
+      </section>
+
+      <!-- 4. WORKOUT & ROUTINES TAB -->
+      <section class="tab-panel" id="panel-workout">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 style="font-size: 1.2rem; font-weight: 700;">Rutinas Semanales de Entrenamiento</h3>
+            <p class="text-muted" style="font-size: 0.85rem;">Configura tus ejercicios por día con animaciones visuales paso a paso.</p>
+          </div>
+          <button class="btn btn-primary" id="btn-create-new-routine">
+            <i data-lucide="plus"></i> Nueva Rutina
+          </button>
+        </div>
+
+        <div class="grid-2" id="routines-list-container">
+          <!-- Populated dynamically via workout.js -->
+        </div>
+
+        <h3 style="font-size: 1.2rem; font-weight: 700; margin: 32px 0 16px 0;">Catálogo de Ejercicios con Animaciones</h3>
+        
+        <div class="recipe-search-bar" style="margin-bottom: 20px;">
+          <button class="btn btn-secondary filter-muscle-btn active" data-muscle="all">Todos</button>
+          <button class="btn btn-secondary filter-muscle-btn" data-muscle="pecho">Pecho</button>
+          <button class="btn btn-secondary filter-muscle-btn" data-muscle="espalda">Espalda</button>
+          <button class="btn btn-secondary filter-muscle-btn" data-muscle="piernas">Piernas</button>
+          <button class="btn btn-secondary filter-muscle-btn" data-muscle="hombros">Hombros</button>
+          <button class="btn btn-secondary filter-muscle-btn" data-muscle="brazos">Brazos</button>
+          <button class="btn btn-secondary filter-muscle-btn" data-muscle="core">Core / Abdomen</button>
+          <button class="btn btn-secondary filter-muscle-btn" data-muscle="cardio">Cardio</button>
+          
+          <button class="btn btn-accent" id="btn-add-custom-exercise" style="margin-left: auto;">
+            <i data-lucide="plus"></i> Añadir Ejercicio
+          </button>
+        </div>
+
+        <div class="exercise-card-grid" id="exercise-catalog-grid">
+          <!-- Populated dynamically via workout.js -->
+        </div>
+      </section>
+
+      <!-- 5. WORKOUT HISTORY TAB -->
+      <section class="tab-panel" id="panel-history">
+        <div class="card">
+          <h3 class="card-title" style="margin-bottom: 16px;"><i data-lucide="history"></i> Registro de Sesiones Completadas</h3>
+          <div id="workout-history-list">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ---------------------------------------------------- -->
+  <!-- MODAL: INTERACTIVE GUIDED WORKOUT ("EMPEZAR ENTRENAMIENTO") -->
+  <!-- ---------------------------------------------------- -->
+  <div class="trainer-overlay" id="modal-trainer">
+    <div class="trainer-header">
+      <div class="trainer-title">
+        <h3 id="trainer-routine-name">Entrenamiento en Curso</h3>
+        <span class="text-muted" id="trainer-exercise-progress">Ejercicio 1 de 4</span>
+      </div>
+      
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <div style="font-size: 1.2rem; font-weight: 800; color: var(--accent-orange);" id="trainer-total-timer">00:00</div>
+        <button class="btn btn-secondary" id="btn-close-trainer" style="background: rgba(239,68,68,0.2); color: var(--accent-red); border: none;">
+          <i data-lucide="x"></i> Salir
+        </button>
+      </div>
+    </div>
+
+    <div class="trainer-body">
+      <!-- Main Exercise View -->
+      <div class="trainer-main-view">
+        <div class="trainer-anim-large" id="trainer-anim-container">
+          <!-- Animation loaded here -->
+        </div>
+
+        <h2 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 6px;" id="trainer-ex-name">Sentadillas profundas</h2>
+        <p class="text-muted" style="font-size: 0.9rem; max-width: 500px; margin-bottom: 16px;" id="trainer-ex-instructions">
+          Mantén la espalda recta y rompe el paralelo de 90°.
+        </p>
+
+        <!-- Dynamic State Display (Exercise Set Tracker VS Rest Countdown) -->
+        <div id="trainer-action-area" style="width: 100%; max-width: 450px;">
+          
+          <div id="view-set-active">
+            <div style="display: flex; justify-content: center; gap: 20px; margin-bottom: 16px;">
+              <div style="background: rgba(255,255,255,0.05); padding: 12px 24px; border-radius: 12px;">
+                <span class="text-muted" style="font-size: 0.8rem; display: block;">Serie</span>
+                <span style="font-size: 1.8rem; font-weight: 800; color: var(--primary);" id="trainer-current-set">1 / 4</span>
+              </div>
+              <div style="background: rgba(255,255,255,0.05); padding: 12px 24px; border-radius: 12px;">
+                <span class="text-muted" style="font-size: 0.8rem; display: block;">Objetivo Reps</span>
+                <span style="font-size: 1.8rem; font-weight: 800;" id="trainer-target-reps">12</span>
+              </div>
+              <div style="background: rgba(255,255,255,0.05); padding: 12px 24px; border-radius: 12px;">
+                <span class="text-muted" style="font-size: 0.8rem; display: block;">Peso (kg)</span>
+                <span style="font-size: 1.8rem; font-weight: 800; color: var(--accent-yellow);" id="trainer-weight-kg">0</span>
+              </div>
+            </div>
+
+            <button class="btn btn-primary" id="btn-complete-set" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 800;">
+              <i data-lucide="check-circle"></i> COMPLETAR SERIE & INICIAR DESCANSO
+            </button>
+          </div>
+
+          <div id="view-rest-active" style="display: none;">
+            <span class="text-muted" style="font-size: 0.9rem; font-weight: 700; text-transform: uppercase;">Tiempo de Descanso</span>
+            <div class="rest-timer-display" id="trainer-rest-seconds">60s</div>
+            <button class="btn btn-secondary" id="btn-skip-rest" style="margin-top: 10px;">
+              <i data-lucide="fast-forward"></i> Omitir Descanso
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Sidebar: Next exercise preview & Music Widget -->
+      <div class="trainer-sidebar">
+        <!-- Music Player Widget -->
+        <div class="music-player-widget">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+            <span style="font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; color: var(--accent-orange);">
+              <i data-lucide="music"></i> Música Gym
+            </span>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">YouTube Music</span>
+          </div>
+
+          <select id="music-playlist-select" class="input-field" style="width: 100%; margin-bottom: 10px; font-size: 0.82rem;">
+            <option value="https://www.youtube.com/embed/videoseries?list=PL4fGSI1pDJn6jWjXda_m58fROa0hflS7R">🔥 Gym Beats & Workout Hits</option>
+            <option value="https://www.youtube.com/embed/videoseries?list=PLDISKgcnAC4Tz2F5k0f40vB3p-zO79R7w">⚡ Synthwave & Cyberpunk Motivation</option>
+            <option value="https://www.youtube.com/embed/videoseries?list=RDCLAK5uy_k6d-lV5E-W9iX_3e6aY3-S8a">🎧 Hip Hop Gym Motivation</option>
+          </select>
+
+          <iframe id="music-iframe" style="width: 100%; height: 160px; border-radius: 10px; border: none;" src="https://www.youtube.com/embed/videoseries?list=PL4fGSI1pDJn6jWjXda_m58fROa0hflS7R" allow="autoplay"></iframe>
+        </div>
+
+        <!-- Upcoming exercises list -->
+        <div class="card" style="flex: 1; overflow-y: auto;">
+          <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 10px;">Ejercicios de la Sesión</h4>
+          <div id="trainer-exercise-list" style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- Rendered list -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PROFILE & MACRO SETTINGS -->
+  <div class="trainer-overlay" id="modal-profile" style="background: rgba(0,0,0,0.8);">
+    <div class="card" style="max-width: 500px; margin: auto; width: 90%;">
+      <div class="card-header">
+        <h3 class="card-title"><i data-lucide="user-cog"></i> Configurar Perfil y Objetivo de Peso</h3>
+        <button class="btn btn-secondary" id="btn-close-profile" style="padding: 6px 10px;"><i data-lucide="x"></i></button>
+      </div>
+
+      <form id="form-profile-settings" style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Edad</label>
+            <input type="number" id="prof-age" class="input-field" style="width: 100%;" required>
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Género</label>
+            <select id="prof-gender" class="input-field" style="width: 100%;">
+              <option value="male">Hombre</option>
+              <option value="female">Mujer</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Peso Actual (kg)</label>
+            <input type="number" step="0.1" id="prof-weight" class="input-field" style="width: 100%;" required>
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Altura (cm)</label>
+            <input type="number" id="prof-height" class="input-field" style="width: 100%;" required>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Peso Objetivo (kg)</label>
+            <input type="number" step="0.1" id="prof-target-weight" class="input-field" style="width: 100%;" required>
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Ritmo de Pérdida / sem</label>
+            <select id="prof-rate" class="input-field" style="width: 100%;">
+              <option value="0.25">-0.25 kg / semana (Suave)</option>
+              <option value="0.5">-0.5 kg / semana (Recomendado)</option>
+              <option value="0.75">-0.75 kg / semana (Intenso)</option>
+              <option value="1.0">-1.0 kg / semana (Extremo)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-muted);">Nivel de Actividad</label>
+          <select id="prof-activity" class="input-field" style="width: 100%;">
+            <option value="sedentary">Sedentario (Poco o ningún ejercicio)</option>
+            <option value="light">Ligero (1-3 días/semana)</option>
+            <option value="moderate">Moderado (3-5 días/semana)</option>
+            <option value="active">Activo (6-7 días/semana)</option>
+            <option value="very_active">Muy Activo (Trabajo físico / Doble entreno)</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="margin-top: 10px;">
+          <i data-lucide="save"></i> Guardar y Recalcular Deficit
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: SHOPPING LIST -->
+  <div class="trainer-overlay" id="modal-shopping-list" style="background: rgba(0,0,0,0.8);">
+    <div class="card" style="max-width: 550px; margin: auto; width: 90%; max-height: 80vh; display: flex; flex-direction: column;">
+      <div class="card-header">
+        <h3 class="card-title"><i data-lucide="shopping-bag"></i> Lista Consolidada de la Compra</h3>
+        <button class="btn btn-secondary" id="btn-close-shopping-list" style="padding: 6px 10px;"><i data-lucide="x"></i></button>
+      </div>
+
+      <div id="shopping-list-content" style="flex: 1; overflow-y: auto; padding-right: 8px;">
+        <!-- Populated via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Modules -->
+  <script src="js/app.js?v=1.0.0"></script>
+  <script src="js/diet.js?v=1.0.0"></script>
+  <script src="js/recipe_finder.js?v=1.0.0"></script>
+  <script src="js/workout.js?v=1.0.0"></script>
+  <script src="js/trainer.js?v=1.0.0"></script>
+  <script src="js/music.js?v=1.0.0"></script>
+</body>
+</html>

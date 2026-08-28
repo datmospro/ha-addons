@@ -1,0 +1,25 @@
+FROM node:22-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies
+RUN npm install --omit=dev
+
+# Copy all application files
+COPY . .
+
+# Set environment variables
+ENV DB_PATH=/data/fitcontroller.db
+ENV PORT=8099
+ENV NODE_ENV=production
+
+# Expose server port
+EXPOSE 8099
+
+# Make run.sh executable and start
+RUN chmod +x run.sh
+CMD ["./run.sh"]
