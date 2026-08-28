@@ -60,7 +60,7 @@ window.FitApp = {
         }
 
         // Trigger tab specific loads
-        if (tabKey === 'diet' && window.DietModule) window.DietModule.loadPlan();
+        if (tabKey === 'diet' && window.DietModule) window.DietModule.loadPlanAndRecipes();
         if (tabKey === 'recipe-finder' && window.RecipeModule) window.RecipeModule.search();
         if (tabKey === 'workout' && window.WorkoutModule) window.WorkoutModule.loadRoutinesAndCatalog();
         if (tabKey === 'history' && window.WorkoutModule) window.WorkoutModule.loadHistory();

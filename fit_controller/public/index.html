@@ -189,17 +189,50 @@
 
       <!-- 2. DIET & MEAL PLANNER TAB -->
       <section class="tab-panel" id="panel-diet">
+        <!-- 7-DAY MEAL PLANNER CALENDAR -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
           <div>
-            <h3 style="font-size: 1.2rem; font-weight: 700;">Plan Semanal de Comidas</h3>
-            <p class="text-muted" style="font-size: 0.85rem;">Las cantidades e ingredientes se multiplican automáticamente según el selector de personas.</p>
+            <h3 style="font-size: 1.2rem; font-weight: 700;">Plan Semanal de Comidas (7 Días)</h3>
+            <p class="text-muted" style="font-size: 0.85rem;">Ingredientes y cantidades ajustados automáticamente según las personas seleccionadas.</p>
           </div>
-          <button class="btn btn-accent" id="btn-add-meal-to-plan">
-            <i data-lucide="plus-circle"></i> Ir al Buscador de Recetas
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" id="btn-open-shopping-list-from-diet">
+              <i data-lucide="shopping-bag"></i> Lista Compra
+            </button>
+            <button class="btn btn-primary" id="btn-open-assign-meal-modal">
+              <i data-lucide="plus"></i> Asignar Plato a Plan
+            </button>
+          </div>
+        </div>
+
+        <!-- 7-Day Meal Calendar Grid -->
+        <div class="weekly-grid" id="weekly-meal-container" style="margin-bottom: 36px;">
+          <!-- Populated dynamically via diet.js -->
+        </div>
+
+        <!-- CUSTOM DISHES & RECIPE CATALOG SECTION -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 32px 0 16px 0; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 style="font-size: 1.2rem; font-weight: 700;">Catálogo de Mis Platos & Recetas</h3>
+            <p class="text-muted" style="font-size: 0.85rem;">Añade tus platos caseros con macronutrientes, calorías e ingredientes para asignarlos a la semana.</p>
+          </div>
+          <button class="btn btn-primary" id="btn-open-create-recipe-modal">
+            <i data-lucide="plus-circle"></i> Crear Nuevo Plato
           </button>
         </div>
 
-        <div class="weekly-grid" id="weekly-meal-container">
+        <!-- Recipe Category Filter Bar -->
+        <div style="display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 6px;">
+          <button class="filter-recipe-btn active btn btn-secondary" data-cat="all" style="padding: 6px 14px; font-size: 0.8rem;">Todas</button>
+          <button class="filter-recipe-btn btn btn-secondary" data-cat="desayuno" style="padding: 6px 14px; font-size: 0.8rem;">Desayunos</button>
+          <button class="filter-recipe-btn btn btn-secondary" data-cat="almuerzo" style="padding: 6px 14px; font-size: 0.8rem;">Almuerzos</button>
+          <button class="filter-recipe-btn btn btn-secondary" data-cat="merienda" style="padding: 6px 14px; font-size: 0.8rem;">Meriendas</button>
+          <button class="filter-recipe-btn btn btn-secondary" data-cat="cena" style="padding: 6px 14px; font-size: 0.8rem;">Cenas</button>
+          <button class="filter-recipe-btn btn btn-secondary" data-cat="snack" style="padding: 6px 14px; font-size: 0.8rem;">Snacks</button>
+        </div>
+
+        <!-- Recipe Cards Grid -->
+        <div class="recipe-card-grid" id="my-recipes-catalog-grid">
           <!-- Populated dynamically via diet.js -->
         </div>
       </section>
@@ -865,12 +898,155 @@
     </div>
   </div>
 
+  <!-- MODAL: CREAR / EDITAR PLATO Y RECETA -->
+  <div class="trainer-overlay" id="modal-create-recipe" style="background: rgba(0,0,0,0.85); z-index: 2500; backdrop-filter: blur(10px);">
+    <div class="card" style="max-width: 600px; margin: auto; width: 92%; max-height: 90vh; overflow-y: auto;">
+      <div class="card-header">
+        <h3 class="card-title" id="modal-create-recipe-title"><i data-lucide="utensils"></i> Crear Nuevo Plato Personalizado</h3>
+        <button class="btn btn-secondary" id="btn-close-create-recipe" style="padding: 6px 10px;"><i data-lucide="x"></i></button>
+      </div>
+
+      <form id="form-create-recipe" style="display: flex; flex-direction: column; gap: 14px;">
+        <input type="hidden" id="edit-recipe-id">
+
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-muted);">Nombre del Plato / Receta</label>
+          <input type="text" id="new-recipe-title" class="input-field" placeholder="Ej: Pollo al Limón con Arroz Integral" style="width: 100%;" required>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Categoría</label>
+            <select id="new-recipe-category" class="input-field" style="width: 100%;">
+              <option value="almuerzo">Almuerzo</option>
+              <option value="desayuno">Desayuno</option>
+              <option value="merienda">Merienda</option>
+              <option value="cena">Cena</option>
+              <option value="snack">Snack</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Tiempo de Prep. (min)</label>
+            <input type="number" id="new-recipe-prep-time" class="input-field" value="15" min="1" style="width: 100%;">
+          </div>
+        </div>
+
+        <!-- Macros Breakdown Grid -->
+        <div style="background: rgba(15,23,42,0.6); padding: 12px; border-radius: 10px; border: 1px solid var(--border-color);">
+          <span style="font-size: 0.8rem; font-weight: 700; color: var(--primary); display: block; margin-bottom: 8px;">Macronutrientes & Calorías (por ración)</span>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+            <div>
+              <label style="font-size: 0.72rem; color: var(--accent-orange);">Calorías (kcal)</label>
+              <input type="number" id="new-recipe-kcal" class="input-field" placeholder="450" style="width: 100%; font-size: 0.85rem;" required>
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: var(--primary);">Proteína (g)</label>
+              <input type="number" id="new-recipe-protein" class="input-field" placeholder="35" style="width: 100%; font-size: 0.85rem;" required>
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: var(--accent-yellow);">Carbos (g)</label>
+              <input type="number" id="new-recipe-carbs" class="input-field" placeholder="45" style="width: 100%; font-size: 0.85rem;" required>
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: var(--accent-purple);">Grasas (g)</label>
+              <input type="number" id="new-recipe-fat" class="input-field" placeholder="12" style="width: 100%; font-size: 0.85rem;" required>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-muted);">Ingredientes (Un ingrediente por línea: Nombre: Cantidad Unidad)</label>
+          <textarea id="new-recipe-ingredients" class="input-field" rows="3" placeholder="Pechuga de pollo: 200 g&#10;Arroz integral: 70 g&#10;Aceite de oliva: 5 ml" style="width: 100%; font-family: monospace; font-size: 0.82rem;"></textarea>
+        </div>
+
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-muted);">Pasos de Preparación (Un paso por línea)</label>
+          <textarea id="new-recipe-instructions" class="input-field" rows="3" placeholder="1. Cocer el arroz integral.&#10;2. Hacer el pollo a la plancha.&#10;3. Meclar y servir." style="width: 100%; font-size: 0.82rem;"></textarea>
+        </div>
+
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-muted);">URL de Imagen del Plato (Opcional)</label>
+          <input type="text" id="new-recipe-image-url" class="input-field" placeholder="https://..." style="width: 100%;">
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; justify-content: center; margin-top: 6px;">
+          <i data-lucide="check"></i> Guardar Plato
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ASIGNAR PLATO A PLAN SEMANAL -->
+  <div class="trainer-overlay" id="modal-assign-meal-to-day" style="background: rgba(0,0,0,0.85); z-index: 2500; backdrop-filter: blur(10px);">
+    <div class="card" style="max-width: 480px; margin: auto; width: 90%;">
+      <div class="card-header">
+        <h3 class="card-title"><i data-lucide="plus-circle"></i> Asignar Plato al Plan Semanal</h3>
+        <button class="btn btn-secondary" id="btn-close-assign-meal" style="padding: 6px 10px;"><i data-lucide="x"></i></button>
+      </div>
+
+      <form id="form-assign-meal" style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Día de la Semana</label>
+            <select id="assign-meal-day" class="input-field" style="width: 100%;" required>
+              <option value="lunes">Lunes</option>
+              <option value="martes">Martes</option>
+              <option value="miercoles">Miércoles</option>
+              <option value="jueves">Jueves</option>
+              <option value="viernes">Viernes</option>
+              <option value="sabado">Sábado</option>
+              <option value="domingo">Domingo</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Momento de la Comida</label>
+            <select id="assign-meal-type" class="input-field" style="width: 100%;" required>
+              <option value="desayuno">Desayuno</option>
+              <option value="almuerzo">Almuerzo</option>
+              <option value="merienda">Merienda</option>
+              <option value="cena">Cena</option>
+              <option value="snack">Snack</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-muted);">Seleccionar Plato del Catálogo</label>
+          <select id="assign-meal-recipe-id" class="input-field" style="width: 100%;" required>
+            <!-- Populated via JS -->
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; justify-content: center;">
+          <i data-lucide="check"></i> Asignar Plato
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: VER MENÚ COMPLETO Y RECETAS DEL DÍA -->
+  <div class="trainer-overlay" id="modal-day-meal-details" style="background: rgba(9, 13, 22, 0.95); backdrop-filter: blur(20px); z-index: 2500;">
+    <div class="card" style="max-width: 850px; margin: auto; width: 94%; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title" id="day-details-title"><i data-lucide="utensils"></i> Menú Completo del Día</h3>
+          <p class="text-muted" style="font-size: 0.85rem;" id="day-details-subtitle">Ingredientes e instrucciones</p>
+        </div>
+        <button class="btn btn-secondary" id="btn-close-day-meal-details" style="padding: 6px 10px;"><i data-lucide="x"></i></button>
+      </div>
+
+      <div id="day-meal-details-grid" style="flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 16px;">
+        <!-- Populated via JS -->
+      </div>
+    </div>
+  </div>
+
   <!-- JavaScript Modules -->
-  <script src="js/app.js?v=1.2.3"></script>
-  <script src="js/diet.js?v=1.2.3"></script>
-  <script src="js/recipe_finder.js?v=1.2.3"></script>
-  <script src="js/workout.js?v=1.2.3"></script>
-  <script src="js/trainer.js?v=1.2.3"></script>
-  <script src="js/music.js?v=1.2.3"></script>
+  <script src="js/app.js?v=1.3.0"></script>
+  <script src="js/diet.js?v=1.3.0"></script>
+  <script src="js/recipe_finder.js?v=1.3.0"></script>
+  <script src="js/workout.js?v=1.3.0"></script>
+  <script src="js/trainer.js?v=1.3.0"></script>
+  <script src="js/music.js?v=1.3.0"></script>
 </body>
 </html>

@@ -400,6 +400,27 @@ app.post('/api/recipes/import-external', (req, res) => {
   }
 });
 
+app.put('/api/recipes/:id', (req, res) => {
+  try {
+    const { title, description, category, prep_time_min, servings, kcal, protein, carbs, fat, fiber, ingredients, instructions, image_url } = req.body;
+
+    db.prepare(`
+      UPDATE recipes 
+      SET title = ?, description = ?, category = ?, prep_time_min = ?, servings = ?, kcal = ?, protein = ?, carbs = ?, fat = ?, fiber = ?, ingredients_json = ?, instructions_json = ?, image_url = ?
+      WHERE id = ?
+    `).run(
+      title, description || '', category || 'almuerzo', prep_time_min || 15, servings || 1,
+      parseInt(kcal, 10), parseInt(protein || 0, 10), parseInt(carbs || 0, 10), parseInt(fat || 0, 10), parseInt(fiber || 0, 10),
+      JSON.stringify(ingredients || []), JSON.stringify(instructions || []), image_url || '',
+      req.params.id
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/recipes/:id', (req, res) => {
   try {
     db.prepare(`DELETE FROM recipes WHERE id = ?`).run(req.params.id);
