@@ -464,7 +464,7 @@
 
       <!-- Sidebar: Next exercise preview & Music Widget -->
       <div class="trainer-sidebar">
-        <!-- Music Player Widget (Privacy-Enhanced) -->
+        <!-- Music Player Widget (Privacy-Enhanced with Dual Volume Controls) -->
         <div class="music-player-widget">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
             <span style="font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; color: var(--accent-orange);">
@@ -473,11 +473,23 @@
             <span style="font-size: 0.75rem; color: var(--text-muted);">YouTube Music</span>
           </div>
 
+          <!-- Dual Sound Controls -->
+          <div style="background: rgba(15,23,42,0.6); padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.75rem; color: var(--primary); font-weight: 700; min-width: 90px;">🔔 Pitidos App:</span>
+              <input type="range" id="volume-beeps-slider" min="0" max="100" value="70" style="flex: 1; accent-color: var(--primary); cursor: pointer;">
+              <span id="volume-beeps-val" style="font-size: 0.75rem; font-weight: 700; width: 35px; text-align: right;">70%</span>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.75rem; color: var(--accent-orange); font-weight: 700; min-width: 90px;">🎵 Música Video:</span>
+              <input type="range" id="volume-music-slider" min="0" max="100" value="80" style="flex: 1; accent-color: var(--accent-orange); cursor: pointer;">
+              <span id="volume-music-val" style="font-size: 0.75rem; font-weight: 700; width: 35px; text-align: right;">80%</span>
+            </div>
+          </div>
+
           <select id="music-playlist-select" class="input-field" style="width: 100%; margin-bottom: 8px; font-size: 0.82rem;">
             <option value="">-- Seleccionar Lista o Pegar Enlace --</option>
-            <option value="https://www.youtube-nocookie.com/embed/5qap5aO4i9A">🔥 Workout Beats 24/7 (Lofi & Chill)</option>
-            <option value="https://www.youtube-nocookie.com/embed/jfKfPfyJRdk">⚡ Lofi Hip Hop Radio 24/7</option>
-            <option value="https://www.youtube-nocookie.com/embed/videoseries?list=PL4fGSI1pDJn6jWjXda_m58fROa0hflS7R">🎧 Gym Motivation Playlist</option>
           </select>
 
           <div style="display: flex; gap: 6px; margin-bottom: 10px;">
@@ -794,11 +806,11 @@
   </div>
 
   <!-- JavaScript Modules -->
-  <script src="js/app.js?v=1.1.2"></script>
-  <script src="js/diet.js?v=1.1.2"></script>
-  <script src="js/recipe_finder.js?v=1.1.2"></script>
-  <script src="js/workout.js?v=1.1.2"></script>
-  <script src="js/trainer.js?v=1.1.2"></script>
-  <script src="js/music.js?v=1.1.2"></script>
+  <script src="js/app.js?v=1.1.3"></script>
+  <script src="js/diet.js?v=1.1.3"></script>
+  <script src="js/recipe_finder.js?v=1.1.3"></script>
+  <script src="js/workout.js?v=1.1.3"></script>
+  <script src="js/trainer.js?v=1.1.3"></script>
+  <script src="js/music.js?v=1.1.3"></script>
 </body>
 </html>

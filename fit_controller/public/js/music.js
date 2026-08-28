@@ -5,6 +5,7 @@ window.MusicModule = {
   init: function() {
     this.bindWidgetEvents();
     this.bindSettingsEvents();
+    this.bindVolumeEvents();
     this.loadPlaylists();
   },
 
@@ -22,7 +23,7 @@ window.MusicModule = {
     const select = document.getElementById('music-playlist-select');
     if (!select) return;
 
-    select.innerHTML = `<option value="">-- Seleccionar Lista de Música --</option>` +
+    select.innerHTML = `<option value="">-- Seleccionar Lista o Pegar Enlace --</option>` +
       this.playlists.map(p => `
         <option value="${p.url}">${p.title}</option>
       `).join('');
@@ -57,6 +58,33 @@ window.MusicModule = {
     if (window.lucide) lucide.createIcons();
   },
 
+  bindVolumeEvents: function() {
+    // 1. App Beeps Volume Slider
+    const beepsSlider = document.getElementById('volume-beeps-slider');
+    const beepsVal = document.getElementById('volume-beeps-val');
+
+    if (beepsSlider && beepsVal) {
+      beepsSlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        beepsVal.textContent = `${val}%`;
+        if (window.TrainerModule) {
+          window.TrainerModule.beepVolume = val / 100;
+        }
+      });
+    }
+
+    // 2. Video Music Volume Slider
+    const musicSlider = document.getElementById('volume-music-slider');
+    const musicVal = document.getElementById('volume-music-val');
+
+    if (musicSlider && musicVal) {
+      musicSlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        musicVal.textContent = `${val}%`;
+      });
+    }
+  },
+
   bindWidgetEvents: function() {
     const select = document.getElementById('music-playlist-select');
     const iframe = document.getElementById('music-iframe');
@@ -65,13 +93,13 @@ window.MusicModule = {
 
     if (select && iframe) {
       select.addEventListener('change', (e) => {
-        this.playUrl(e.target.value);
+        this.playUrl(e.target.value, true);
       });
     }
 
     if (btnCustom && customInput) {
       btnCustom.addEventListener('click', () => {
-        this.playUrl(customInput.value);
+        this.playUrl(customInput.value, true);
       });
     }
   },
@@ -110,6 +138,20 @@ window.MusicModule = {
         }
       });
     }
+  },
+
+  playRandomPlaylist: function() {
+    if (!this.playlists || this.playlists.length === 0) return;
+
+    const randomIndex = Math.floor(Math.random() * this.playlists.length);
+    const randomPlaylist = this.playlists[randomIndex];
+
+    const select = document.getElementById('music-playlist-select');
+    if (select) {
+      select.value = randomPlaylist.url;
+    }
+
+    this.playUrl(randomPlaylist.url, true);
   },
 
   editPlaylistPrompt: function(id) {
@@ -155,12 +197,16 @@ window.MusicModule = {
     return url;
   },
 
-  playUrl: function(url) {
+  playUrl: function(url, autoplay = true) {
     const iframe = document.getElementById('music-iframe');
     if (!iframe) return;
 
-    const formatted = this.formatEmbedUrl(url);
+    let formatted = this.formatEmbedUrl(url);
     if (formatted) {
+      if (autoplay && !formatted.includes('autoplay=')) {
+        const separator = formatted.includes('?') ? '&' : '?';
+        formatted += `${separator}autoplay=1&enablejsapi=1`;
+      }
       iframe.src = formatted;
       iframe.style.display = 'block';
     } else {

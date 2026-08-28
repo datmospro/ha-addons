@@ -13,6 +13,7 @@ window.TrainerModule = {
   repCounter: 0,
   audioCtx: null,
   soundEnabled: true,
+  beepVolume: 0.70,
   onRestCompleteCallback: null,
 
   init: function() {
@@ -53,7 +54,8 @@ window.TrainerModule = {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, now);
 
-      gain.gain.setValueAtTime(0.5, now);
+      const vol = this.beepVolume !== undefined ? this.beepVolume : 0.70;
+      gain.gain.setValueAtTime(vol, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
       osc.connect(gain);
@@ -150,6 +152,11 @@ window.TrainerModule = {
 
     document.getElementById('trainer-routine-name').textContent = routine.name;
     document.getElementById('modal-trainer').classList.add('active');
+
+    // Auto-select a random workout music playlist and play automatically!
+    if (window.MusicModule) {
+      window.MusicModule.playRandomPlaylist();
+    }
 
     // Start main workout clock
     clearInterval(this.workoutTimerInterval);
