@@ -453,6 +453,30 @@ app.post('/api/workout/exercises', (req, res) => {
   }
 });
 
+app.put('/api/workout/exercises/:id', (req, res) => {
+  try {
+    const { name, muscle_group, equipment, difficulty, instructions, animation_url } = req.body;
+    db.prepare(`
+      UPDATE exercises SET
+        name = ?, muscle_group = ?, equipment = ?, difficulty = ?, instructions = ?, animation_url = ?
+      WHERE id = ?
+    `).run(name, muscle_group, equipment || 'Corporal', difficulty || 'Intermedio', instructions || '', animation_url || '', req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/workout/exercises/:id', (req, res) => {
+  try {
+    db.prepare(`DELETE FROM routine_exercises WHERE exercise_id = ?`).run(req.params.id);
+    db.prepare(`DELETE FROM exercises WHERE id = ?`).run(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/workout/routines', (req, res) => {
   try {
     const routines = db.prepare(`SELECT * FROM routines ORDER BY id ASC`).all();

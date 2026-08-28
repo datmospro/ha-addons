@@ -2,6 +2,7 @@
 window.WorkoutModule = {
   currentRoutines: [],
   exerciseCatalog: [],
+  selectedRoutineForDetails: null,
 
   init: function() {
     this.bindMuscleFilterEvents();
@@ -16,7 +17,7 @@ window.WorkoutModule = {
   loadRoutines: async function() {
     try {
       this.currentRoutines = await window.apiFetch('api/workout/routines');
-      this.renderRoutines();
+      this.renderRoutineCalendar();
     } catch (err) {
       console.error('Error loading routines:', err);
     }
@@ -31,57 +32,71 @@ window.WorkoutModule = {
     }
   },
 
-  renderRoutines: function() {
-    const container = document.getElementById('routines-list-container');
-    if (!container) return;
+  renderRoutineCalendar: function() {
+    const calendarGrid = document.getElementById('workout-calendar-grid');
+    if (!calendarGrid) return;
 
-    if (this.currentRoutines.length === 0) {
-      container.innerHTML = '<p class="text-muted">No hay rutinas creadas. Haz clic en "Nueva Rutina" para comenzar.</p>';
-      return;
-    }
+    const days = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
 
-    container.innerHTML = this.currentRoutines.map(r => `
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <h4 style="font-size: 1.1rem; font-weight: 700;">${r.name}</h4>
-            <span class="text-muted" style="font-size: 0.8rem; text-transform: capitalize;">Día habitual: ${r.day_of_week || 'Sin asignar'}</span>
-          </div>
-          <button class="btn btn-primary" onclick="window.TrainerModule.startRoutine(${r.id})">
-            <i data-lucide="play"></i> Entrenar
-          </button>
-        </div>
-        <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 14px;">${r.description || 'Sin descripción'}</p>
+    calendarGrid.innerHTML = days.map(day => {
+      const routine = this.currentRoutines.find(r => (r.day_of_week || '').toLowerCase() === day);
 
-        <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;">
-          ${r.exercises.map(e => `
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(15,23,42,0.6); border-radius: 8px; font-size: 0.85rem;">
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-weight: 700; color: var(--primary);">${e.name}</span>
-                <span class="text-muted">(${e.muscle_group})</span>
+      if (routine) {
+        return `
+          <div class="day-column" style="background: rgba(30, 41, 59, 0.9); border-color: rgba(16, 185, 129, 0.3);">
+            <div class="day-header">
+              <div class="day-title">${day}</div>
+              <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--primary); font-size: 0.7rem; font-weight: 700;">${routine.exercises ? routine.exercises.length : 0} ejercicios</span>
+            </div>
+
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+              <h4 style="font-size: 1.05rem; font-weight: 800; color: var(--primary);">${routine.name}</h4>
+              <p class="text-muted" style="font-size: 0.78rem;">${routine.description || 'Rutina asignada'}</p>
+
+              <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 4px;">
+                ${(routine.exercises || []).slice(0, 3).map(e => `
+                  <div style="font-size: 0.75rem; background: rgba(15,23,42,0.6); padding: 4px 8px; border-radius: 6px; display: flex; justify-content: space-between;">
+                    <span>${e.name}</span>
+                    <strong style="color: var(--accent-cyan);">${e.sets}x${e.reps}</strong>
+                  </div>
+                `).join('')}
+                ${(routine.exercises || []).length > 3 ? `<span class="text-muted" style="font-size: 0.72rem;">... (+${routine.exercises.length - 3} más)</span>` : ''}
               </div>
-              <div style="display: flex; align-items: center; gap: 12px;">
-                <span style="font-weight: 600;">
-                  ${e.sets} series x ${e.reps} reps ${e.weight_kg > 0 ? `| ${e.weight_kg}kg` : ''}
-                </span>
-                <button onclick="window.WorkoutModule.removeExerciseFromRoutine(${e.routine_exercise_id})" style="background: transparent; border: none; color: var(--accent-red); cursor: pointer;" title="Quitar ejercicio">
-                  <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 12px;">
+              <button class="btn btn-secondary" onclick="window.WorkoutModule.openRoutineDetailsModal(${routine.id})" style="width: 100%; font-size: 0.78rem; justify-content: center;">
+                <i data-lucide="eye" style="width: 14px; height: 14px;"></i> Ver Animaciones
+              </button>
+
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn-primary" onclick="window.TrainerModule.startRoutine(${routine.id})" style="flex: 1; font-size: 0.78rem; padding: 6px; justify-content: center;">
+                  <i data-lucide="play" style="width: 12px; height: 12px;"></i> Entrenar
+                </button>
+                <button class="btn btn-secondary" onclick="window.WorkoutModule.openAddExerciseModal(${routine.id})" style="padding: 6px;" title="Añadir ejercicio">
+                  <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
                 </button>
               </div>
             </div>
-          `).join('')}
-        </div>
+          </div>
+        `;
+      }
 
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <button class="btn btn-secondary" onclick="window.WorkoutModule.openAddExerciseModal(${r.id})" style="font-size: 0.8rem;">
-            <i data-lucide="plus"></i> Añadir Ejercicio
-          </button>
-          <button class="btn btn-secondary" onclick="window.WorkoutModule.deleteRoutine(${r.id})" style="font-size: 0.8rem; color: var(--accent-red); border-color: rgba(239,68,68,0.2);">
-            <i data-lucide="trash-2"></i> Eliminar Rutina
+      return `
+        <div class="day-column" style="opacity: 0.7;">
+          <div class="day-header">
+            <div class="day-title">${day}</div>
+            <span class="text-muted" style="font-size: 0.75rem;">Descanso</span>
+          </div>
+          <div style="flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px 0;">
+            <p class="text-muted" style="font-size: 0.8rem;">Día libre o de recuperación muscular</p>
+          </div>
+          <button class="btn btn-secondary" onclick="window.WorkoutModule.openCreateRoutineModalForDay('${day}')" style="width: 100%; font-size: 0.75rem; justify-content: center;">
+            + Asignar Rutina
           </button>
         </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
 
     if (window.lucide) lucide.createIcons();
   },
@@ -106,6 +121,15 @@ window.WorkoutModule = {
           <span class="text-muted" style="font-size: 0.75rem; margin-left: 6px;">${ex.equipment}</span>
         </div>
         <p class="text-muted" style="font-size: 0.8rem; flex: 1;">${ex.instructions || ''}</p>
+
+        <div style="display: flex; gap: 8px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border-color);">
+          <button class="btn btn-secondary" onclick="window.WorkoutModule.openEditExerciseModal(${ex.id})" style="flex: 1; font-size: 0.78rem; padding: 6px; justify-content: center;">
+            <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i> Editar
+          </button>
+          <button class="btn btn-secondary" onclick="window.WorkoutModule.deleteExerciseFromCatalog(${ex.id})" style="padding: 6px; font-size: 0.78rem; color: var(--accent-red); border-color: rgba(239,68,68,0.2);" title="Eliminar del catálogo">
+            <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+          </button>
+        </div>
       </div>
     `).join('');
 
@@ -120,7 +144,7 @@ window.WorkoutModule = {
       if (url.toLowerCase().endsWith('.mp4') || url.toLowerCase().includes('.mp4') || url.includes('/vid/')) {
         return `
           <video src="${url}" autoplay loop muted playsinline style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px;">
-            Tu navegador no soporta reproducción de vídeo HTML5.
+            Tu navegador no soporta vídeo HTML5.
           </video>
         `;
       }
@@ -262,7 +286,24 @@ window.WorkoutModule = {
       });
     }
 
-    // 2. Add Exercise to Routine Modal
+    // 2. Routine Details Modal (Previews exercise videos at a glance)
+    const modalDetails = document.getElementById('modal-routine-details');
+    const btnCloseDetails = document.getElementById('btn-close-routine-details');
+    if (btnCloseDetails) {
+      btnCloseDetails.addEventListener('click', () => modalDetails.classList.remove('active'));
+    }
+
+    const btnStartFromDetails = document.getElementById('btn-start-from-details');
+    if (btnStartFromDetails) {
+      btnStartFromDetails.addEventListener('click', () => {
+        if (this.selectedRoutineForDetails) {
+          modalDetails.classList.remove('active');
+          window.TrainerModule.startRoutine(this.selectedRoutineForDetails.id);
+        }
+      });
+    }
+
+    // 3. Add Exercise to Routine Modal
     const modalAddEx = document.getElementById('modal-add-exercise-to-routine');
     const btnCloseAddEx = document.getElementById('btn-close-add-ex-routine');
     if (btnCloseAddEx) {
@@ -294,13 +335,18 @@ window.WorkoutModule = {
       });
     }
 
-    // 3. Create Custom Exercise Modal
+    // 4. Create / Edit Exercise Modal
     const modalCreateEx = document.getElementById('modal-create-exercise');
     const btnOpenCreateEx = document.getElementById('btn-open-create-exercise-modal');
     const btnCloseCreateEx = document.getElementById('btn-close-create-exercise');
 
     if (btnOpenCreateEx) {
-      btnOpenCreateEx.addEventListener('click', () => modalCreateEx.classList.add('active'));
+      btnOpenCreateEx.addEventListener('click', () => {
+        document.getElementById('edit-ex-id').value = '';
+        document.getElementById('form-create-exercise').reset();
+        document.getElementById('modal-create-exercise-title').innerHTML = `<i data-lucide="dumbbell"></i> Crear Ejercicio Personalizado`;
+        modalCreateEx.classList.add('active');
+      });
     }
     if (btnCloseCreateEx) {
       btnCloseCreateEx.addEventListener('click', () => modalCreateEx.classList.remove('active'));
@@ -310,6 +356,8 @@ window.WorkoutModule = {
     if (formCreateEx) {
       formCreateEx.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const editId = document.getElementById('edit-ex-id').value;
+
         const body = {
           name: document.getElementById('new-ex-name').value,
           muscle_group: document.getElementById('new-ex-muscle').value,
@@ -322,19 +370,68 @@ window.WorkoutModule = {
         };
 
         try {
-          await window.apiFetch('api/workout/exercises', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-          });
+          if (editId) {
+            await window.apiFetch(`api/workout/exercises/${editId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body)
+            });
+          } else {
+            await window.apiFetch('api/workout/exercises', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body)
+            });
+          }
           modalCreateEx.classList.remove('active');
           formCreateEx.reset();
           this.loadExerciseCatalog();
+          this.loadRoutines();
         } catch (err) {
-          alert('Error al crear ejercicio: ' + err.message);
+          alert('Error al guardar ejercicio: ' + err.message);
         }
       });
     }
+  },
+
+  openCreateRoutineModalForDay: function(day) {
+    document.getElementById('routine-day-select').value = day;
+    document.getElementById('modal-create-routine').classList.add('active');
+  },
+
+  openRoutineDetailsModal: function(routineId) {
+    const routine = this.currentRoutines.find(r => r.id === routineId);
+    if (!routine) return;
+
+    this.selectedRoutineForDetails = routine;
+    document.getElementById('details-routine-title').innerHTML = `<i data-lucide="activity"></i> ${routine.name}`;
+    document.getElementById('details-routine-subtitle').textContent = `Ejercicios y vídeos para el ${routine.day_of_week} | ${routine.exercises ? routine.exercises.length : 0} Ejercicios`;
+
+    const grid = document.getElementById('routine-details-exercises-grid');
+    if (!routine.exercises || routine.exercises.length === 0) {
+      grid.innerHTML = `<p class="text-muted" style="grid-column: 1/-1;">Esta rutina no tiene ejercicios asignados aún.</p>`;
+    } else {
+      grid.innerHTML = routine.exercises.map(ex => `
+        <div style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="width: 100%; height: 160px; background: #050811; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+            ${this.getAnimationGraphicHtml(ex)}
+          </div>
+          <div>
+            <h4 style="font-size: 1rem; font-weight: 800; color: var(--primary);">${ex.name}</h4>
+            <span class="text-muted" style="font-size: 0.75rem;">${ex.muscle_group} | ${ex.equipment}</span>
+          </div>
+          <div style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; display: flex; justify-content: space-between;">
+            <span>Series: <strong>${ex.sets}</strong></span>
+            <span>Reps: <strong>${ex.reps}</strong></span>
+            <span>Peso: <strong style="color: var(--accent-yellow);">${ex.weight_kg || 0}kg</strong></span>
+          </div>
+          <p class="text-muted" style="font-size: 0.78rem; margin-top: auto;">${ex.instructions || ''}</p>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('modal-routine-details').classList.add('active');
+    if (window.lucide) lucide.createIcons();
   },
 
   openAddExerciseModal: async function(routineId) {
@@ -348,6 +445,31 @@ window.WorkoutModule = {
     `).join('');
 
     document.getElementById('modal-add-exercise-to-routine').classList.add('active');
+  },
+
+  openEditExerciseModal: function(exerciseId) {
+    const ex = this.exerciseCatalog.find(e => e.id === exerciseId);
+    if (!ex) return;
+
+    document.getElementById('edit-ex-id').value = ex.id;
+    document.getElementById('new-ex-name').value = ex.name;
+    document.getElementById('new-ex-muscle').value = ex.muscle_group;
+    document.getElementById('new-ex-equipment').value = ex.equipment || '';
+    document.getElementById('new-ex-instructions').value = ex.instructions || '';
+    document.getElementById('new-ex-anim-url').value = ex.animation_url || '';
+
+    document.getElementById('modal-create-exercise-title').innerHTML = `<i data-lucide="edit-3"></i> Editar Ejercicio: ${ex.name}`;
+    document.getElementById('modal-create-exercise').classList.add('active');
+  },
+
+  deleteExerciseFromCatalog: async function(exerciseId) {
+    try {
+      await window.apiFetch(`api/workout/exercises/${exerciseId}`, { method: 'DELETE' });
+      this.loadExerciseCatalog();
+      this.loadRoutines();
+    } catch (err) {
+      alert('Error al eliminar ejercicio: ' + err.message);
+    }
   },
 
   removeExerciseFromRoutine: async function(routineExerciseId) {

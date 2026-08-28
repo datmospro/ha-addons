@@ -13,7 +13,7 @@
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="css/style.css?v=1.0.2">
+  <link rel="stylesheet" href="css/style.css?v=1.0.4">
 </head>
 <body>
 
@@ -46,7 +46,7 @@
         </button>
         <button class="nav-btn" data-tab="workout" id="btn-tab-workout">
           <i data-lucide="activity"></i>
-          <span>Rutinas & Ejercicios</span>
+          <span>Rutinas & Calendario</span>
         </button>
         <button class="nav-btn" data-tab="history" id="btn-tab-history">
           <i data-lucide="history"></i>
@@ -233,22 +233,33 @@
 
       <!-- 4. WORKOUT & ROUTINES TAB -->
       <section class="tab-panel" id="panel-workout">
+        <!-- CALENDAR WORKOUT VIEW -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
           <div>
-            <h3 style="font-size: 1.2rem; font-weight: 700;">Rutinas Semanales de Entrenamiento</h3>
-            <p class="text-muted" style="font-size: 0.85rem;">Configura tus ejercicios por día con animaciones visuales paso a paso.</p>
+            <h3 style="font-size: 1.2rem; font-weight: 700;">Calendario Semanal de Entrenamientos</h3>
+            <p class="text-muted" style="font-size: 0.85rem;">Haz clic en cualquier rutina para ver sus vídeos y ejercicios de un vistazo.</p>
           </div>
           <button class="btn btn-primary" id="btn-open-create-routine-modal">
             <i data-lucide="plus"></i> Nueva Rutina
           </button>
         </div>
 
-        <div class="grid-2" id="routines-list-container">
+        <!-- 7-Day Routine Calendar Grid -->
+        <div class="weekly-grid" id="workout-calendar-grid" style="margin-bottom: 32px;">
           <!-- Populated dynamically via workout.js -->
         </div>
 
-        <h3 style="font-size: 1.2rem; font-weight: 700; margin: 32px 0 16px 0;">Catálogo de Ejercicios con Animaciones</h3>
-        
+        <!-- EXERCISE CATALOG SECTION -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 32px 0 16px 0; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 style="font-size: 1.2rem; font-weight: 700;">Catálogo de Ejercicios (Con Vídeos & Animaciones)</h3>
+            <p class="text-muted" style="font-size: 0.85rem;">Edita o elimina ejercicios, o añade tus propios vídeos MP4 de GymVisual.</p>
+          </div>
+          <button class="btn btn-accent" id="btn-open-create-exercise-modal">
+            <i data-lucide="plus"></i> Crear Ejercicio
+          </button>
+        </div>
+
         <div class="recipe-search-bar" style="margin-bottom: 20px;">
           <button class="btn btn-secondary filter-muscle-btn active" data-muscle="all">Todos</button>
           <button class="btn btn-secondary filter-muscle-btn" data-muscle="pecho">Pecho</button>
@@ -258,10 +269,6 @@
           <button class="btn btn-secondary filter-muscle-btn" data-muscle="brazos">Brazos</button>
           <button class="btn btn-secondary filter-muscle-btn" data-muscle="core">Core / Abdomen</button>
           <button class="btn btn-secondary filter-muscle-btn" data-muscle="cardio">Cardio</button>
-          
-          <button class="btn btn-accent" id="btn-open-create-exercise-modal" style="margin-left: auto;">
-            <i data-lucide="plus"></i> Crear Ejercicio
-          </button>
         </div>
 
         <div class="exercise-card-grid" id="exercise-catalog-grid">
@@ -280,6 +287,31 @@
       </section>
 
     </main>
+  </div>
+
+  <!-- ---------------------------------------------------- -->
+  <!-- MODAL: DETALLES DE LA RUTINA (VISTA PREVIA CON ANIMACIONES) -->
+  <!-- ---------------------------------------------------- -->
+  <div class="trainer-overlay" id="modal-routine-details" style="background: rgba(9, 13, 22, 0.95); backdrop-filter: blur(20px);">
+    <div class="card" style="max-width: 900px; margin: auto; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title" id="details-routine-title"><i data-lucide="activity"></i> Vista Previa de la Rutina</h3>
+          <p class="text-muted" style="font-size: 0.85rem;" id="details-routine-subtitle">Ejercicios y animaciones para hoy</p>
+        </div>
+        <button class="btn btn-secondary" id="btn-close-routine-details" style="padding: 6px 10px;"><i data-lucide="x"></i></button>
+      </div>
+
+      <div id="routine-details-exercises-grid" style="flex: 1; overflow-y: auto; padding: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+        <!-- Populated via JS with exercise videos & details -->
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; padding-top: 16px; border-top: 1px solid var(--border-color); margin-top: 12px;">
+        <button class="btn btn-primary" id="btn-start-from-details" style="padding: 12px 24px; font-weight: 800; font-size: 1.05rem;">
+          <i data-lucide="play-circle"></i> ¡Empezar Entrenamiento Ahora!
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- ---------------------------------------------------- -->
@@ -312,7 +344,7 @@
           Mantén la espalda recta y rompe el paralelo de 90°.
         </p>
 
-        <!-- Dynamic State Display (Exercise Set Tracker VS Rest Countdown) -->
+        <!-- Dynamic State Display -->
         <div id="trainer-action-area" style="width: 100%; max-width: 450px;">
           
           <div id="view-set-active">
@@ -349,7 +381,7 @@
 
       <!-- Sidebar: Next exercise preview & Music Widget -->
       <div class="trainer-sidebar">
-        <!-- Music Player Widget -->
+        <!-- Music Player Widget (Lazy Loaded) -->
         <div class="music-player-widget">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
             <span style="font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; color: var(--accent-orange);">
@@ -359,12 +391,13 @@
           </div>
 
           <select id="music-playlist-select" class="input-field" style="width: 100%; margin-bottom: 10px; font-size: 0.82rem;">
+            <option value="">-- Seleccionar Playlist de Entrenamiento --</option>
             <option value="https://www.youtube.com/embed/videoseries?list=PL4fGSI1pDJn6jWjXda_m58fROa0hflS7R">🔥 Gym Beats & Workout Hits</option>
             <option value="https://www.youtube.com/embed/videoseries?list=PLDISKgcnAC4Tz2F5k0f40vB3p-zO79R7w">⚡ Synthwave & Cyberpunk Motivation</option>
             <option value="https://www.youtube.com/embed/videoseries?list=RDCLAK5uy_k6d-lV5E-W9iX_3e6aY3-S8a">🎧 Hip Hop Gym Motivation</option>
           </select>
 
-          <iframe id="music-iframe" style="width: 100%; height: 160px; border-radius: 10px; border: none;" src="https://www.youtube.com/embed/videoseries?list=PL4fGSI1pDJn6jWjXda_m58fROa0hflS7R" allow="autoplay"></iframe>
+          <iframe id="music-iframe" style="width: 100%; height: 160px; border-radius: 10px; border: none; display: none;" src="about:blank" allow="autoplay"></iframe>
         </div>
 
         <!-- Upcoming exercises list -->
@@ -594,15 +627,17 @@
     </div>
   </div>
 
-  <!-- MODAL: CREAR EJERCICIO PERSONALIZADO EN CATALOGO -->
+  <!-- MODAL: CREAR / EDITAR EJERCICIO PERSONALIZADO EN CATALOGO -->
   <div class="trainer-overlay" id="modal-create-exercise" style="background: rgba(0,0,0,0.8);">
     <div class="card" style="max-width: 500px; margin: auto; width: 90%;">
       <div class="card-header">
-        <h3 class="card-title"><i data-lucide="dumbbell"></i> Crear Ejercicio Personalizado</h3>
+        <h3 class="card-title" id="modal-create-exercise-title"><i data-lucide="dumbbell"></i> Crear / Editar Ejercicio</h3>
         <button class="btn btn-secondary" id="btn-close-create-exercise" style="padding: 6px 10px;"><i data-lucide="x"></i></button>
       </div>
 
       <form id="form-create-exercise" style="display: flex; flex-direction: column; gap: 14px;">
+        <input type="hidden" id="edit-ex-id">
+
         <div>
           <label style="font-size: 0.8rem; color: var(--text-muted);">Nombre del Ejercicio</label>
           <input type="text" id="new-ex-name" class="input-field" placeholder="ej: Dominadas supinas" style="width: 100%;" required>
@@ -633,8 +668,8 @@
         </div>
 
         <div>
-          <label style="font-size: 0.8rem; color: var(--text-muted);">URL de Animación / GIF (Opcional)</label>
-          <input type="url" id="new-ex-anim-url" class="input-field" placeholder="https://..." style="width: 100%;">
+          <label style="font-size: 0.8rem; color: var(--text-muted);">URL de Animación / Vídeo MP4 o GIF (GymVisual / Directo)</label>
+          <input type="url" id="new-ex-anim-url" class="input-field" placeholder="https://gymvisual.com/img/vid/..." style="width: 100%;">
         </div>
 
         <button type="submit" class="btn btn-primary" style="margin-top: 10px;">
@@ -645,11 +680,11 @@
   </div>
 
   <!-- JavaScript Modules -->
-  <script src="js/app.js?v=1.0.2"></script>
-  <script src="js/diet.js?v=1.0.2"></script>
-  <script src="js/recipe_finder.js?v=1.0.2"></script>
-  <script src="js/workout.js?v=1.0.2"></script>
-  <script src="js/trainer.js?v=1.0.2"></script>
-  <script src="js/music.js?v=1.0.2"></script>
+  <script src="js/app.js?v=1.0.4"></script>
+  <script src="js/diet.js?v=1.0.4"></script>
+  <script src="js/recipe_finder.js?v=1.0.4"></script>
+  <script src="js/workout.js?v=1.0.4"></script>
+  <script src="js/trainer.js?v=1.0.4"></script>
+  <script src="js/music.js?v=1.0.4"></script>
 </body>
 </html>

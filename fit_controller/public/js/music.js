@@ -1,4 +1,4 @@
-// Workout Music Player Module
+// Workout Music Player Module (Lazy-loaded to avoid telemetry console errors)
 window.MusicModule = {
   init: function() {
     const select = document.getElementById('music-playlist-select');
@@ -6,7 +6,13 @@ window.MusicModule = {
 
     if (select && iframe) {
       select.addEventListener('change', (e) => {
-        iframe.src = e.target.value;
+        if (e.target.value) {
+          iframe.src = e.target.value;
+          iframe.style.display = 'block';
+        } else {
+          iframe.src = 'about:blank';
+          iframe.style.display = 'none';
+        }
       });
     }
   }
