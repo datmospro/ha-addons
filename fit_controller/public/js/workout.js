@@ -498,7 +498,7 @@ window.WorkoutModule = {
   },
 
   openEditRoutineModal: function(routineId) {
-    const routine = this.currentRoutines.find(r => r.id === routineId);
+    const routine = this.currentRoutines.find(r => Number(r.id) === Number(routineId));
     if (!routine) return;
 
     document.getElementById('routine-edit-id').value = routine.id;
@@ -509,40 +509,44 @@ window.WorkoutModule = {
     document.getElementById('modal-create-routine').classList.add('active');
   },
 
-  openEditRoutineExerciseModal: function(reId) {
-    let ex = null;
+  toggleInlineEdit: function(reId, isEditing) {
+    const displayBox = document.getElementById(`display-box-${reId}`);
+    const editBox = document.getElementById(`edit-box-${reId}`);
 
-    if (this.selectedRoutineForDetails && this.selectedRoutineForDetails.exercises) {
-      ex = this.selectedRoutineForDetails.exercises.find(e => Number(e.routine_exercise_id) === Number(reId) || Number(e.id) === Number(reId));
-    }
-
-    if (!ex) {
-      for (const r of this.currentRoutines) {
-        if (r.exercises) {
-          const found = r.exercises.find(e => Number(e.routine_exercise_id) === Number(reId) || Number(e.id) === Number(reId));
-          if (found) { ex = found; break; }
-        }
+    if (displayBox && editBox) {
+      if (isEditing) {
+        displayBox.style.display = 'none';
+        editBox.style.display = 'flex';
+      } else {
+        displayBox.style.display = 'grid';
+        editBox.style.display = 'none';
       }
     }
+  },
 
-    if (!ex) {
-      console.error('No se pudo encontrar el ejercicio para ID:', reId);
-      return;
+  saveInlineExerciseData: async function(reId) {
+    const sets = document.getElementById(`inline-sets-${reId}`).value;
+    const reps = document.getElementById(`inline-reps-${reId}`).value;
+    const weight_kg = document.getElementById(`inline-weight-${reId}`).value;
+    const rest_sec = document.getElementById(`inline-rest-${reId}`).value;
+
+    try {
+      await window.apiFetch(`api/workout/routine-exercise/${reId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sets, reps, weight_kg, rest_sec })
+      });
+      await this.loadRoutines();
+      if (this.selectedRoutineForDetails) {
+        this.openRoutineDetailsModal(this.selectedRoutineForDetails.id);
+      }
+    } catch (err) {
+      alert('Error al guardar datos: ' + err.message);
     }
+  },
 
-    document.getElementById('edit-re-id').value = ex.routine_exercise_id || ex.id;
-    document.getElementById('edit-re-sets').value = ex.sets || 3;
-    document.getElementById('edit-re-reps').value = ex.reps || 12;
-    document.getElementById('edit-re-weight').value = ex.weight_kg !== undefined ? ex.weight_kg : 0;
-    document.getElementById('edit-re-rest').value = ex.rest_sec !== undefined ? ex.rest_sec : 60;
-    document.getElementById('modal-edit-re-title').innerHTML = `<i data-lucide="edit-3"></i> Editar Datos: ${ex.name}`;
-
-    const modal = document.getElementById('modal-edit-routine-exercise');
-    if (modal) {
-      modal.style.zIndex = '2500';
-      modal.classList.add('active');
-    }
-    if (window.lucide) lucide.createIcons();
+  openEditRoutineExerciseModal: function(reId) {
+    this.toggleInlineEdit(reId, true);
   },
 
   openRoutineDetailsModal: function(routineId) {
@@ -568,14 +572,51 @@ window.WorkoutModule = {
               <h4 style="font-size: 1rem; font-weight: 800; color: var(--primary);">${ex.name}</h4>
               <span class="text-muted" style="font-size: 0.75rem;">${ex.muscle_group} | ${ex.equipment}</span>
             </div>
-            <div style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: 700; display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+
+            <!-- Normal Display View -->
+            <div id="display-box-${reId}" style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: 700; display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
               <span>Series: <strong>${ex.sets}</strong></span>
               <span>Reps: <strong>${ex.reps}${ex.is_isometric ? 's' : ''}</strong></span>
               <span>Peso: <strong style="color: var(--accent-yellow);">${ex.weight_kg || 0} kg</strong></span>
               <span>Descanso: <strong style="color: var(--primary);">${ex.rest_sec || 60} s</strong></span>
             </div>
+
+            <!-- Inline Edit View (Shown when clicking Editar Datos) -->
+            <div id="edit-box-${reId}" style="display: none; flex-direction: column; gap: 8px; background: rgba(16,185,129,0.08); padding: 10px; border-radius: 8px; border: 1px solid rgba(16,185,129,0.3);">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                <div>
+                  <label style="font-size: 0.7rem; color: var(--text-muted);">Series</label>
+                  <input type="number" id="inline-sets-${reId}" value="${ex.sets}" min="1" class="input-field" style="width: 100%; padding: 4px 8px; font-size: 0.8rem;">
+                </div>
+                <div>
+                  <label style="font-size: 0.7rem; color: var(--text-muted);">Reps/Segs</label>
+                  <input type="number" id="inline-reps-${reId}" value="${ex.reps}" min="1" class="input-field" style="width: 100%; padding: 4px 8px; font-size: 0.8rem;">
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                <div>
+                  <label style="font-size: 0.7rem; color: var(--text-muted);">Peso (kg)</label>
+                  <input type="number" step="0.5" id="inline-weight-${reId}" value="${ex.weight_kg || 0}" class="input-field" style="width: 100%; padding: 4px 8px; font-size: 0.8rem;">
+                </div>
+                <div>
+                  <label style="font-size: 0.7rem; color: var(--text-muted);">Descanso (s)</label>
+                  <input type="number" id="inline-rest-${reId}" value="${ex.rest_sec || 60}" min="5" class="input-field" style="width: 100%; padding: 4px 8px; font-size: 0.8rem;">
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 6px; margin-top: 4px;">
+                <button class="btn btn-primary" onclick="window.WorkoutModule.saveInlineExerciseData(${reId})" style="flex: 1; padding: 6px; font-size: 0.78rem; font-weight: 800; justify-content: center;">
+                  <i data-lucide="check" style="width: 12px; height: 12px;"></i> Guardar
+                </button>
+                <button class="btn btn-secondary" onclick="window.WorkoutModule.toggleInlineEdit(${reId}, false)" style="padding: 6px 10px; font-size: 0.78rem; justify-content: center;">
+                  Cancelar
+                </button>
+              </div>
+            </div>
+
             <div style="display: flex; gap: 8px; margin-top: auto;">
-              <button class="btn btn-secondary" onclick="window.WorkoutModule.openEditRoutineExerciseModal(${reId})" style="flex: 1; padding: 6px; font-size: 0.78rem; justify-content: center;">
+              <button class="btn btn-secondary" onclick="window.WorkoutModule.toggleInlineEdit(${reId}, true)" style="flex: 1; padding: 6px; font-size: 0.78rem; justify-content: center;">
                 <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i> Editar Datos
               </button>
               <button class="btn btn-secondary" onclick="window.WorkoutModule.removeExerciseFromRoutine(${reId})" style="padding: 6px; font-size: 0.78rem; color: var(--accent-red); border-color: rgba(239,68,68,0.2);" title="Quitar de la rutina">
