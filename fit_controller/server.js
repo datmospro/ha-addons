@@ -431,21 +431,21 @@ app.get('/api/workout/exercises', (req, res) => {
 
 app.post('/api/workout/exercises', (req, res) => {
   try {
-    const { name, muscle_group, equipment, difficulty, instructions, animation_url, default_sets, default_reps, default_rest_sec, cadence_sec, is_isometric } = req.body;
+    const { name, muscle_group, equipment, difficulty, instructions, animation_url, default_sets, default_reps, default_rest_sec, cadence_sec, is_isometric, prep_sec } = req.body;
 
     if (!name || !muscle_group) {
       return res.status(400).json({ error: 'Nombre y Grupo Muscular son requeridos' });
     }
 
     const stmt = db.prepare(`
-      INSERT INTO exercises (name, muscle_group, equipment, difficulty, instructions, animation_type, animation_url, default_sets, default_reps, default_rest_sec, cadence_sec, is_isometric)
-      VALUES (?, ?, ?, ?, ?, 'url', ?, ?, ?, ?, ?, ?)
+      INSERT INTO exercises (name, muscle_group, equipment, difficulty, instructions, animation_type, animation_url, default_sets, default_reps, default_rest_sec, cadence_sec, is_isometric, prep_sec)
+      VALUES (?, ?, ?, ?, ?, 'url', ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
       name, muscle_group, equipment || 'Corporal', difficulty || 'Intermedio', instructions || '',
       animation_url || '', parseInt(default_sets || 3, 10), parseInt(default_reps || 12, 10), parseInt(default_rest_sec || 60, 10),
-      parseInt(cadence_sec || 0, 10), is_isometric ? 1 : 0
+      parseInt(cadence_sec || 3, 10), is_isometric ? 1 : 0, parseInt(prep_sec || 5, 10)
     );
 
     res.json({ id: result.lastInsertRowid, success: true });
@@ -456,15 +456,15 @@ app.post('/api/workout/exercises', (req, res) => {
 
 app.put('/api/workout/exercises/:id', (req, res) => {
   try {
-    const { name, muscle_group, equipment, difficulty, instructions, animation_url, cadence_sec, is_isometric } = req.body;
+    const { name, muscle_group, equipment, difficulty, instructions, animation_url, cadence_sec, is_isometric, prep_sec } = req.body;
     db.prepare(`
       UPDATE exercises SET
         name = ?, muscle_group = ?, equipment = ?, difficulty = ?, instructions = ?, animation_url = ?,
-        cadence_sec = ?, is_isometric = ?
+        cadence_sec = ?, is_isometric = ?, prep_sec = ?
       WHERE id = ?
     `).run(
       name, muscle_group, equipment || 'Corporal', difficulty || 'Intermedio', instructions || '',
-      animation_url || '', parseInt(cadence_sec || 0, 10), is_isometric ? 1 : 0, req.params.id
+      animation_url || '', parseInt(cadence_sec || 3, 10), is_isometric ? 1 : 0, parseInt(prep_sec || 5, 10), req.params.id
     );
     res.json({ success: true });
   } catch (err) {
@@ -490,7 +490,7 @@ app.get('/api/workout/routines', (req, res) => {
       const exercises = db.prepare(`
         SELECT re.id as routine_exercise_id, re.order_index, re.sets, re.reps, re.weight_kg, re.rest_sec,
                e.id as exercise_id, e.name, e.muscle_group, e.equipment, e.difficulty, e.instructions,
-               e.animation_type, e.animation_data, e.animation_url, e.cadence_sec, e.is_isometric
+               e.animation_type, e.animation_data, e.animation_url, e.cadence_sec, e.is_isometric, e.prep_sec
         FROM routine_exercises re
         JOIN exercises e ON re.exercise_id = e.id
         WHERE re.routine_id = ?

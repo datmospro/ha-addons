@@ -366,6 +366,7 @@ window.WorkoutModule = {
           animation_url: document.getElementById('new-ex-anim-url').value,
           cadence_sec: document.getElementById('new-ex-cadence').value || 3,
           is_isometric: document.getElementById('new-ex-isometric').checked ? 1 : 0,
+          prep_sec: document.getElementById('new-ex-prep').value || 5,
           default_sets: 3,
           default_reps: 12,
           default_rest_sec: 60
@@ -461,6 +462,7 @@ window.WorkoutModule = {
     document.getElementById('new-ex-anim-url').value = ex.animation_url || '';
     document.getElementById('new-ex-cadence').value = ex.cadence_sec !== undefined ? ex.cadence_sec : 3;
     document.getElementById('new-ex-isometric').checked = !!ex.is_isometric;
+    document.getElementById('new-ex-prep').value = ex.prep_sec !== undefined ? ex.prep_sec : 5;
 
     document.getElementById('modal-create-exercise-title').innerHTML = `<i data-lucide="edit-3"></i> Editar Ejercicio: ${ex.name}`;
     document.getElementById('modal-create-exercise').classList.add('active');

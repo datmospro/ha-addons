@@ -9,6 +9,7 @@ window.TrainerModule = {
   restSeconds: 0,
   restTimerInterval: null,
   cadenceTimerInterval: null,
+  prepTimerInterval: null,
   repCounter: 0,
   audioCtx: null,
   soundEnabled: true,
@@ -63,6 +64,20 @@ window.TrainerModule = {
     } catch (e) {
       console.error('Audio beep failed:', e);
     }
+  },
+
+  // Distinctive 3-tone victory chord for completing a series/set
+  playVictoryChime: function() {
+    if (!this.soundEnabled) return;
+    this.initAudio();
+    if (!this.audioCtx) return;
+
+    const notes = [523.25, 659.25, 783.99]; // C5, E5, G5 triad
+    notes.forEach((freq, idx) => {
+      setTimeout(() => {
+        this.playAudioBeep(freq, 0.25);
+      }, idx * 120);
+    });
   },
 
   bindEvents: function() {
@@ -152,6 +167,7 @@ window.TrainerModule = {
   renderCurrentExercise: function() {
     clearInterval(this.cadenceTimerInterval);
     clearInterval(this.restTimerInterval);
+    clearInterval(this.prepTimerInterval);
 
     const ex = this.activeRoutine.exercises[this.currentExerciseIndex];
     if (!ex) return;
@@ -166,7 +182,7 @@ window.TrainerModule = {
     document.getElementById('trainer-ex-instructions').textContent = ex.instructions || 'Mantén la técnica correcta con respiración fluida.';
 
     document.getElementById('trainer-current-set').textContent = `${this.currentSetIndex} / ${setsCount}`;
-    document.getElementById('trainer-target-reps').textContent = ex.reps;
+    document.getElementById('trainer-target-reps').textContent = `0 / ${ex.reps}`;
     document.getElementById('trainer-weight-kg').textContent = ex.weight_kg || 0;
 
     // Render animation graphic (video MP4 or SVG)
@@ -177,21 +193,57 @@ window.TrainerModule = {
     document.getElementById('view-set-active').style.display = 'block';
     document.getElementById('view-rest-active').style.display = 'none';
 
-    // Start Audio Cadence Pacer or Isometric Hold Timer
-    this.startCadenceOrIsometricPacer(ex);
+    // Start 5-second preparation countdown before active set
+    this.startPrepCountdown(ex);
 
     if (window.lucide) lucide.createIcons();
   },
 
+  startPrepCountdown: function(ex) {
+    const overlay = document.getElementById('trainer-prep-overlay');
+    const prepSecondsEl = document.getElementById('trainer-prep-seconds');
+    let prepTime = parseInt(ex.prep_sec !== undefined ? ex.prep_sec : 5, 10);
+
+    if (prepTime <= 0) {
+      if (overlay) overlay.style.display = 'none';
+      this.startCadenceOrIsometricPacer(ex);
+      return;
+    }
+
+    if (overlay) {
+      overlay.style.display = 'flex';
+      if (prepSecondsEl) prepSecondsEl.textContent = prepTime;
+    }
+
+    this.playAudioBeep(600, 0.15); // Prep tick
+
+    clearInterval(this.prepTimerInterval);
+    this.prepTimerInterval = setInterval(() => {
+      prepTime--;
+      if (prepTime > 0) {
+        if (prepSecondsEl) prepSecondsEl.textContent = prepTime;
+        this.playAudioBeep(600, 0.15);
+      } else {
+        if (prepSecondsEl) prepSecondsEl.textContent = "¡VAMOS!";
+        this.playAudioBeep(950, 0.3); // Start active set chime
+        clearInterval(this.prepTimerInterval);
+
+        setTimeout(() => {
+          if (overlay) overlay.style.display = 'none';
+          this.startCadenceOrIsometricPacer(ex);
+        }, 600);
+      }
+    }, 1000);
+  },
+
   startCadenceOrIsometricPacer: function(ex) {
     clearInterval(this.cadenceTimerInterval);
-    this.playAudioBeep(880, 0.2); // Start chime
-
     const cadenceSec = parseInt(ex.cadence_sec !== undefined ? ex.cadence_sec : 3, 10);
+    const targetReps = parseInt(ex.reps || 12, 10);
 
     if (ex.is_isometric) {
       // Isometric Hold Exercise (e.g. Plank for X seconds)
-      let secondsLeft = parseInt(ex.reps || 45, 10);
+      let secondsLeft = targetReps;
       document.getElementById('trainer-target-reps').textContent = `${secondsLeft}s`;
 
       this.cadenceTimerInterval = setInterval(() => {
@@ -200,16 +252,23 @@ window.TrainerModule = {
           document.getElementById('trainer-target-reps').textContent = `${secondsLeft}s`;
           if (secondsLeft <= 3) this.playAudioBeep(600, 0.15); // Warning chime
         } else {
-          document.getElementById('trainer-target-reps').textContent = `0s ¡Listo!`;
+          document.getElementById('trainer-target-reps').textContent = `0s ¡Completado!`;
           clearInterval(this.cadenceTimerInterval);
-          this.playAudioBeep(1046, 0.4); // Completion chime
+          this.playVictoryChime();
+
+          // Auto-advance to rest or next set/exercise!
+          setTimeout(() => {
+            this.handleSetCompleted();
+          }, 800);
         }
       }, 1000);
 
     } else if (cadenceSec > 0) {
       // Rep Cadence Pacer (Beeps on every rep cycle)
-      this.repCounter = 0;
-      const targetReps = parseInt(ex.reps || 12, 10);
+      this.repCounter = 1;
+      document.getElementById('trainer-target-reps').textContent = `Rep ${this.repCounter} / ${targetReps}`;
+      this.playAudioBeep(880, 0.2); // First rep beep
+
       let stepInCadence = cadenceSec;
 
       this.cadenceTimerInterval = setInterval(() => {
@@ -217,11 +276,20 @@ window.TrainerModule = {
         if (stepInCadence <= 0) {
           stepInCadence = cadenceSec;
           this.repCounter++;
-          this.playAudioBeep(880, 0.2); // Rep cadence beep
+
+          if (this.repCounter <= targetReps) {
+            document.getElementById('trainer-target-reps').textContent = `Rep ${this.repCounter} / ${targetReps}`;
+            this.playAudioBeep(880, 0.2); // Beep on each rep increase!
+          }
 
           if (this.repCounter >= targetReps) {
             clearInterval(this.cadenceTimerInterval);
-            this.playAudioBeep(1046, 0.4); // Series finish chime
+            this.playVictoryChime();
+
+            // Auto-advance to rest or next set/exercise!
+            setTimeout(() => {
+              this.handleSetCompleted();
+            }, 800);
           }
         }
       }, 1000);
@@ -231,6 +299,7 @@ window.TrainerModule = {
   handleSetCompleted: function() {
     this.initAudio();
     clearInterval(this.cadenceTimerInterval);
+    clearInterval(this.prepTimerInterval);
 
     const ex = this.activeRoutine.exercises[this.currentExerciseIndex];
     if (!ex) return;
@@ -254,6 +323,7 @@ window.TrainerModule = {
     this.initAudio();
     clearInterval(this.cadenceTimerInterval);
     clearInterval(this.restTimerInterval);
+    clearInterval(this.prepTimerInterval);
 
     if (!this.activeRoutine || !this.activeRoutine.exercises) return;
 
@@ -272,6 +342,7 @@ window.TrainerModule = {
     this.initAudio();
     clearInterval(this.cadenceTimerInterval);
     clearInterval(this.restTimerInterval);
+    clearInterval(this.prepTimerInterval);
 
     if (!this.activeRoutine || !this.activeRoutine.exercises) return;
 
@@ -304,6 +375,7 @@ window.TrainerModule = {
     this.initAudio();
     clearInterval(this.cadenceTimerInterval);
     clearInterval(this.restTimerInterval);
+    clearInterval(this.prepTimerInterval);
 
     if (index >= 0 && index < this.activeRoutine.exercises.length) {
       this.currentExerciseIndex = index;
@@ -373,6 +445,9 @@ window.TrainerModule = {
     clearInterval(this.workoutTimerInterval);
     clearInterval(this.restTimerInterval);
     clearInterval(this.cadenceTimerInterval);
+    clearInterval(this.prepTimerInterval);
+    const overlay = document.getElementById('trainer-prep-overlay');
+    if (overlay) overlay.style.display = 'none';
     document.getElementById('modal-trainer').classList.remove('active');
   }
 };

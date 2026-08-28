@@ -76,7 +76,7 @@ function initDb() {
     )
   `);
 
-  // 4. Exercises table (With cadence_sec and is_isometric columns)
+  // 4. Exercises table
   db.exec(`
     CREATE TABLE IF NOT EXISTS exercises (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,18 +91,16 @@ function initDb() {
       default_sets INTEGER DEFAULT 3,
       default_reps INTEGER DEFAULT 12,
       default_rest_sec INTEGER DEFAULT 60,
-      cadence_sec INTEGER DEFAULT 0,
-      is_isometric INTEGER DEFAULT 0
+      cadence_sec INTEGER DEFAULT 3,
+      is_isometric INTEGER DEFAULT 0,
+      prep_sec INTEGER DEFAULT 5
     )
   `);
 
-  // Ensure cadence columns exist for existing databases
-  try {
-    db.exec(`ALTER TABLE exercises ADD COLUMN cadence_sec INTEGER DEFAULT 0`);
-  } catch (e) {}
-  try {
-    db.exec(`ALTER TABLE exercises ADD COLUMN is_isometric INTEGER DEFAULT 0`);
-  } catch (e) {}
+  // Migrations for missing columns
+  try { db.exec(`ALTER TABLE exercises ADD COLUMN cadence_sec INTEGER DEFAULT 3`); } catch (e) {}
+  try { db.exec(`ALTER TABLE exercises ADD COLUMN is_isometric INTEGER DEFAULT 0`); } catch (e) {}
+  try { db.exec(`ALTER TABLE exercises ADD COLUMN prep_sec INTEGER DEFAULT 5`); } catch (e) {}
 
   // 5. Routines table
   db.exec(`
@@ -276,7 +274,8 @@ function seedDefaultData() {
         default_reps: 12,
         default_rest_sec: 60,
         cadence_sec: 3,
-        is_isometric: 0
+        is_isometric: 0,
+        prep_sec: 5
       },
       {
         name: "Flexiones de Pecho (Push-ups)",
@@ -291,7 +290,8 @@ function seedDefaultData() {
         default_reps: 15,
         default_rest_sec: 45,
         cadence_sec: 3,
-        is_isometric: 0
+        is_isometric: 0,
+        prep_sec: 5
       },
       {
         name: "Extensión de Tríceps con Barra (Pullover)",
@@ -306,7 +306,8 @@ function seedDefaultData() {
         default_reps: 10,
         default_rest_sec: 60,
         cadence_sec: 3,
-        is_isometric: 0
+        is_isometric: 0,
+        prep_sec: 5
       },
       {
         name: "Curl de Bíceps con Mancuernas",
@@ -321,7 +322,8 @@ function seedDefaultData() {
         default_reps: 12,
         default_rest_sec: 45,
         cadence_sec: 3,
-        is_isometric: 0
+        is_isometric: 0,
+        prep_sec: 5
       },
       {
         name: "Plancha Abdominal Isometrica",
@@ -336,17 +338,18 @@ function seedDefaultData() {
         default_reps: 45,
         default_rest_sec: 45,
         cadence_sec: 0,
-        is_isometric: 1
+        is_isometric: 1,
+        prep_sec: 5
       }
     ];
 
     const stmtEx = db.prepare(`
-      INSERT INTO exercises (name, muscle_group, equipment, difficulty, instructions, animation_type, animation_data, animation_url, default_sets, default_reps, default_rest_sec, cadence_sec, is_isometric)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO exercises (name, muscle_group, equipment, difficulty, instructions, animation_type, animation_data, animation_url, default_sets, default_reps, default_rest_sec, cadence_sec, is_isometric, prep_sec)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     for (const ex of defaultExercises) {
-      stmtEx.run(ex.name, ex.muscle_group, ex.equipment, ex.difficulty, ex.instructions, ex.animation_type, ex.animation_data, ex.animation_url, ex.default_sets, ex.default_reps, ex.default_rest_sec, ex.cadence_sec || 0, ex.is_isometric || 0);
+      stmtEx.run(ex.name, ex.muscle_group, ex.equipment, ex.difficulty, ex.instructions, ex.animation_type, ex.animation_data, ex.animation_url, ex.default_sets, ex.default_reps, ex.default_rest_sec, ex.cadence_sec || 3, ex.is_isometric || 0, ex.prep_sec || 5);
     }
   }
 
