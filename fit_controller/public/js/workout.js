@@ -113,8 +113,20 @@ window.WorkoutModule = {
   },
 
   getAnimationGraphicHtml: function(ex) {
-    if (ex.animation_url && ex.animation_url.trim().length > 5 && !ex.animation_url.includes('gymvisual.com')) {
-      return `<img src="${ex.animation_url}" alt="${ex.name}" onerror="this.onerror=null; this.parentNode.innerHTML=window.WorkoutModule.getSvgFallbackHtml('${ex.animation_data || ex.muscle_group}');">`;
+    if (ex.animation_url && ex.animation_url.trim().length > 5) {
+      const url = ex.animation_url.trim();
+      
+      // If the URL is an MP4 video (like GymVisual .mp4 links), render an HTML5 autoplay loop video tag!
+      if (url.toLowerCase().endsWith('.mp4') || url.toLowerCase().includes('.mp4') || url.includes('/vid/')) {
+        return `
+          <video src="${url}" autoplay loop muted playsinline style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px;">
+            Tu navegador no soporta reproducción de vídeo HTML5.
+          </video>
+        `;
+      }
+      
+      // Standard image/GIF tag
+      return `<img src="${url}" alt="${ex.name}" onerror="this.onerror=null; this.parentNode.innerHTML=window.WorkoutModule.getSvgFallbackHtml('${ex.animation_data || ex.muscle_group}');">`;
     }
     return this.getSvgFallbackHtml(ex.animation_data || ex.muscle_group);
   },
@@ -122,7 +134,6 @@ window.WorkoutModule = {
   getSvgFallbackHtml: function(key) {
     const keyLower = String(key || '').toLowerCase();
     
-    // Rich SVG Vector Animations with smooth CSS Keyframes
     if (keyLower.includes('squat') || keyLower.includes('sentadilla') || keyLower.includes('pierna')) {
       return `
         <svg viewBox="0 0 100 100" style="width: 100%; height: 100%; max-height: 160px;">
@@ -155,7 +166,7 @@ window.WorkoutModule = {
       `;
     }
 
-    if (keyLower.includes('curl') || keyLower.includes('brazo') || keyLower.includes('bicep')) {
+    if (keyLower.includes('curl') || keyLower.includes('brazo') || keyLower.includes('bicep') || keyLower.includes('tricep')) {
       return `
         <svg viewBox="0 0 100 100" style="width: 100%; height: 100%; max-height: 160px;">
           <style>

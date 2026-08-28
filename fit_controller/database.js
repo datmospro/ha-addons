@@ -399,6 +399,19 @@ function seedDefaultData() {
         default_rest_sec: 45
       },
       {
+        name: "Extensión de Tríceps con Barra (Pullover)",
+        muscle_group: "brazos",
+        equipment: "Barra Z / Banco",
+        difficulty: "Intermedio",
+        instructions: "Tumbado en banco, sostiene la barra sobre la cabeza y flexiona los codos descendiendo la barra controlado hacia atrás.",
+        animation_type: "url",
+        animation_data: "tricep",
+        animation_url: "https://gymvisual.com/img/vid/11000/119101201-barbell-triceps-extension-bent-arms-pullover-back-view.mp4",
+        default_sets: 4,
+        default_reps: 10,
+        default_rest_sec: 60
+      },
+      {
         name: "Fondos de Tríceps en Banco",
         muscle_group: "brazos",
         equipment: "Banco / Silla",
