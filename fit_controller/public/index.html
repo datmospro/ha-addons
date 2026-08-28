@@ -210,11 +210,16 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin: 32px 0 16px 0; flex-wrap: wrap; gap: 12px;">
           <div>
             <h3 style="font-size: 1.2rem; font-weight: 700;">Catálogo de Mis Platos & Recetas</h3>
-            <p class="text-muted" style="font-size: 0.85rem;">Añade tus platos caseros con macronutrientes, calorías e ingredientes para asignarlos a la semana.</p>
+            <p class="text-muted" style="font-size: 0.85rem;">Añade tus platos caseros o impórtalos en JSON desde tu IA favorita para tu plan semanal.</p>
           </div>
-          <button class="btn btn-primary" onclick="window.DietModule.openCreateRecipeModal()">
-            <i data-lucide="plus-circle"></i> Crear Nuevo Plato
-          </button>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-secondary" onclick="window.DietModule.openImportModal()" style="border-color: var(--accent-cyan); color: var(--accent-cyan);">
+              <i data-lucide="file-json"></i> Importar JSON IA
+            </button>
+            <button class="btn btn-primary" onclick="window.DietModule.openCreateRecipeModal()">
+              <i data-lucide="plus-circle"></i> Crear Nuevo Plato
+            </button>
+          </div>
         </div>
 
         <!-- Recipe Category Filter Bar -->
@@ -1013,11 +1018,44 @@
     </div>
   </div>
 
+  <!-- MODAL: IMPORTAR PLATOS Y PLAN EN FORMATO JSON -->
+  <div class="trainer-overlay" id="modal-import-diet" style="background: rgba(0,0,0,0.85); z-index: 99999; backdrop-filter: blur(10px);">
+    <div class="card" style="max-width: 650px; margin: auto; width: 92%; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="card-header">
+        <h3 class="card-title"><i data-lucide="file-json" style="color: var(--accent-cyan);"></i> Importar Platos y Plan Semanal (JSON IA)</h3>
+        <button class="btn btn-secondary" id="btn-close-import-diet" style="padding: 6px 10px;"><i data-lucide="x"></i></button>
+      </div>
+
+      <div style="padding: 10px 0; display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0;">
+        <p class="text-muted" style="font-size: 0.83rem; line-height: 1.4;">
+          Pega aquí el texto JSON generado por tu IA (ChatGPT, Claude, Gemini). Puedes importar platos individuales o el menú semanal completo configurado.
+        </p>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" class="btn btn-secondary" onclick="window.DietModule.fillSampleImportJson()" style="font-size: 0.78rem; padding: 6px 12px;">
+            <i data-lucide="code"></i> Cargar JSON de Ejemplo
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="window.DietModule.copyAiPromptTemplate()" style="font-size: 0.78rem; padding: 6px 12px; color: var(--primary); border-color: rgba(16,185,129,0.3);">
+            <i data-lucide="copy"></i> Copiar Prompt para la IA
+          </button>
+        </div>
+
+        <textarea id="import-diet-json-input" class="input-field" placeholder='Pega aquí el JSON en formato {"recipes": [...], "plan": [...]} o [{ "title": "..." }]...' style="width: 100%; flex: 1; min-height: 220px; font-family: monospace; font-size: 0.78rem; resize: vertical; line-height: 1.4; padding: 12px;"></textarea>
+
+        <div id="import-diet-status" style="display: none; font-size: 0.83rem; padding: 10px 14px; border-radius: 8px; font-weight: 700;"></div>
+
+        <button type="button" class="btn btn-primary" onclick="window.DietModule.submitImportJson()" style="width: 100%; padding: 12px; font-weight: 800; justify-content: center; font-size: 0.95rem;">
+          <i data-lucide="upload-cloud"></i> Procesar e Importar al Plan
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- JavaScript Modules -->
-  <script src="js/app.js?v=1.3.7"></script>
-  <script src="js/diet.js?v=1.3.7"></script>
-  <script src="js/workout.js?v=1.3.7"></script>
-  <script src="js/trainer.js?v=1.3.7"></script>
-  <script src="js/music.js?v=1.3.7"></script>
+  <script src="js/app.js?v=1.4.0"></script>
+  <script src="js/diet.js?v=1.4.0"></script>
+  <script src="js/workout.js?v=1.4.0"></script>
+  <script src="js/trainer.js?v=1.4.0"></script>
+  <script src="js/music.js?v=1.4.0"></script>
 </body>
 </html>

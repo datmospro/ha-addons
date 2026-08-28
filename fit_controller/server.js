@@ -324,7 +324,142 @@ app.get('/api/diet/shopping-list', (req, res) => {
       };
     });
 
-    res.json(shoppingList);
+// Import custom recipes and weekly plan from AI JSON
+app.post('/api/diet/import-json', (req, res) => {
+  try {
+    let bodyData = req.body.body !== undefined ? req.body.body : req.body;
+    if (typeof bodyData === 'string') {
+      try {
+        bodyData = JSON.parse(bodyData);
+      } catch (e) {
+        return res.status(400).json({ error: 'El texto no es un JSON válido' });
+      }
+    }
+
+    let recipesList = [];
+    let planList = [];
+
+    if (Array.isArray(bodyData)) {
+      recipesList = bodyData;
+    } else if (bodyData && typeof bodyData === 'object') {
+      if (bodyData.recipes && Array.isArray(bodyData.recipes)) {
+        recipesList = bodyData.recipes;
+      }
+      if (bodyData.plan && Array.isArray(bodyData.plan)) {
+        planList = bodyData.plan;
+      }
+      if (bodyData.weekly_plan && Array.isArray(bodyData.weekly_plan)) {
+        planList = bodyData.weekly_plan;
+      }
+      // Single recipe check
+      if (!bodyData.recipes && !bodyData.plan && bodyData.title) {
+        recipesList = [bodyData];
+      }
+    }
+
+    let importedRecipesCount = 0;
+    let importedPlanCount = 0;
+
+    const titleToIdMap = {};
+
+    // 1. Process Recipes
+    recipesList.forEach(r => {
+      if (!r.title) return;
+
+      const existing = db.prepare(`SELECT id FROM recipes WHERE LOWER(title) = LOWER(?)`).get(r.title);
+      let recipeId = null;
+
+      const ingredientsJson = JSON.stringify(r.ingredients || []);
+      const instructionsArray = Array.isArray(r.instructions)
+        ? r.instructions
+        : (typeof r.instructions === 'string' ? [r.instructions] : []);
+      const instructionsJson = JSON.stringify(instructionsArray);
+
+      if (existing) {
+        recipeId = existing.id;
+        db.prepare(`
+          UPDATE recipes SET
+            category = COALESCE(?, category),
+            prep_time_min = COALESCE(?, prep_time_min),
+            kcal = COALESCE(?, kcal),
+            protein = COALESCE(?, protein),
+            carbs = COALESCE(?, carbs),
+            fat = COALESCE(?, fat),
+            ingredients_json = ?,
+            instructions_json = ?
+          WHERE id = ?
+        `).run(
+          r.category || 'almuerzo',
+          r.prep_time_min || 15,
+          r.kcal || 300,
+          r.protein || 0,
+          r.carbs || 0,
+          r.fat || 0,
+          ingredientsJson,
+          instructionsJson,
+          recipeId
+        );
+      } else {
+        const stmt = db.prepare(`
+          INSERT INTO recipes (title, description, category, prep_time_min, servings, kcal, protein, carbs, fat, fiber, ingredients_json, instructions_json, image_url, is_custom)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        `);
+        const result = stmt.run(
+          r.title,
+          r.description || '',
+          r.category || 'almuerzo',
+          r.prep_time_min || 15,
+          r.servings || 1,
+          r.kcal || 300,
+          r.protein || 0,
+          r.carbs || 0,
+          r.fat || 0,
+          r.fiber || 0,
+          ingredientsJson,
+          instructionsJson,
+          r.image_url || ''
+        );
+        recipeId = result.lastInsertRowid;
+        importedRecipesCount++;
+      }
+
+      titleToIdMap[r.title.toLowerCase()] = recipeId;
+    });
+
+    // 2. Process Weekly Plan Items
+    planList.forEach(item => {
+      const day = (item.day_of_week || item.day || '').toLowerCase();
+      const mealType = (item.meal_type || item.meal || item.type || '').toLowerCase();
+      const recipeTitle = item.recipe_title || item.title || item.recipe || '';
+
+      if (!day || !mealType) return;
+
+      let recipeId = null;
+      if (recipeTitle && titleToIdMap[recipeTitle.toLowerCase()]) {
+        recipeId = titleToIdMap[recipeTitle.toLowerCase()];
+      } else if (recipeTitle) {
+        const found = db.prepare(`SELECT id FROM recipes WHERE LOWER(title) = LOWER(?)`).get(recipeTitle);
+        if (found) recipeId = found.id;
+      }
+
+      const existingPlan = db.prepare(`SELECT id FROM meal_plans WHERE day_of_week = ? AND meal_type = ?`).get(day, mealType);
+      if (existingPlan) {
+        db.prepare(`UPDATE meal_plans SET recipe_id = ?, custom_title = ? WHERE id = ?`)
+          .run(recipeId, recipeTitle || null, existingPlan.id);
+      } else {
+        db.prepare(`INSERT INTO meal_plans (day_of_week, meal_type, recipe_id, custom_title, people_count) VALUES (?, ?, ?, ?, 1)`)
+          .run(day, mealType, recipeId, recipeTitle || null);
+      }
+
+      importedPlanCount++;
+    });
+
+    res.json({
+      success: true,
+      importedRecipesCount,
+      importedPlanCount,
+      message: `Importación completada: ${importedRecipesCount} platos procesados y ${importedPlanCount} asignaciones de menú actualizadas.`
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

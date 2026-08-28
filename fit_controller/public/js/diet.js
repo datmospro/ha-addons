@@ -354,6 +354,16 @@ window.DietModule = {
         modalShop.classList.remove('active');
       });
     }
+
+    // 5. Import Diet JSON Modal Close
+    const modalImport = document.getElementById('modal-import-diet');
+    const btnCloseImport = document.getElementById('btn-close-import-diet');
+    if (btnCloseImport && modalImport) {
+      btnCloseImport.addEventListener('click', () => {
+        modalImport.style.display = 'none';
+        modalImport.classList.remove('active');
+      });
+    }
   },
 
   openShoppingListModal: async function() {
@@ -571,6 +581,172 @@ window.DietModule = {
     if (fillProtein) fillProtein.style.width = `${Math.min(100, Math.round((dayData.totalsPerPerson.protein / targetProtein) * 100))}%`;
     if (fillCarbs) fillCarbs.style.width = `${Math.min(100, Math.round((dayData.totalsPerPerson.carbs / targetCarbs) * 100))}%`;
     if (fillFat) fillFat.style.width = `${Math.min(100, Math.round((dayData.totalsPerPerson.fat / targetFat) * 100))}%`;
+  },
+
+  openImportModal: function() {
+    const modal = document.getElementById('modal-import-diet');
+    if (!modal) return;
+
+    const statusEl = document.getElementById('import-diet-status');
+    if (statusEl) statusEl.style.display = 'none';
+
+    modal.style.display = 'flex';
+    modal.style.zIndex = '99999';
+    modal.classList.add('active');
+    if (window.lucide) lucide.createIcons();
+  },
+
+  closeImportModal: function() {
+    const modal = document.getElementById('modal-import-diet');
+    if (modal) {
+      modal.style.display = 'none';
+      modal.classList.remove('active');
+    }
+  },
+
+  fillSampleImportJson: function() {
+    const sample = {
+      "recipes": [
+        {
+          "title": "Avena Energética con Plátano y Crema de Cacahuete",
+          "category": "desayuno",
+          "prep_time_min": 10,
+          "kcal": 380,
+          "protein": 14,
+          "carbs": 56,
+          "fat": 10,
+          "ingredients": [
+            { "name": "Copos de avena", "amount": "60", "unit": "g" },
+            { "name": "Plátano", "amount": "1", "unit": "unidad" },
+            { "name": "Crema de cacahuete", "amount": "15", "unit": "g" },
+            { "name": "Leche desnatada o bebida vegetal", "amount": "200", "unit": "ml" }
+          ],
+          "instructions": [
+            "Mezclar los copos de avena con la leche y calentar 2 min en microondas.",
+            "Cortar el plátano en rodajas y añadir encima.",
+            "Añadir la cucharada de crema de cacahuete y servir caliente."
+          ]
+        },
+        {
+          "title": "Pechuga de Pollo a la Plancha con Arroz Integral",
+          "category": "almuerzo",
+          "prep_time_min": 20,
+          "kcal": 520,
+          "protein": 45,
+          "carbs": 50,
+          "fat": 12,
+          "ingredients": [
+            { "name": "Pechuga de pollo", "amount": "200", "unit": "g" },
+            { "name": "Arroz integral cocido", "amount": "180", "unit": "g" },
+            { "name": "Aceite de oliva virgen extra", "amount": "10", "unit": "ml" },
+            { "name": "Brócoli al vapor", "amount": "100", "unit": "g" }
+          ],
+          "instructions": [
+            "Sazonar la pechuga de pollo con sal, pimienta y orégano.",
+            "Cocinar a la plancha con unas gotas de aceite de oliva hasta dorar por ambos lados.",
+            "Servir acompañado del arroz integral cocido y el brócoli al vapor."
+          ]
+        }
+      ],
+      "plan": [
+        { "day_of_week": "lunes", "meal_type": "desayuno", "recipe_title": "Avena Energética con Plátano y Crema de Cacahuete" },
+        { "day_of_week": "lunes", "meal_type": "almuerzo", "recipe_title": "Pechuga de Pollo a la Plancha con Arroz Integral" },
+        { "day_of_week": "martes", "meal_type": "desayuno", "recipe_title": "Avena Energética con Plátano y Crema de Cacahuete" }
+      ]
+    };
+
+    const textarea = document.getElementById('import-diet-json-input');
+    if (textarea) {
+      textarea.value = JSON.stringify(sample, null, 2);
+    }
+  },
+
+  copyAiPromptTemplate: function() {
+    const promptText = `Por favor, actúa como un nutricionista experto y genera una respuesta ÚNICAMENTE en formato JSON válido (sin texto extra fuera del bloque JSON) para importar en mi aplicación de dietas con la siguiente estructura:
+
+{
+  "recipes": [
+    {
+      "title": "Nombre exacto del plato",
+      "category": "desayuno|almuerzo|merienda|cena|snack",
+      "prep_time_min": 15,
+      "kcal": 450,
+      "protein": 35,
+      "carbs": 40,
+      "fat": 12,
+      "ingredients": [
+        { "name": "Ingrediente 1", "amount": "100", "unit": "g" },
+        { "name": "Ingrediente 2", "amount": "1", "unit": "unidad" }
+      ],
+      "instructions": [
+        "Paso 1 de preparación...",
+        "Paso 2 de preparación..."
+      ]
+    }
+  ],
+  "plan": [
+    { "day_of_week": "lunes", "meal_type": "desayuno", "recipe_title": "Nombre exacto del plato" },
+    { "day_of_week": "lunes", "meal_type": "almuerzo", "recipe_title": "Nombre exacto del plato" }
+  ]
+}
+
+Por favor, crea un menú saludable para toda la semana acorde a mi objetivo de déficit calórico.`;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(promptText).then(() => {
+        alert('📋 Prompt copiado al portapapeles. Pégalo en ChatGPT, Gemini o Claude para pedir tu dieta en JSON.');
+      }).catch(() => {
+        prompt("Copia este prompt para la IA:", promptText);
+      });
+    } else {
+      prompt("Copia este prompt para la IA:", promptText);
+    }
+  },
+
+  submitImportJson: async function() {
+    const textarea = document.getElementById('import-diet-json-input');
+    const statusEl = document.getElementById('import-diet-status');
+
+    if (!textarea || !textarea.value.trim()) {
+      if (statusEl) {
+        statusEl.style.display = 'block';
+        statusEl.style.background = 'rgba(239,68,68,0.15)';
+        statusEl.style.color = 'var(--accent-red)';
+        statusEl.textContent = '❌ Por favor, pega un JSON antes de importar.';
+      }
+      return;
+    }
+
+    try {
+      const jsonText = textarea.value.trim();
+      const res = await window.apiFetch('api/diet/import-json', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: jsonText })
+      });
+
+      if (statusEl) {
+        statusEl.style.display = 'block';
+        statusEl.style.background = 'rgba(16,185,129,0.15)';
+        statusEl.style.color = 'var(--primary)';
+        statusEl.textContent = `✅ ${res.message || 'Importación completada con éxito.'}`;
+      }
+
+      await this.loadPlanAndRecipes();
+
+      setTimeout(() => {
+        this.closeImportModal();
+        textarea.value = '';
+      }, 1500);
+
+    } catch (err) {
+      if (statusEl) {
+        statusEl.style.display = 'block';
+        statusEl.style.background = 'rgba(239,68,68,0.15)';
+        statusEl.style.color = 'var(--accent-red)';
+        statusEl.textContent = `❌ Error al importar: ${err.message}`;
+      }
+    }
   }
 };
 
