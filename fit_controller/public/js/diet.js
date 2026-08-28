@@ -357,8 +357,12 @@ window.DietModule = {
   },
 
   openShoppingListModal: async function() {
+    if (window.debugLog) window.debugLog('▶️ Ejecutando DietModule.openShoppingListModal()');
     const modal = document.getElementById('modal-shopping-list');
-    if (!modal) return;
+    if (!modal) {
+      if (window.debugLog) window.debugLog('❌ ERROR: #modal-shopping-list NO encontrado');
+      return;
+    }
 
     try {
       const items = await window.apiFetch('api/diet/shopping-list');
@@ -380,17 +384,23 @@ window.DietModule = {
         }
       }
     } catch (err) {
-      console.error('Error fetching shopping list:', err);
+      if (window.debugLog) window.debugLog('❌ Error en lista compra: ' + err.message);
     }
 
     modal.style.display = 'flex';
+    modal.style.zIndex = '99999';
     modal.classList.add('active');
+    if (window.debugLog) window.debugLog('✅ Modal #modal-shopping-list desplegado');
     if (window.lucide) lucide.createIcons();
   },
 
   openCreateRecipeModal: function() {
+    if (window.debugLog) window.debugLog('▶️ Ejecutando DietModule.openCreateRecipeModal()');
     const modal = document.getElementById('modal-create-recipe');
-    if (!modal) return;
+    if (!modal) {
+      if (window.debugLog) window.debugLog('❌ ERROR: #modal-create-recipe NO encontrado');
+      return;
+    }
 
     const elEditId = document.getElementById('edit-recipe-id');
     if (elEditId) elEditId.value = '';
@@ -402,7 +412,9 @@ window.DietModule = {
     if (titleEl) titleEl.innerHTML = `<i data-lucide="utensils"></i> Crear Nuevo Plato Personalizado`;
 
     modal.style.display = 'flex';
+    modal.style.zIndex = '99999';
     modal.classList.add('active');
+    if (window.debugLog) window.debugLog('✅ Modal #modal-create-recipe desplegado con display: flex');
     if (window.lucide) lucide.createIcons();
   },
 
@@ -416,8 +428,12 @@ window.DietModule = {
   },
 
   openAssignModal: function(day = 'lunes', mealType = 'almuerzo') {
+    if (window.debugLog) window.debugLog(`▶️ Ejecutando DietModule.openAssignModal(${day}, ${mealType})`);
     const modal = document.getElementById('modal-assign-meal-to-day');
-    if (!modal) return;
+    if (!modal) {
+      if (window.debugLog) window.debugLog('❌ ERROR: #modal-assign-meal-to-day NO encontrado');
+      return;
+    }
 
     const elDay = document.getElementById('assign-meal-day');
     if (elDay) elDay.value = day || 'lunes';
@@ -428,7 +444,9 @@ window.DietModule = {
     this.populateAssignModalDropdown();
 
     modal.style.display = 'flex';
+    modal.style.zIndex = '99999';
     modal.classList.add('active');
+    if (window.debugLog) window.debugLog('✅ Modal #modal-assign-meal-to-day desplegado');
     if (window.lucide) lucide.createIcons();
   },
 

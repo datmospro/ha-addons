@@ -509,26 +509,44 @@ window.WorkoutModule = {
   },
 
   openCreateRoutineModal: function() {
+    if (window.debugLog) window.debugLog('▶️ Ejecutando WorkoutModule.openCreateRoutineModal()');
     const modal = document.getElementById('modal-create-routine');
-    if (!modal) return;
-    document.getElementById('routine-edit-id').value = '';
+    if (!modal) {
+      if (window.debugLog) window.debugLog('❌ ERROR: #modal-create-routine NO encontrado');
+      return;
+    }
+    const editId = document.getElementById('routine-edit-id');
+    if (editId) editId.value = '';
     const form = document.getElementById('form-create-routine');
     if (form) form.reset();
-    document.getElementById('modal-routine-title-text').textContent = 'Crear Nueva Rutina';
+    const title = document.getElementById('modal-routine-title-text');
+    if (title) title.textContent = 'Crear Nueva Rutina';
+
     modal.style.display = 'flex';
+    modal.style.zIndex = '99999';
     modal.classList.add('active');
+    if (window.debugLog) window.debugLog('✅ Modal #modal-create-routine desplegado con display: flex y zIndex: 99999');
     if (window.lucide) lucide.createIcons();
   },
 
   openCreateExerciseModal: function() {
+    if (window.debugLog) window.debugLog('▶️ Ejecutando WorkoutModule.openCreateExerciseModal()');
     const modal = document.getElementById('modal-create-exercise');
-    if (!modal) return;
-    document.getElementById('edit-ex-id').value = '';
+    if (!modal) {
+      if (window.debugLog) window.debugLog('❌ ERROR: #modal-create-exercise NO encontrado');
+      return;
+    }
+    const editExId = document.getElementById('edit-ex-id');
+    if (editExId) editExId.value = '';
     const form = document.getElementById('form-create-exercise');
     if (form) form.reset();
-    document.getElementById('modal-create-exercise-title').innerHTML = `<i data-lucide="dumbbell"></i> Crear Ejercicio Personalizado`;
+    const title = document.getElementById('modal-create-exercise-title');
+    if (title) title.innerHTML = `<i data-lucide="dumbbell"></i> Crear Ejercicio Personalizado`;
+
     modal.style.display = 'flex';
+    modal.style.zIndex = '99999';
     modal.classList.add('active');
+    if (window.debugLog) window.debugLog('✅ Modal #modal-create-exercise desplegado con display: flex y zIndex: 99999');
     if (window.lucide) lucide.createIcons();
   },
 
