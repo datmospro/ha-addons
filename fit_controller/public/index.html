@@ -381,7 +381,7 @@
 
       <!-- Sidebar: Next exercise preview & Music Widget -->
       <div class="trainer-sidebar">
-        <!-- Music Player Widget (Lazy Loaded) -->
+        <!-- Music Player Widget (Privacy-Enhanced) -->
         <div class="music-player-widget">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
             <span style="font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; color: var(--accent-orange);">
@@ -390,14 +390,27 @@
             <span style="font-size: 0.75rem; color: var(--text-muted);">YouTube Music</span>
           </div>
 
-          <select id="music-playlist-select" class="input-field" style="width: 100%; margin-bottom: 10px; font-size: 0.82rem;">
-            <option value="">-- Seleccionar Playlist de Entrenamiento --</option>
-            <option value="https://www.youtube.com/embed/videoseries?list=PL4fGSI1pDJn6jWjXda_m58fROa0hflS7R">🔥 Gym Beats & Workout Hits</option>
-            <option value="https://www.youtube.com/embed/videoseries?list=PLDISKgcnAC4Tz2F5k0f40vB3p-zO79R7w">⚡ Synthwave & Cyberpunk Motivation</option>
-            <option value="https://www.youtube.com/embed/videoseries?list=RDCLAK5uy_k6d-lV5E-W9iX_3e6aY3-S8a">🎧 Hip Hop Gym Motivation</option>
+          <select id="music-playlist-select" class="input-field" style="width: 100%; margin-bottom: 8px; font-size: 0.82rem;">
+            <option value="">-- Seleccionar Lista o Pegar Enlace --</option>
+            <option value="https://www.youtube-nocookie.com/embed/5qap5aO4i9A">🔥 Workout Beats 24/7 (Lofi & Chill)</option>
+            <option value="https://www.youtube-nocookie.com/embed/jfKfPfyJRdk">⚡ Lofi Hip Hop Radio 24/7</option>
+            <option value="https://www.youtube-nocookie.com/embed/videoseries?list=PL4fGSI1pDJn6jWjXda_m58fROa0hflS7R">🎧 Gym Motivation Playlist</option>
           </select>
 
-          <iframe id="music-iframe" style="width: 100%; height: 160px; border-radius: 10px; border: none; display: none;" src="about:blank" allow="autoplay"></iframe>
+          <div style="display: flex; gap: 6px; margin-bottom: 10px;">
+            <input type="text" id="music-custom-url" class="input-field" placeholder="Pegar enlace/ID de YouTube..." style="flex: 1; font-size: 0.78rem; padding: 6px 10px;">
+            <button class="btn btn-secondary" id="btn-play-custom-music" style="font-size: 0.78rem; padding: 6px 10px;">
+              <i data-lucide="play" style="width: 12px; height: 12px;"></i>
+            </button>
+          </div>
+
+          <iframe id="music-iframe" 
+            style="width: 100%; height: 160px; border-radius: 10px; border: none; display: none;" 
+            src="about:blank" 
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+            referrerpolicy="strict-origin-when-cross-origin"
+            allowfullscreen>
+          </iframe>
         </div>
 
         <!-- Upcoming exercises list -->
