@@ -604,14 +604,17 @@
   </div>
 
   <!-- MODAL: SHOPPING LIST -->
-  <div class="trainer-overlay" id="modal-shopping-list" style="background: rgba(0,0,0,0.8);">
-    <div class="card" style="max-width: 550px; margin: auto; width: 90%; max-height: 80vh; display: flex; flex-direction: column;">
-      <div class="card-header">
-        <h3 class="card-title"><i data-lucide="shopping-bag"></i> Lista Consolidada de la Compra</h3>
+  <div class="trainer-overlay" id="modal-shopping-list" style="background: rgba(0,0,0,0.85); z-index: 99999; backdrop-filter: blur(10px);">
+    <div class="card" style="max-width: 580px; margin: auto; width: 92%; max-height: 85vh; display: flex; flex-direction: column;">
+      <div class="card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 14px;">
+        <div>
+          <h3 class="card-title"><i data-lucide="shopping-bag" style="color: var(--primary);"></i> Lista Consolidada de la Compra</h3>
+          <p class="text-muted" style="font-size: 0.8rem; margin-top: 2px;" id="shopping-list-subtitle">Acumulado total de ingredientes multiplicados por las personas del plan semanal</p>
+        </div>
         <button class="btn btn-secondary" id="btn-close-shopping-list" style="padding: 6px 10px;"><i data-lucide="x"></i></button>
       </div>
 
-      <div id="shopping-list-content" style="flex: 1; overflow-y: auto; padding-right: 8px;">
+      <div id="shopping-list-content" style="flex: 1; overflow-y: auto; padding-right: 4px;">
         <!-- Populated via JS -->
       </div>
     </div>
@@ -1065,10 +1068,10 @@
   </div>
 
   <!-- JavaScript Modules -->
-  <script src="js/app.js?v=1.4.2"></script>
-  <script src="js/diet.js?v=1.4.2"></script>
-  <script src="js/workout.js?v=1.4.2"></script>
-  <script src="js/trainer.js?v=1.4.2"></script>
-  <script src="js/music.js?v=1.4.2"></script>
+  <script src="js/app.js?v=1.4.3"></script>
+  <script src="js/diet.js?v=1.4.3"></script>
+  <script src="js/workout.js?v=1.4.3"></script>
+  <script src="js/trainer.js?v=1.4.3"></script>
+  <script src="js/music.js?v=1.4.3"></script>
 </body>
 </html>

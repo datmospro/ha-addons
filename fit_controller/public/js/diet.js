@@ -370,22 +370,30 @@ window.DietModule = {
     const modal = document.getElementById('modal-shopping-list');
     if (!modal) return;
 
+    const peopleCount = (window.FitApp && window.FitApp.peopleCount) || 1;
+    const subEl = document.getElementById('shopping-list-subtitle');
+    if (subEl) {
+      subEl.textContent = `Ingredientes totales acumulados para la semana (${peopleCount} ${peopleCount === 1 ? 'persona' : 'personas'})`;
+    }
+
     try {
       const items = await window.apiFetch('api/diet/shopping-list');
       const container = document.getElementById('shopping-list-content');
       if (container) {
         if (!items || items.length === 0) {
-          container.innerHTML = '<p class="text-muted" style="padding: 16px;">No hay ingredientes asignados en el plan semanal.</p>';
+          container.innerHTML = '<p class="text-muted" style="padding: 20px; text-align: center;">No hay ingredientes asignados en el plan semanal.</p>';
         } else {
           container.innerHTML = `
-            <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; flex-direction: column; gap: 8px;">
               ${items.map(item => `
-                <li style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); border-radius: 8px;">
-                  <span style="font-weight: 700; color: #fff; font-size: 0.9rem;">${item.name}</span>
-                  <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--primary); font-weight: 800; font-size: 0.82rem; padding: 4px 10px;">${item.displayAmount}</span>
-                </li>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(15,23,42,0.85); border: 1px solid var(--border-color); border-radius: 10px;">
+                  <span style="font-weight: 700; color: #fff; font-size: 0.92rem;">${item.name}</span>
+                  <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--primary); font-weight: 900; font-size: 0.88rem; padding: 5px 12px; border-radius: 8px;">
+                    ${item.displayAmount}
+                  </span>
+                </div>
               `).join('')}
-            </ul>
+            </div>
           `;
         }
       }
