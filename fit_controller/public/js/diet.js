@@ -501,54 +501,244 @@ window.DietModule = {
     }
   },
 
-  openDayMealDetailsModal: function(dayKey) {
+  openDayMealDetailsModal: function(dayKey, defaultActiveMealType = null) {
     const modal = document.getElementById('modal-day-meal-details');
     if (!modal) return;
 
+    this.currentDayKey = dayKey;
+
+    // Sync people count selector inside modal
+    const peopleCount = (window.FitApp && window.FitApp.peopleCount) || 1;
+    const modalSelect = document.getElementById('modal-people-count-select');
+    if (modalSelect) modalSelect.value = String(peopleCount);
+
     const dayData = (this.currentPlanData && this.currentPlanData[dayKey]) ? this.currentPlanData[dayKey] : null;
 
-    const peopleCount = (window.FitApp && window.FitApp.peopleCount) || 1;
-    document.getElementById('day-details-title').innerHTML = `<i data-lucide="utensils"></i> Menú Completo del ${dayKey.toUpperCase()}`;
-    document.getElementById('day-details-subtitle').textContent = dayData ? `Total del Día: ${dayData.totalsPerPerson.kcal} kcal/persona | Ingredientes multiplicados para ${peopleCount} ${peopleCount === 1 ? 'persona' : 'personas'}` : 'Sin datos';
+    const dayTitleEl = document.getElementById('day-details-title');
+    const daySubtitleEl = document.getElementById('day-details-subtitle');
 
-    const grid = document.getElementById('day-meal-details-grid');
+    if (dayTitleEl) dayTitleEl.innerHTML = `<i data-lucide="utensils" style="color: var(--primary);"></i> Menú Completo del ${dayKey.toUpperCase()}`;
+    if (daySubtitleEl) {
+      daySubtitleEl.textContent = dayData 
+        ? `Total del Día: ${dayData.totalsPerPerson.kcal} kcal/persona (${dayData.totalsPerPerson.protein}g P | ${dayData.totalsPerPerson.carbs}g C | ${dayData.totalsPerPerson.fat}g G)`
+        : 'Sin platos asignados a este día';
+    }
+
+    const tabsBar = document.getElementById('day-meal-tabs-bar');
+    const contentArea = document.getElementById('day-meal-tab-content');
+
     if (!dayData || !dayData.meals || dayData.meals.length === 0) {
-      grid.innerHTML = `<p class="text-muted" style="padding: 16px;">No hay platos asignados a este día aún.</p>`;
+      if (tabsBar) tabsBar.innerHTML = '';
+      if (contentArea) {
+        contentArea.innerHTML = `
+          <div style="text-align: center; padding: 40px 16px;">
+            <i data-lucide="utensils-crossed" style="width: 48px; height: 48px; color: var(--text-muted); opacity: 0.5; margin-bottom: 12px;"></i>
+            <h4 style="font-size: 1.1rem; color: #fff;">No hay comidas asignadas al ${dayKey.toUpperCase()}</h4>
+            <p class="text-muted" style="font-size: 0.85rem; margin-top: 6px;">Asigna platos al menú semanal usando el botón "Asignar Plato a Plan".</p>
+            <button class="btn btn-primary" onclick="window.DietModule.closeDayMealDetailsModal(); window.DietModule.openAssignModal('${dayKey}', 'almuerzo');" style="margin-top: 16px;">
+              <i data-lucide="plus-circle"></i> Asignar Plato Ahora
+            </button>
+          </div>
+        `;
+      }
     } else {
-      grid.innerHTML = dayData.meals.map(m => `
-        <div style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--primary); text-transform: uppercase; font-size: 0.75rem; font-weight: 800;">
-              ${m.meal_type}
-            </span>
-            <span style="font-size: 0.82rem; font-weight: 800; color: var(--accent-orange);">
-              ${m.perPerson.kcal} kcal / persona
-            </span>
-          </div>
+      // Order meals chronologically: Desayuno, Almuerzo, Merienda, Cena, Snack
+      const mealOrder = ['desayuno', 'almuerzo', 'merienda', 'cena', 'snack'];
+      const sortedMeals = [...dayData.meals].sort((a, b) => {
+        const indexA = mealOrder.indexOf((a.meal_type || '').toLowerCase());
+        const indexB = mealOrder.indexOf((b.meal_type || '').toLowerCase());
+        return (indexA === -1 ? 99 : indexA) - (indexB === -1 ? 99 : indexB);
+      });
 
-          <h4 style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 8px;">${m.recipe_title}</h4>
+      // Determine active meal
+      let activeMeal = null;
+      if (defaultActiveMealType) {
+        activeMeal = sortedMeals.find(m => (m.meal_type || '').toLowerCase() === defaultActiveMealType.toLowerCase());
+      }
+      if (!activeMeal) {
+        activeMeal = sortedMeals[0];
+      }
 
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 12px;">
-            <div>
-              <span style="font-size: 0.8rem; font-weight: 700; color: var(--primary);">Ingredientes (${peopleCount} pers.):</span>
-              <ul style="font-size: 0.82rem; color: #e2e8f0; padding-left: 16px; margin-top: 4px;">
-                ${(m.ingredients || []).map(ing => `<li><strong>${ing.scaledAmount} ${ing.unit}</strong> ${ing.name}</li>`).join('')}
-              </ul>
-            </div>
-            <div>
-              <span style="font-size: 0.8rem; font-weight: 700; color: var(--accent-cyan);">Instrucciones de Prep.:</span>
-              <ol style="font-size: 0.8rem; color: var(--text-muted); padding-left: 16px; margin-top: 4px;">
-                ${(m.instructions || []).map(ins => `<li>${ins}</li>`).join('')}
-              </ol>
-            </div>
-          </div>
-        </div>
-      `).join('');
+      // Render Tabs Bar
+      if (tabsBar) {
+        tabsBar.innerHTML = sortedMeals.map(m => {
+          const isActive = activeMeal && m.id === activeMeal.id;
+          const typeUpper = (m.meal_type || 'COMIDA').toUpperCase();
+          const kcal = m.perPerson ? m.perPerson.kcal : 0;
+
+          return `
+            <button type="button" 
+                    onclick="window.DietModule.selectMealTab('${m.meal_type}')"
+                    class="btn ${isActive ? 'btn-primary' : 'btn-secondary'}"
+                    style="font-size: 0.82rem; padding: 8px 14px; font-weight: 700; white-space: nowrap; ${isActive ? 'box-shadow: 0 0 14px var(--primary-glow);' : 'opacity: 0.85;'}">
+              <span>${typeUpper}</span>
+              <span class="badge" style="background: ${isActive ? 'rgba(0,0,0,0.2)' : 'rgba(16,185,129,0.15)'}; color: ${isActive ? '#000' : 'var(--primary)'}; font-size: 0.72rem; font-weight: 800; padding: 2px 6px;">
+                ${kcal} kcal
+              </span>
+            </button>
+          `;
+        }).join('');
+      }
+
+      // Render Active Meal Content
+      this.renderDayMealTabContent(activeMeal, dayKey, peopleCount);
     }
 
     modal.style.display = 'flex';
+    modal.style.zIndex = '99999';
     modal.classList.add('active');
     if (window.lucide) lucide.createIcons();
+  },
+
+  selectMealTab: function(mealType) {
+    if (this.currentDayKey) {
+      this.openDayMealDetailsModal(this.currentDayKey, mealType);
+    }
+  },
+
+  changeModalPeopleCount: async function(newCount) {
+    const count = parseInt(newCount, 10) || 1;
+    this.peopleCount = count;
+    if (window.FitApp) window.FitApp.peopleCount = count;
+
+    try {
+      await window.apiFetch('api/diet/people-count', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ people_count: count })
+      });
+      await this.loadPlan();
+      if (this.currentDayKey) {
+        this.openDayMealDetailsModal(this.currentDayKey);
+      }
+    } catch (err) {
+      console.error('Error changing people count:', err);
+    }
+  },
+
+  closeDayMealDetailsModal: function() {
+    const modal = document.getElementById('modal-day-meal-details');
+    if (modal) {
+      modal.style.display = 'none';
+      modal.classList.remove('active');
+    }
+  },
+
+  renderDayMealTabContent: function(meal, dayKey, peopleCount) {
+    const contentArea = document.getElementById('day-meal-tab-content');
+    if (!contentArea || !meal) return;
+
+    const perPerson = meal.perPerson || { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+    const scaledTotal = meal.scaledTotal || { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+    const ingredients = meal.ingredients || [];
+    const instructions = meal.instructions || [];
+
+    contentArea.innerHTML = `
+      <div style="background: rgba(15,23,42,0.85); border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+        
+        <!-- Header Info -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+              <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--primary); text-transform: uppercase; font-size: 0.78rem; font-weight: 900; padding: 4px 10px;">
+                ${(meal.meal_type || 'COMIDA').toUpperCase()}
+              </span>
+              <span class="text-muted" style="font-size: 0.8rem;">
+                <i data-lucide="clock" style="width: 13px; height: 13px;"></i> Prep: ${meal.prep_time_min || 15} min
+              </span>
+            </div>
+            <h3 style="font-size: 1.35rem; font-weight: 800; color: #fff; line-height: 1.2;">${meal.recipe_title}</h3>
+          </div>
+
+          <!-- Actions -->
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary" onclick="window.DietModule.openAssignModal('${dayKey}', '${meal.meal_type}')" style="font-size: 0.8rem; padding: 8px 12px;">
+              <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Cambiar Plato
+            </button>
+            <button class="btn btn-secondary" onclick="window.DietModule.removeMealAndRefresh(${meal.id})" style="font-size: 0.8rem; padding: 8px 12px; color: var(--accent-red); border-color: rgba(239,68,68,0.3);" title="Quitar de este día">
+              <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Quitar
+            </button>
+          </div>
+        </div>
+
+        <!-- Macro Summary Pills -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; background: rgba(0,0,0,0.25); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);">
+          <div style="text-align: center;">
+            <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Calorías (1 pers.)</span>
+            <div style="font-size: 1.15rem; font-weight: 900; color: var(--accent-orange);">${perPerson.kcal} <span style="font-size: 0.75rem;">kcal</span></div>
+            ${peopleCount > 1 ? `<span style="font-size: 0.68rem; color: var(--text-muted);">Total (${peopleCount}p): ${scaledTotal.kcal} kcal</span>` : ''}
+          </div>
+
+          <div style="text-align: center;">
+            <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Proteínas</span>
+            <div style="font-size: 1.15rem; font-weight: 900; color: var(--primary);">${perPerson.protein} <span style="font-size: 0.75rem;">g</span></div>
+            ${peopleCount > 1 ? `<span style="font-size: 0.68rem; color: var(--text-muted);">Total (${peopleCount}p): ${scaledTotal.protein}g</span>` : ''}
+          </div>
+
+          <div style="text-align: center;">
+            <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Carbohidratos</span>
+            <div style="font-size: 1.15rem; font-weight: 900; color: var(--accent-cyan);">${perPerson.carbs} <span style="font-size: 0.75rem;">g</span></div>
+            ${peopleCount > 1 ? `<span style="font-size: 0.68rem; color: var(--text-muted);">Total (${peopleCount}p): ${scaledTotal.carbs}g</span>` : ''}
+          </div>
+
+          <div style="text-align: center;">
+            <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Grasas</span>
+            <div style="font-size: 1.15rem; font-weight: 900; color: var(--accent-yellow);">${perPerson.fat} <span style="font-size: 0.75rem;">g</span></div>
+            ${peopleCount > 1 ? `<span style="font-size: 0.68rem; color: var(--text-muted);">Total (${peopleCount}p): ${scaledTotal.fat}g</span>` : ''}
+          </div>
+        </div>
+
+        <!-- Ingredients & Instructions Split View -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; margin-top: 6px;">
+          
+          <!-- Ingredients Box -->
+          <div style="background: rgba(16,185,129,0.05); border: 1px solid rgba(16,185,129,0.2); border-radius: 12px; padding: 14px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+              <i data-lucide="shopping-basket" style="color: var(--primary); width: 18px; height: 18px;"></i>
+              <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--primary);">
+                Ingredientes (${peopleCount} ${peopleCount === 1 ? 'persona' : 'personas'})
+              </h4>
+            </div>
+            ${ingredients.length === 0 ? '<p class="text-muted" style="font-size: 0.8rem;">Sin ingredientes detallados.</p>' : `
+              <ul style="font-size: 0.85rem; color: #e2e8f0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 6px;">
+                ${ingredients.map(ing => `
+                  <li style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: rgba(15,23,42,0.6); border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);">
+                    <span>${ing.name}</span>
+                    <strong style="color: var(--primary); font-size: 0.88rem;">${ing.scaledAmount} ${ing.unit || ''}</strong>
+                  </li>
+                `).join('')}
+              </ul>
+            `}
+          </div>
+
+          <!-- Instructions Box -->
+          <div style="background: rgba(6,182,212,0.05); border: 1px solid rgba(6,182,212,0.2); border-radius: 12px; padding: 14px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+              <i data-lucide="chef-hat" style="color: var(--accent-cyan); width: 18px; height: 18px;"></i>
+              <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--accent-cyan);">Instrucciones de Preparación</h4>
+            </div>
+            ${instructions.length === 0 ? '<p class="text-muted" style="font-size: 0.8rem;">Sin instrucciones registradas.</p>' : `
+              <ol style="font-size: 0.83rem; color: #cbd5e1; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; line-height: 1.4;">
+                ${instructions.map(ins => `<li>${ins}</li>`).join('')}
+              </ol>
+            `}
+          </div>
+
+        </div>
+
+      </div>
+    `;
+
+    if (window.lucide) lucide.createIcons();
+  },
+
+  removeMealAndRefresh: async function(mealId) {
+    try {
+      await this.removeMeal(mealId);
+      if (this.currentDayKey) {
+        this.openDayMealDetailsModal(this.currentDayKey);
+      }
+    } catch (e) {}
   },
 
   updateDashboardMacros: function() {
