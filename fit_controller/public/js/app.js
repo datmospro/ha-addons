@@ -68,6 +68,8 @@ window.FitApp = {
 
   bindPeopleScaler: function() {
     const scalerSelect = document.getElementById('global-people-scaler');
+    if (!scalerSelect) return;
+
     scalerSelect.addEventListener('change', async (e) => {
       this.peopleCount = parseInt(e.target.value, 10);
       
@@ -92,7 +94,9 @@ window.FitApp = {
       this.currentProfile = data;
       this.peopleCount = data.default_people_count || 1;
 
-      document.getElementById('global-people-scaler').value = this.peopleCount;
+      const scalerSelect = document.getElementById('global-people-scaler');
+      if (scalerSelect) scalerSelect.value = this.peopleCount;
+
       this.renderDashboardProfile();
     } catch (err) {
       console.error('Error loading profile:', err);
@@ -103,25 +107,35 @@ window.FitApp = {
     if (!this.currentProfile) return;
     const p = this.currentProfile;
 
-    document.getElementById('dash-kcal-target').textContent = `${p.daily_kcal_target.toLocaleString()} kcal`;
-    document.getElementById('dash-tdee-info').textContent = `Peso: ${p.weight_kg}kg | Déficit: ${p.weekly_weight_loss_kg}kg/sem`;
-    document.getElementById('dash-current-weight').textContent = `${p.weight_kg.toFixed(1)} kg`;
-    document.getElementById('dash-target-weight').textContent = `→ Meta: ${p.target_weight_kg.toFixed(1)} kg`;
-    document.getElementById('dash-weekly-rate').textContent = `Ritmo: -${p.weekly_weight_loss_kg} kg por semana`;
+    const setTxt = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    };
 
-    document.getElementById('macro-txt-kcal').textContent = `0 / ${p.daily_kcal_target} kcal`;
-    document.getElementById('macro-txt-protein').textContent = `0 / ${p.daily_protein_target} g`;
-    document.getElementById('macro-txt-carbs').textContent = `0 / ${p.daily_carbs_target} g`;
-    document.getElementById('macro-txt-fat').textContent = `0 / ${p.daily_fat_target} g`;
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val !== undefined && val !== null ? val : '';
+    };
 
-    // Populate modal inputs
-    document.getElementById('prof-age').value = p.age;
-    document.getElementById('prof-gender').value = p.gender;
-    document.getElementById('prof-weight').value = p.weight_kg;
-    document.getElementById('prof-height').value = p.height_cm;
-    document.getElementById('prof-target-weight').value = p.target_weight_kg;
-    document.getElementById('prof-rate').value = p.weekly_weight_loss_kg;
-    document.getElementById('prof-activity').value = p.activity_level;
+    setTxt('dash-kcal-target', `${(p.daily_kcal_target || 1850).toLocaleString()} kcal`);
+    setTxt('dash-tdee-info', `Peso: ${p.weight_kg || 80}kg | Déficit: ${p.weekly_weight_loss_kg || 0.5}kg/sem`);
+    setTxt('dash-current-weight', `${p.weight_kg ? Number(p.weight_kg).toFixed(1) : '80.0'} kg`);
+    setTxt('dash-target-weight', `→ Meta: ${p.target_weight_kg ? Number(p.target_weight_kg).toFixed(1) : '70.0'} kg`);
+    setTxt('dash-weekly-rate', `Ritmo: -${p.weekly_weight_loss_kg || 0.5} kg por semana`);
+
+    setTxt('macro-txt-kcal', `0 / ${p.daily_kcal_target || 1850} kcal`);
+    setTxt('macro-txt-protein', `0 / ${p.daily_protein_target || 140} g`);
+    setTxt('macro-txt-carbs', `0 / ${p.daily_carbs_target || 160} g`);
+    setTxt('macro-txt-fat', `0 / ${p.daily_fat_target || 55} g`);
+
+    // Populate modal inputs safely
+    setVal('prof-age', p.age);
+    setVal('prof-gender', p.gender);
+    setVal('prof-weight', p.weight_kg);
+    setVal('prof-height', p.height_cm);
+    setVal('prof-target-weight', p.target_weight_kg);
+    setVal('prof-rate', p.weekly_weight_loss_kg);
+    setVal('prof-activity', p.activity_level);
   },
 
   bindProfileEvents: function() {
@@ -141,33 +155,45 @@ window.FitApp = {
       });
     }
 
-    document.getElementById('form-profile-settings').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const body = {
-        age: document.getElementById('prof-age').value,
-        gender: document.getElementById('prof-gender').value,
-        weight_kg: document.getElementById('prof-weight').value,
-        height_cm: document.getElementById('prof-height').value,
-        target_weight_kg: document.getElementById('prof-target-weight').value,
-        weekly_weight_loss_kg: document.getElementById('prof-rate').value,
-        activity_level: document.getElementById('prof-activity').value
-      };
+    const formProfile = document.getElementById('form-profile-settings');
+    if (formProfile) {
+      formProfile.addEventListener('submit', async (e) => {
+        e.preventDefault();
 
-      try {
-        const updated = await window.apiFetch('api/profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
-        });
-        this.currentProfile = updated;
-        this.renderDashboardProfile();
-        modal.style.display = 'none';
-        modal.classList.remove('active');
-        if (window.DietModule) window.DietModule.loadPlan();
-      } catch (err) {
-        alert('Error al guardar el perfil: ' + err.message);
-      }
-    });
+        const parseNum = (val) => {
+          if (typeof val === 'string') val = val.replace(',', '.');
+          const p = parseFloat(val);
+          return isNaN(p) ? null : p;
+        };
+
+        const body = {
+          age: parseNum(document.getElementById('prof-age').value),
+          gender: document.getElementById('prof-gender').value,
+          weight_kg: parseNum(document.getElementById('prof-weight').value),
+          height_cm: parseNum(document.getElementById('prof-height').value),
+          target_weight_kg: parseNum(document.getElementById('prof-target-weight').value),
+          weekly_weight_loss_kg: parseNum(document.getElementById('prof-rate').value),
+          activity_level: document.getElementById('prof-activity').value
+        };
+
+        try {
+          const updated = await window.apiFetch('api/profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          this.currentProfile = updated;
+          this.renderDashboardProfile();
+          if (modal) {
+            modal.style.display = 'none';
+            modal.classList.remove('active');
+          }
+          if (window.DietModule) window.DietModule.loadPlan();
+        } catch (err) {
+          alert('Error al guardar el perfil: ' + err.message);
+        }
+      });
+    }
   }
 };
 

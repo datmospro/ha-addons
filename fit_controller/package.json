@@ -1,6 +1,6 @@
 {
   "name": "fit-controller",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "description": "Control de dieta para adelgazar, planificador semanal de comidas con macros, rutinas de ejercicios con animaciones, entrenador guiado y reproductor de música.",
   "main": "server.js",
   "scripts": {
