@@ -2,15 +2,45 @@ const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
 
-const dbPath = process.env.DB_PATH || (fs.existsSync('/data') ? '/data/fitcontroller.db' : path.join(__dirname, 'fitcontroller.db'));
+// Permanent backup directory in Home Assistant config volume
+const configBackupDir = '/config/fit_controller';
+if (fs.existsSync('/config') && !fs.existsSync(configBackupDir)) {
+  try { fs.mkdirSync(configBackupDir, { recursive: true }); } catch (e) {}
+}
 
+let dbPath = process.env.DB_PATH || (fs.existsSync('/data') ? '/data/fitcontroller.db' : path.join(__dirname, 'fitcontroller.db'));
 const dbDir = path.dirname(dbPath);
+
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
+// Restore database from permanent /config backup if /data DB is missing or fresh
+const backupDbFile = path.join(configBackupDir, 'fitcontroller.db');
+if (!fs.existsSync(dbPath) && fs.existsSync(backupDbFile)) {
+  try {
+    fs.copyFileSync(backupDbFile, dbPath);
+    console.log(`[PERSISTENCE] Restored fitcontroller.db from ${backupDbFile}`);
+  } catch (e) {
+    console.error(`[PERSISTENCE] Failed to restore DB from backup:`, e);
+  }
+}
+
 console.log(`Initializing FitController database at: ${dbPath}`);
 const db = new DatabaseSync(dbPath);
+
+function backupDb() {
+  if (fs.existsSync('/config') && fs.existsSync(dbPath)) {
+    try {
+      if (!fs.existsSync(configBackupDir)) {
+        fs.mkdirSync(configBackupDir, { recursive: true });
+      }
+      fs.copyFileSync(dbPath, backupDbFile);
+    } catch (e) {
+      console.error(`[PERSISTENCE] Error backing up database to /config:`, e);
+    }
+  }
+}
 
 function initDb() {
   // 1. User Profile table
@@ -390,5 +420,6 @@ function seedDefaultData() {
 
 module.exports = {
   db,
-  initDb
+  initDb,
+  backupDb
 };

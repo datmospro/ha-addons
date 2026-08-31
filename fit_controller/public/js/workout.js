@@ -178,11 +178,12 @@ window.WorkoutModule = {
   },
 
   getAnimationGraphicHtml: function(ex) {
-    if (ex.animation_url && ex.animation_url.trim().length > 5) {
+    if (ex.animation_url && ex.animation_url.trim().length > 3) {
       const url = ex.animation_url.trim();
+      const urlLower = url.toLowerCase();
       
-      // If the URL is an MP4 video (like GymVisual .mp4 links), render an HTML5 autoplay loop video tag!
-      if (url.toLowerCase().endsWith('.mp4') || url.toLowerCase().includes('.mp4') || url.includes('/vid/')) {
+      // If the URL is an MP4 video or uploaded video file, render an HTML5 video tag!
+      if (urlLower.endsWith('.mp4') || urlLower.endsWith('.webm') || urlLower.includes('.mp4') || urlLower.includes('/vid/') || urlLower.includes('/uploads/')) {
         return `
           <video src="${url}" autoplay loop muted playsinline style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px;">
             Tu navegador no soporta vídeo HTML5.
@@ -191,7 +192,7 @@ window.WorkoutModule = {
       }
       
       // Standard image/GIF tag
-      return `<img src="${url}" alt="${ex.name}" onerror="this.onerror=null; this.parentNode.innerHTML=window.WorkoutModule.getSvgFallbackHtml('${ex.animation_data || ex.muscle_group}');">`;
+      return `<img src="${url}" alt="${ex.name}" style="max-width: 100%; max-height: 100%; object-fit: contain;" onerror="this.onerror=null; this.parentNode.innerHTML=window.WorkoutModule.getSvgFallbackHtml('${ex.animation_data || ex.muscle_group}');">`;
     }
     return this.getSvgFallbackHtml(ex.animation_data || ex.muscle_group);
   },
@@ -793,6 +794,59 @@ window.WorkoutModule = {
     } catch (err) {
       console.error('Error loading history:', err);
     }
+  },
+
+  handleVideoFileUpload: function(event) {
+    const file = event.target.files && event.target.files[0];
+    const statusEl = document.getElementById('ex-upload-status');
+    const urlInput = document.getElementById('new-ex-anim-url');
+
+    if (!file) return;
+
+    if (statusEl) {
+      statusEl.style.color = 'var(--accent-yellow)';
+      statusEl.textContent = '⏳ Subiendo vídeo MP4 al servidor...';
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64Data = e.target.result;
+
+      try {
+        const res = await window.apiFetch('api/upload-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: file.name,
+            base64: base64Data
+          })
+        });
+
+        if (res && res.url) {
+          if (urlInput) urlInput.value = res.url;
+          if (statusEl) {
+            statusEl.style.color = 'var(--primary)';
+            statusEl.textContent = `✅ Vídeo guardado correctamente: ${res.filename}`;
+          }
+        } else {
+          throw new Error(res.error || 'Respuesta de subida no válida');
+        }
+      } catch (err) {
+        if (statusEl) {
+          statusEl.style.color = 'var(--accent-red)';
+          statusEl.textContent = `❌ Error al subir vídeo: ${err.message}`;
+        }
+      }
+    };
+
+    reader.onerror = () => {
+      if (statusEl) {
+        statusEl.style.color = 'var(--accent-red)';
+        statusEl.textContent = '❌ Error al leer el archivo en el navegador.';
+      }
+    };
+
+    reader.readAsDataURL(file);
   }
 };
 

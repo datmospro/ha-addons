@@ -1,7 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { db, initDb } = require('./database');
+const fs = require('fs');
+const { db, initDb, backupDb } = require('./database');
 const { searchLocalRecipes, searchExternalRecipes } = require('./recipe_engine');
 
 // Initialize SQLite DB
@@ -10,8 +11,25 @@ initDb();
 const app = express();
 const PORT = process.env.PORT || 8099;
 
+// Ensure persistent uploads directories exist
+const dataUploadsDir = fs.existsSync('/data') ? '/data/uploads' : path.join(__dirname, 'public', 'uploads');
+const configUploadsDir = '/config/fit_controller/uploads';
+
+[dataUploadsDir, path.join(dataUploadsDir, 'videos'), configUploadsDir, path.join(configUploadsDir, 'videos')].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+  }
+});
+
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
+
+// Serve uploaded video and image files statically
+app.use('/uploads', express.static(dataUploadsDir));
+if (fs.existsSync(configUploadsDir)) {
+  app.use('/uploads', express.static(configUploadsDir));
+}
 
 // Disable browser caching for HA Ingress webview
 app.use((req, res, next) => {
@@ -22,6 +40,46 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public'), { etag: false, maxAge: 0 }));
+
+// Endpoint: Upload custom exercise MP4 video or animation file
+app.post('/api/upload-video', (req, res) => {
+  try {
+    const { filename, base64 } = req.body;
+    if (!filename || !base64) {
+      return res.status(400).json({ error: 'Filename y base64 son requeridos' });
+    }
+
+    const matches = base64.match(/^data:(video\/[a-zA-Z0-9]+|image\/[a-zA-Z0-9]+);base64,(.+)$/);
+    let fileBuffer;
+    if (matches) {
+      fileBuffer = Buffer.from(matches[2], 'base64');
+    } else {
+      fileBuffer = Buffer.from(base64, 'base64');
+    }
+
+    const safeName = filename.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const finalName = `${Date.now()}_${safeName}`;
+
+    // Write to primary data directory
+    const primaryVideoPath = path.join(dataUploadsDir, 'videos', finalName);
+    fs.writeFileSync(primaryVideoPath, fileBuffer);
+
+    // Mirror write to persistent /config/fit_controller backup directory
+    if (fs.existsSync('/config')) {
+      try {
+        const backupVideoPath = path.join(configUploadsDir, 'videos', finalName);
+        fs.writeFileSync(backupVideoPath, fileBuffer);
+      } catch (e) {
+        console.error('[PERSISTENCE] Error saving video backup to /config:', e);
+      }
+    }
+
+    const publicUrl = `/uploads/videos/${finalName}`;
+    res.json({ success: true, url: publicUrl, filename: finalName });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Helper to compute TDEE & macro targets for weight loss
 function calculateMacros(profile) {
@@ -122,6 +180,7 @@ app.post('/api/profile', (req, res) => {
     );
 
     const result = db.prepare(`SELECT * FROM user_profile WHERE id = 1`).get();
+    backupDb();
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
