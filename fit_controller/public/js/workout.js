@@ -710,12 +710,30 @@ window.WorkoutModule = {
       <option value="${e.id}">${e.name} (${e.muscle_group} - ${e.equipment})</option>
     `).join('');
 
+    if (this.exerciseCatalog.length > 0) {
+      this.updateAddExercisePreview(this.exerciseCatalog[0].id);
+    }
+
     const modal = document.getElementById('modal-add-exercise-to-routine');
     if (modal) {
       modal.style.zIndex = '2500';
       modal.style.display = 'flex';
       modal.classList.add('active');
     }
+  },
+
+  updateAddExercisePreview: function(exerciseId) {
+    const container = document.getElementById('add-ex-preview-container');
+    if (!container) return;
+
+    const ex = this.exerciseCatalog.find(e => Number(e.id) === Number(exerciseId));
+    if (!ex) {
+      container.innerHTML = '<p class="text-muted" style="font-size: 0.8rem;">Selecciona un ejercicio para ver su vídeo</p>';
+      return;
+    }
+
+    container.innerHTML = this.getAnimationGraphicHtml(ex);
+    if (window.lucide) lucide.createIcons();
   },
 
   openCreateExerciseModal: function() {

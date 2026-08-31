@@ -722,9 +722,14 @@
 
         <div>
           <label style="font-size: 0.8rem; color: var(--text-muted);">Seleccionar Ejercicio</label>
-          <select id="add-ex-select" class="input-field" style="width: 100%;" required>
+          <select id="add-ex-select" class="input-field" style="width: 100%;" onchange="window.WorkoutModule.updateAddExercisePreview(this.value)" required>
             <!-- Populated via JS -->
           </select>
+          
+          <!-- Live MP4 Video / Animation Preview Box -->
+          <div id="add-ex-preview-container" style="background: rgba(15,23,42,0.85); border: 1px solid var(--border-color); border-radius: 10px; height: 170px; display: flex; justify-content: center; align-items: center; overflow: hidden; margin-top: 8px; padding: 6px;">
+            <!-- Populated dynamically via JS -->
+          </div>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
@@ -1087,10 +1092,10 @@
   </div>
 
   <!-- JavaScript Modules -->
-  <script src="js/app.js?v=1.5.2"></script>
-  <script src="js/diet.js?v=1.5.2"></script>
-  <script src="js/workout.js?v=1.5.2"></script>
-  <script src="js/trainer.js?v=1.5.2"></script>
-  <script src="js/music.js?v=1.5.2"></script>
+  <script src="js/app.js?v=1.5.3"></script>
+  <script src="js/diet.js?v=1.5.3"></script>
+  <script src="js/workout.js?v=1.5.3"></script>
+  <script src="js/trainer.js?v=1.5.3"></script>
+  <script src="js/music.js?v=1.5.3"></script>
 </body>
 </html>
