@@ -179,13 +179,16 @@ window.WorkoutModule = {
 
   getAnimationGraphicHtml: function(ex) {
     if (ex.animation_url && ex.animation_url.trim().length > 3) {
-      const url = ex.animation_url.trim();
+      let url = ex.animation_url.trim();
+      if (url.startsWith('/')) {
+        url = url.substring(1);
+      }
       const urlLower = url.toLowerCase();
       
       // If the URL is an MP4 video or uploaded video file, render an HTML5 video tag!
-      if (urlLower.endsWith('.mp4') || urlLower.endsWith('.webm') || urlLower.includes('.mp4') || urlLower.includes('/vid/') || urlLower.includes('/uploads/')) {
+      if (urlLower.endsWith('.mp4') || urlLower.endsWith('.webm') || urlLower.includes('.mp4') || urlLower.includes('/vid/') || urlLower.includes('uploads/')) {
         return `
-          <video src="${url}" autoplay loop muted playsinline style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px;">
+          <video src="${url}" autoplay loop muted playsinline preload="auto" style="width: 100%; height: 100%; max-height: 180px; object-fit: contain; border-radius: 8px; background: rgba(0,0,0,0.5);">
             Tu navegador no soporta vídeo HTML5.
           </video>
         `;
@@ -715,6 +718,31 @@ window.WorkoutModule = {
     }
   },
 
+  openCreateExerciseModal: function() {
+    const modal = document.getElementById('modal-create-exercise');
+    if (!modal) return;
+
+    const form = document.getElementById('form-create-exercise');
+    if (form) form.reset();
+
+    const editId = document.getElementById('edit-ex-id');
+    if (editId) editId.value = '';
+
+    const title = document.getElementById('modal-create-exercise-title');
+    if (title) title.innerHTML = '<i data-lucide="dumbbell"></i> Crear Ejercicio Personalizado';
+
+    const fileInput = document.getElementById('new-ex-anim-file');
+    if (fileInput) fileInput.value = '';
+
+    const statusEl = document.getElementById('ex-upload-status');
+    if (statusEl) statusEl.textContent = '';
+
+    modal.style.zIndex = '99999';
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+    if (window.lucide) lucide.createIcons();
+  },
+
   openEditExerciseModal: function(exerciseId) {
     const ex = this.exerciseCatalog.find(e => Number(e.id) === Number(exerciseId));
     if (!ex) return;
@@ -728,6 +756,14 @@ window.WorkoutModule = {
     document.getElementById('new-ex-cadence').value = ex.cadence_sec !== undefined ? ex.cadence_sec : 3;
     document.getElementById('new-ex-isometric').checked = !!ex.is_isometric;
     document.getElementById('new-ex-prep').value = ex.prep_sec !== undefined ? ex.prep_sec : 5;
+
+    const fileInput = document.getElementById('new-ex-anim-file');
+    if (fileInput) fileInput.value = '';
+    const statusEl = document.getElementById('ex-upload-status');
+    if (statusEl) {
+      statusEl.style.color = 'var(--primary)';
+      statusEl.textContent = ex.animation_url ? `Vídeo o animación guardada: ${ex.animation_url}` : '';
+    }
 
     document.getElementById('modal-create-exercise-title').innerHTML = `<i data-lucide="edit-3"></i> Editar Ejercicio: ${ex.name}`;
     const modalCreateEx = document.getElementById('modal-create-exercise');

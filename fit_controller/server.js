@@ -74,7 +74,7 @@ app.post('/api/upload-video', (req, res) => {
       }
     }
 
-    const publicUrl = `/uploads/videos/${finalName}`;
+    const publicUrl = `uploads/videos/${finalName}`;
     res.json({ success: true, url: publicUrl, filename: finalName });
   } catch (err) {
     res.status(500).json({ error: err.message });
