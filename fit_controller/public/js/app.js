@@ -161,6 +161,7 @@ window.FitApp = {
         });
         this.currentProfile = updated;
         this.renderDashboardProfile();
+        modal.style.display = 'none';
         modal.classList.remove('active');
         if (window.DietModule) window.DietModule.loadPlan();
       } catch (err) {
