@@ -805,13 +805,17 @@ app.put('/api/workout/routine-exercises/reorder', (req, res) => {
     }
 
     const updateStmt = db.prepare(`UPDATE routine_exercises SET order_index = ? WHERE id = ? AND routine_id = ?`);
-    const updateMany = db.transaction((ids) => {
-      ids.forEach((id, index) => {
+    db.exec('BEGIN');
+    try {
+      ordered_ids.forEach((id, index) => {
         updateStmt.run(index + 1, id, routine_id);
       });
-    });
+      db.exec('COMMIT');
+    } catch (e) {
+      try { db.exec('ROLLBACK'); } catch (_) {}
+      throw e;
+    }
 
-    updateMany(ordered_ids);
     backupDb();
     res.json({ success: true });
   } catch (err) {
