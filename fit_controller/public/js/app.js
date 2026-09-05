@@ -23,6 +23,10 @@ window.FitApp = {
     this.bindPeopleScaler();
     await this.loadProfile();
 
+    if (window.ProgressModule) {
+      window.ProgressModule.init();
+    }
+
     if (window.lucide) {
       lucide.createIcons();
     }
@@ -38,6 +42,7 @@ window.FitApp = {
       'dashboard': { title: 'Dashboard Fit', subtitle: 'Resumen de déficit calórico, macros y rutina de hoy.' },
       'diet': { title: 'Planificador Semanal de Dieta & Mis Platos', subtitle: 'Control de comidas, catálogo de recetas e ingredientes ajustados a las personas.' },
       'workout': { title: 'Rutinas & Ejercicios', subtitle: 'Planifica tus entrenamientos con animaciones explicativas.' },
+      'progress': { title: 'Seguimiento de Progreso & Fotos', subtitle: 'Evolución de peso, medidas corporales y comparador visual de fotos antes vs después.' },
       'history': { title: 'Historial de Entrenos', subtitle: 'Registro de tus entrenamientos completados y calorías quemadas.' },
       'settings': { title: 'Configuración & Música', subtitle: 'Administra tus listas de reproducción de música para entrenar y preferencias.' }
     };
@@ -61,6 +66,7 @@ window.FitApp = {
         // Trigger tab specific loads
         if (tabKey === 'diet' && window.DietModule) window.DietModule.loadPlanAndRecipes();
         if (tabKey === 'workout' && window.WorkoutModule) window.WorkoutModule.loadRoutinesAndCatalog();
+        if (tabKey === 'progress' && window.ProgressModule) window.ProgressModule.loadAll();
         if (tabKey === 'history' && window.WorkoutModule) window.WorkoutModule.loadHistory();
       });
     });

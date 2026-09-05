@@ -15,7 +15,14 @@ const PORT = process.env.PORT || 8099;
 const dataUploadsDir = fs.existsSync('/data') ? '/data/uploads' : path.join(__dirname, 'public', 'uploads');
 const configUploadsDir = '/config/fit_controller/uploads';
 
-[dataUploadsDir, path.join(dataUploadsDir, 'videos'), configUploadsDir, path.join(configUploadsDir, 'videos')].forEach(dir => {
+[
+  dataUploadsDir,
+  path.join(dataUploadsDir, 'videos'),
+  path.join(dataUploadsDir, 'photos'),
+  configUploadsDir,
+  path.join(configUploadsDir, 'videos'),
+  path.join(configUploadsDir, 'photos')
+].forEach(dir => {
   if (!fs.existsSync(dir)) {
     try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
   }
@@ -75,6 +82,47 @@ app.post('/api/upload-video', (req, res) => {
     }
 
     const publicUrl = `uploads/videos/${finalName}`;
+    res.json({ success: true, url: publicUrl, filename: finalName });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/upload-progress-photo', (req, res) => {
+  try {
+    const { base64, filename, pose, person_id } = req.body;
+    if (!base64) {
+      return res.status(400).json({ error: 'No se envió imagen' });
+    }
+
+    const matches = base64.match(/^data:(image\/[a-zA-Z0-9]+);base64,(.+)$/);
+    let fileBuffer;
+    if (matches) {
+      fileBuffer = Buffer.from(matches[2], 'base64');
+    } else {
+      fileBuffer = Buffer.from(base64, 'base64');
+    }
+
+    const poseKey = pose || 'photo';
+    const personKey = person_id ? `p${person_id}` : 'px';
+    const safeName = (filename || 'progress.jpg').replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const finalName = `${Date.now()}_${personKey}_${poseKey}_${safeName}`;
+
+    // Write to primary data directory
+    const primaryPath = path.join(dataUploadsDir, 'photos', finalName);
+    fs.writeFileSync(primaryPath, fileBuffer);
+
+    // Mirror to persistent /config directory
+    if (fs.existsSync('/config')) {
+      try {
+        const backupPath = path.join(configUploadsDir, 'photos', finalName);
+        fs.writeFileSync(backupPath, fileBuffer);
+      } catch (e) {
+        console.error('[PERSISTENCE] Error saving photo backup to /config:', e);
+      }
+    }
+
+    const publicUrl = `uploads/photos/${finalName}`;
     res.json({ success: true, url: publicUrl, filename: finalName });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -924,6 +972,154 @@ app.put('/api/music/playlists/:id', (req, res) => {
 app.delete('/api/music/playlists/:id', (req, res) => {
   try {
     db.prepare(`DELETE FROM music_playlists WHERE id = ?`).run(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ----------------------------------------------------
+// PEOPLE & BODY PROGRESS ENDPOINTS
+// ----------------------------------------------------
+
+app.get('/api/people', (req, res) => {
+  try {
+    const rows = db.prepare(`SELECT * FROM people ORDER BY id ASC`).all();
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/people', (req, res) => {
+  try {
+    const { name, gender, height_cm, target_weight_kg } = req.body;
+    if (!name) return res.status(400).json({ error: 'El nombre es obligatorio' });
+
+    const stmt = db.prepare(`
+      INSERT INTO people (name, gender, height_cm, target_weight_kg)
+      VALUES (?, ?, ?, ?)
+    `);
+    const result = stmt.run(name, gender || 'female', parseFloat(height_cm || 170), parseFloat(target_weight_kg || 65));
+    backupDb();
+    res.json({ success: true, id: result.lastInsertRowid });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/people/:id', (req, res) => {
+  try {
+    const { name, gender, height_cm, target_weight_kg } = req.body;
+    db.prepare(`
+      UPDATE people SET name = ?, gender = ?, height_cm = ?, target_weight_kg = ?
+      WHERE id = ?
+    `).run(name, gender || 'female', parseFloat(height_cm || 170), parseFloat(target_weight_kg || 65), req.params.id);
+    backupDb();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/people/:id', (req, res) => {
+  try {
+    db.prepare(`DELETE FROM body_progress WHERE person_id = ?`).run(req.params.id);
+    db.prepare(`DELETE FROM people WHERE id = ?`).run(req.params.id);
+    backupDb();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/progress', (req, res) => {
+  try {
+    const { person_id } = req.query;
+    let sql = `SELECT * FROM body_progress`;
+    const params = [];
+    if (person_id) {
+      sql += ` WHERE person_id = ?`;
+      params.push(person_id);
+    }
+    sql += ` ORDER BY date ASC, id ASC`;
+    const rows = db.prepare(sql).all(...params);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/progress', (req, res) => {
+  try {
+    const { person_id, date, weight_kg, chest_cm, waist_cm, hips_cm, arm_cm, thigh_cm, photo_front, photo_side, photo_back, notes } = req.body;
+    if (!person_id || !weight_kg) {
+      return res.status(400).json({ error: 'Persona y peso son requeridos' });
+    }
+
+    const regDate = date || new Date().toISOString().split('T')[0];
+
+    const stmt = db.prepare(`
+      INSERT INTO body_progress (person_id, date, weight_kg, chest_cm, waist_cm, hips_cm, arm_cm, thigh_cm, photo_front, photo_side, photo_back, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const result = stmt.run(
+      person_id,
+      regDate,
+      parseFloat(weight_kg),
+      chest_cm ? parseFloat(chest_cm) : null,
+      waist_cm ? parseFloat(waist_cm) : null,
+      hips_cm ? parseFloat(hips_cm) : null,
+      arm_cm ? parseFloat(arm_cm) : null,
+      thigh_cm ? parseFloat(thigh_cm) : null,
+      photo_front || '',
+      photo_side || '',
+      photo_back || '',
+      notes || ''
+    );
+
+    backupDb();
+    res.json({ success: true, id: result.lastInsertRowid });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/progress/:id', (req, res) => {
+  try {
+    const { date, weight_kg, chest_cm, waist_cm, hips_cm, arm_cm, thigh_cm, photo_front, photo_side, photo_back, notes } = req.body;
+    db.prepare(`
+      UPDATE body_progress SET
+        date = ?, weight_kg = ?, chest_cm = ?, waist_cm = ?, hips_cm = ?, arm_cm = ?, thigh_cm = ?,
+        photo_front = ?, photo_side = ?, photo_back = ?, notes = ?
+      WHERE id = ?
+    `).run(
+      date,
+      parseFloat(weight_kg),
+      chest_cm ? parseFloat(chest_cm) : null,
+      waist_cm ? parseFloat(waist_cm) : null,
+      hips_cm ? parseFloat(hips_cm) : null,
+      arm_cm ? parseFloat(arm_cm) : null,
+      thigh_cm ? parseFloat(thigh_cm) : null,
+      photo_front || '',
+      photo_side || '',
+      photo_back || '',
+      notes || '',
+      req.params.id
+    );
+
+    backupDb();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/progress/:id', (req, res) => {
+  try {
+    db.prepare(`DELETE FROM body_progress WHERE id = ?`).run(req.params.id);
+    backupDb();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

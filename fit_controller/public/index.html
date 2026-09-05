@@ -48,6 +48,10 @@
           <i data-lucide="history"></i>
           <span>Historial Entrenos</span>
         </button>
+        <button class="nav-btn" data-tab="progress" id="btn-tab-progress">
+          <i data-lucide="trending-up"></i>
+          <span>Progreso & Fotos</span>
+        </button>
         <button class="nav-btn" data-tab="settings" id="btn-tab-settings">
           <i data-lucide="settings"></i>
           <span>Configuración</span>
@@ -341,6 +345,171 @@
           </div>
 
         </div>
+      </section>
+
+      <!-- ---------------------------------------------------- -->
+      <!-- TAB 6: SEGUIMIENTO DE PROGRESO, MEDIDAS Y COMPARADOR DE FOTOS -->
+      <!-- ---------------------------------------------------- -->
+      <section class="tab-panel" id="panel-progress">
+        <!-- Progress Controls & Person Switcher Header -->
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 14px;">
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="users" style="color: var(--primary); width: 18px; height: 18px;"></i>
+              <span style="font-size: 0.85rem; font-weight: 700; color: #fff;">Persona:</span>
+            </div>
+            <select id="progress-person-select" class="input-field" style="font-size: 0.9rem; font-weight: 800; color: var(--primary); padding: 6px 12px; min-width: 180px;">
+              <!-- Populated via JS -->
+            </select>
+            <button class="btn btn-secondary" onclick="window.ProgressModule.openAddPersonModal()" style="padding: 6px 12px; font-size: 0.78rem;" title="Añadir nueva persona">
+              <i data-lucide="user-plus" style="width: 14px; height: 14px;"></i> Nueva Persona
+            </button>
+            <button class="btn btn-secondary" onclick="window.ProgressModule.deleteCurrentPerson()" style="padding: 6px 10px; font-size: 0.78rem; color: var(--accent-red); border-color: rgba(239,68,68,0.2);" title="Eliminar persona seleccionada">
+              <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+            </button>
+          </div>
+
+          <button class="btn btn-primary" onclick="window.ProgressModule.openAddProgressModal()" style="font-size: 0.85rem; padding: 10px 18px; font-weight: 800;">
+            <i data-lucide="plus-circle"></i> Registrar Peso & Fotos
+          </button>
+        </div>
+
+        <!-- Summary KPIs Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px;">
+          <div class="card" style="padding: 14px 18px;">
+            <span class="text-muted" style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase;">Peso Actual</span>
+            <div style="font-size: 1.8rem; font-weight: 900; color: #fff; margin-top: 4px;" id="kpi-current-weight">-- kg</div>
+          </div>
+          <div class="card" style="padding: 14px 18px;">
+            <span class="text-muted" style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase;">Cambio Total</span>
+            <div style="font-size: 1.8rem; font-weight: 900; color: var(--primary); margin-top: 4px;" id="kpi-weight-change">0.0 kg</div>
+          </div>
+          <div class="card" style="padding: 14px 18px;">
+            <span class="text-muted" style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase;">Variación Cintura</span>
+            <div style="font-size: 1.8rem; font-weight: 900; color: var(--accent-yellow); margin-top: 4px;" id="kpi-waist-change">-- cm</div>
+          </div>
+          <div class="card" style="padding: 14px 18px;">
+            <span class="text-muted" style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase;">Meta de Peso</span>
+            <div style="font-size: 1.8rem; font-weight: 900; color: var(--accent-cyan); margin-top: 4px;" id="kpi-target-weight">-- kg</div>
+          </div>
+        </div>
+
+        <!-- COMPARADOR VISUAL DE FOTOS (HERRAMIENTA ESTRELLA) -->
+        <div class="card" style="margin-bottom: 24px; border: 1px solid rgba(16,185,129,0.3); background: rgba(15,23,42,0.7);">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border-color);">
+            <div>
+              <h3 class="card-title" style="font-size: 1.25rem;"><i data-lucide="split" style="color: var(--primary);"></i> Comparador Visual de Fotos ("Antes vs Después")</h3>
+              <p class="text-muted" style="font-size: 0.82rem; margin-top: 2px;">Compara cambios corporales entre dos fechas en la misma postura con cortinilla interactiva o transparencias.</p>
+            </div>
+
+            <!-- Pose Selector Tabs -->
+            <div style="display: flex; gap: 6px; background: rgba(30,41,59,0.8); padding: 4px; border-radius: 10px; border: 1px solid var(--border-color);">
+              <button class="btn-pose-tab btn btn-secondary active" data-pose="front" onclick="window.ProgressModule.setComparatorPose('front')" style="padding: 6px 14px; font-size: 0.8rem; font-weight: 800; background: var(--primary); color: #000;">
+                Frontal
+              </button>
+              <button class="btn-pose-tab btn btn-secondary" data-pose="side" onclick="window.ProgressModule.setComparatorPose('side')" style="padding: 6px 14px; font-size: 0.8rem; font-weight: 800; background: rgba(255,255,255,0.05); color: var(--text-muted);">
+                Perfil
+              </button>
+              <button class="btn-pose-tab btn btn-secondary" data-pose="back" onclick="window.ProgressModule.setComparatorPose('back')" style="padding: 6px 14px; font-size: 0.8rem; font-weight: 800; background: rgba(255,255,255,0.05); color: var(--text-muted);">
+                Espalda
+              </button>
+            </div>
+          </div>
+
+          <!-- Comparator Controls Bar -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; background: rgba(0,0,0,0.25); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);">
+            <div>
+              <label style="font-size: 0.75rem; color: var(--accent-orange); font-weight: 800; display: block; margin-bottom: 4px;">Foto A (Inicial / Antes):</label>
+              <select id="compare-select-a" class="input-field" style="width: 100%; font-size: 0.82rem; font-weight: 700;">
+                <!-- Populated via JS -->
+              </select>
+            </div>
+
+            <div>
+              <label style="font-size: 0.75rem; color: var(--primary); font-weight: 800; display: block; margin-bottom: 4px;">Foto B (Reciente / Después):</label>
+              <select id="compare-select-b" class="input-field" style="width: 100%; font-size: 0.82rem; font-weight: 700;">
+                <!-- Populated via JS -->
+              </select>
+            </div>
+
+            <div>
+              <label style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 800; display: block; margin-bottom: 4px;">Modo de Comparación:</label>
+              <div style="display: flex; gap: 4px;">
+                <button class="btn-comp-mode btn btn-secondary active" data-mode="split" onclick="window.ProgressModule.setComparatorMode('split')" style="flex: 1; padding: 6px 8px; font-size: 0.75rem; font-weight: 800; background: var(--accent-cyan); color: #000;" title="Deslizador Cortinilla">
+                  Cortinilla
+                </button>
+                <button class="btn-comp-mode btn btn-secondary" data-mode="opacity" onclick="window.ProgressModule.setComparatorMode('opacity')" style="flex: 1; padding: 6px 8px; font-size: 0.75rem; font-weight: 800; background: rgba(255,255,255,0.05); color: var(--text-muted);" title="Solapado con Transparencia">
+                  Solapado
+                </button>
+                <button class="btn-comp-mode btn btn-secondary" data-mode="side" onclick="window.ProgressModule.setComparatorMode('side')" style="flex: 1; padding: 6px 8px; font-size: 0.75rem; font-weight: 800; background: rgba(255,255,255,0.05); color: var(--text-muted);" title="Lado a lado">
+                  Lado a lado
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Comparison Viewport Area -->
+          <div id="photo-comparison-viewport" style="min-height: 420px; display: flex; align-items: center; justify-content: center;">
+            <!-- Populated dynamically via JS -->
+          </div>
+        </div>
+
+        <!-- CHARTS SECTION: PESO & MEDIDAS -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-bottom: 24px;">
+          <!-- Chart 1: Weight Evolution -->
+          <div class="card" style="display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <h3 class="card-title" style="font-size: 1.05rem;"><i data-lucide="trending-down" style="color: var(--primary);"></i> Evolución del Peso</h3>
+              <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--primary); font-size: 0.72rem;">Curva temporal</span>
+            </div>
+            <div style="position: relative; height: 260px; width: 100%;">
+              <canvas id="chart-progress-weight"></canvas>
+            </div>
+          </div>
+
+          <!-- Chart 2: Body Measurements Evolution -->
+          <div class="card" style="display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <h3 class="card-title" style="font-size: 1.05rem;"><i data-lucide="ruler" style="color: var(--accent-yellow);"></i> Medidas Corporales (cm)</h3>
+              <span class="badge" style="background: rgba(245,158,11,0.15); color: var(--accent-yellow); font-size: 0.72rem;">Cintura, Pecho, Cadera...</span>
+            </div>
+            <div style="position: relative; height: 260px; width: 100%;">
+              <canvas id="chart-progress-measurements"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- PROGRESS HISTORY TABLE -->
+        <div class="card">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <div>
+              <h3 class="card-title" style="font-size: 1.1rem;"><i data-lucide="calendar"></i> Historial de Registros</h3>
+              <p class="text-muted" style="font-size: 0.8rem;">Pesajes, medidas registradas y miniaturas de fotos.</p>
+            </div>
+            <button class="btn btn-secondary" onclick="window.ProgressModule.openAddProgressModal()" style="font-size: 0.8rem; padding: 6px 12px;">
+              <i data-lucide="plus"></i> Añadir Registro
+            </button>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase;">
+                  <th style="padding: 10px;">Fecha</th>
+                  <th style="padding: 10px;">Peso</th>
+                  <th style="padding: 10px;">Medidas</th>
+                  <th style="padding: 10px;">Fotos (F/P/E)</th>
+                  <th style="padding: 10px;">Notas</th>
+                  <th style="padding: 10px; text-align: right;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="progress-history-tbody">
+                <!-- Populated via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </section>
 
     </main>
@@ -1091,11 +1260,162 @@
     </div>
   </div>
 
+  <!-- MODAL: AÑADIR / EDITAR REGISTRO DE PROGRESO Y FOTOS -->
+  <div class="trainer-overlay" id="modal-add-progress" style="background: rgba(0,0,0,0.85); z-index: 2500; backdrop-filter: blur(10px);">
+    <div class="card" style="max-width: 650px; margin: auto; width: 92%; max-height: 90vh; overflow-y: auto;">
+      <div class="card-header">
+        <h3 class="card-title"><i data-lucide="scale" style="color: var(--primary);"></i> <span id="modal-progress-title-text">Nuevo Registro de Progreso</span></h3>
+        <button class="btn btn-secondary" id="btn-close-add-progress" style="padding: 6px 10px;"><i data-lucide="x"></i></button>
+      </div>
+
+      <form id="form-add-progress" style="display: flex; flex-direction: column; gap: 14px;">
+        <input type="hidden" id="prog-edit-id">
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Fecha del Registro</label>
+            <input type="date" id="prog-date" class="input-field" style="width: 100%;" required>
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; color: var(--primary); font-weight: 700;">Peso Corporal (kg) *</label>
+            <input type="number" step="0.1" id="prog-weight" class="input-field" placeholder="ej: 78.5" style="width: 100%; font-weight: 800;" required>
+          </div>
+        </div>
+
+        <!-- Body Measurements -->
+        <div style="background: rgba(15,23,42,0.6); padding: 12px; border-radius: 10px; border: 1px solid var(--border-color);">
+          <span style="font-size: 0.8rem; font-weight: 700; color: var(--accent-yellow); display: block; margin-bottom: 8px;">
+            <i data-lucide="ruler" style="width: 14px; height: 14px; vertical-align: middle;"></i> Medidas Corporales (cm) - Opcional
+          </span>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px;">
+            <div>
+              <label style="font-size: 0.72rem; color: var(--text-muted);">Cintura (cm)</label>
+              <input type="number" step="0.1" id="prog-waist" class="input-field" placeholder="ej: 84" style="width: 100%; font-size: 0.85rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: var(--text-muted);">Pecho (cm)</label>
+              <input type="number" step="0.1" id="prog-chest" class="input-field" placeholder="ej: 102" style="width: 100%; font-size: 0.85rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: var(--text-muted);">Cadera (cm)</label>
+              <input type="number" step="0.1" id="prog-hips" class="input-field" placeholder="ej: 98" style="width: 100%; font-size: 0.85rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: var(--text-muted);">Brazo (cm)</label>
+              <input type="number" step="0.1" id="prog-arm" class="input-field" placeholder="ej: 36" style="width: 100%; font-size: 0.85rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: var(--text-muted);">Muslo (cm)</label>
+              <input type="number" step="0.1" id="prog-thigh" class="input-field" placeholder="ej: 58" style="width: 100%; font-size: 0.85rem;">
+            </div>
+          </div>
+        </div>
+
+        <!-- 3 Photos Upload Box -->
+        <div style="background: rgba(15,23,42,0.6); padding: 12px; border-radius: 10px; border: 1px solid var(--border-color);">
+          <span style="font-size: 0.8rem; font-weight: 700; color: var(--accent-cyan); display: block; margin-bottom: 8px;">
+            <i data-lucide="camera" style="width: 14px; height: 14px; vertical-align: middle;"></i> Fotos de Evolución (Frontal, Perfil, Espalda)
+          </span>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+            <!-- Frontal -->
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;">
+              <span style="font-size: 0.75rem; font-weight: 700; color: #fff;">1. Frontal</span>
+              <div id="photo-preview-front" style="width: 100%; height: 120px; background: rgba(0,0,0,0.4); border: 1px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                <span style="font-size: 0.72rem; color: var(--text-muted);">Sin foto</span>
+              </div>
+              <label class="btn btn-secondary" style="width: 100%; font-size: 0.72rem; padding: 5px 6px; cursor: pointer; justify-content: center;">
+                <i data-lucide="upload" style="width: 12px; height: 12px;"></i> Seleccionar
+                <input type="file" accept="image/*" style="display: none;" onchange="window.ProgressModule.handlePhotoFileSelect('front', event)">
+              </label>
+              <span id="photo-status-front" style="font-size: 0.7rem; font-weight: 700;"></span>
+            </div>
+
+            <!-- Perfil -->
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;">
+              <span style="font-size: 0.75rem; font-weight: 700; color: #fff;">2. Perfil</span>
+              <div id="photo-preview-side" style="width: 100%; height: 120px; background: rgba(0,0,0,0.4); border: 1px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                <span style="font-size: 0.72rem; color: var(--text-muted);">Sin foto</span>
+              </div>
+              <label class="btn btn-secondary" style="width: 100%; font-size: 0.72rem; padding: 5px 6px; cursor: pointer; justify-content: center;">
+                <i data-lucide="upload" style="width: 12px; height: 12px;"></i> Seleccionar
+                <input type="file" accept="image/*" style="display: none;" onchange="window.ProgressModule.handlePhotoFileSelect('side', event)">
+              </label>
+              <span id="photo-status-side" style="font-size: 0.7rem; font-weight: 700;"></span>
+            </div>
+
+            <!-- Espalda -->
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;">
+              <span style="font-size: 0.75rem; font-weight: 700; color: #fff;">3. Espalda</span>
+              <div id="photo-preview-back" style="width: 100%; height: 120px; background: rgba(0,0,0,0.4); border: 1px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                <span style="font-size: 0.72rem; color: var(--text-muted);">Sin foto</span>
+              </div>
+              <label class="btn btn-secondary" style="width: 100%; font-size: 0.72rem; padding: 5px 6px; cursor: pointer; justify-content: center;">
+                <i data-lucide="upload" style="width: 12px; height: 12px;"></i> Seleccionar
+                <input type="file" accept="image/*" style="display: none;" onchange="window.ProgressModule.handlePhotoFileSelect('back', event)">
+              </label>
+              <span id="photo-status-back" style="font-size: 0.7rem; font-weight: 700;"></span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-muted);">Notas / Sensaciones</label>
+          <textarea id="prog-notes" class="input-field" rows="2" placeholder="ej: Me noto con menos retención, buen tono muscular..." style="width: 100%; font-size: 0.82rem;"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; justify-content: center; margin-top: 6px;">
+          <i data-lucide="save"></i> Guardar Registro
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: AÑADIR NUEVA PERSONA -->
+  <div class="trainer-overlay" id="modal-add-person" style="background: rgba(0,0,0,0.85); z-index: 2500; backdrop-filter: blur(10px);">
+    <div class="card" style="max-width: 440px; margin: auto; width: 90%;">
+      <div class="card-header">
+        <h3 class="card-title"><i data-lucide="user-plus" style="color: var(--primary);"></i> Añadir Nueva Persona</h3>
+        <button class="btn btn-secondary" id="btn-close-add-person" style="padding: 6px 10px;"><i data-lucide="x"></i></button>
+      </div>
+
+      <form id="form-add-person" style="display: flex; flex-direction: column; gap: 14px;">
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-muted);">Nombre de la Persona *</label>
+          <input type="text" id="person-name-input" class="input-field" placeholder="ej: María" style="width: 100%;" required>
+        </div>
+
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-muted);">Género</label>
+          <select id="person-gender-select" class="input-field" style="width: 100%;">
+            <option value="female">Mujer</option>
+            <option value="male">Hombre</option>
+          </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Altura (cm)</label>
+            <input type="number" id="person-height-input" class="input-field" value="170" style="width: 100%;" required>
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted);">Peso Objetivo (kg)</label>
+            <input type="number" step="0.1" id="person-target-weight-input" class="input-field" value="65" style="width: 100%;" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; justify-content: center; margin-top: 6px;">
+          <i data-lucide="check"></i> Crear Persona
+        </button>
+      </form>
+    </div>
+  </div>
+
   <!-- JavaScript Modules -->
-  <script src="js/app.js?v=1.5.8"></script>
-  <script src="js/diet.js?v=1.5.8"></script>
-  <script src="js/workout.js?v=1.5.8"></script>
-  <script src="js/trainer.js?v=1.5.8"></script>
-  <script src="js/music.js?v=1.5.8"></script>
+  <script src="js/app.js?v=1.6.0"></script>
+  <script src="js/diet.js?v=1.6.0"></script>
+  <script src="js/workout.js?v=1.6.0"></script>
+  <script src="js/trainer.js?v=1.6.0"></script>
+  <script src="js/music.js?v=1.6.0"></script>
+  <script src="js/progress.js?v=1.6.0"></script>
 </body>
 </html>

@@ -71,6 +71,53 @@ function initDb() {
     `).run();
   }
 
+  // 1.1 People table (Multi-person progress tracking)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS people (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      gender TEXT DEFAULT 'female',
+      height_cm REAL DEFAULT 170,
+      target_weight_kg REAL DEFAULT 65,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  const peopleCount = db.prepare(`SELECT COUNT(*) as count FROM people`).get().count;
+  if (peopleCount === 0) {
+    const userProf = db.prepare(`SELECT * FROM user_profile LIMIT 1`).get();
+    const defaultName = userProf && userProf.name ? userProf.name : 'Usuario Principal';
+    const defaultGender = userProf && userProf.gender ? userProf.gender : 'female';
+    const defaultHeight = userProf && userProf.height_cm ? userProf.height_cm : 170;
+    const defaultTarget = userProf && userProf.target_weight_kg ? userProf.target_weight_kg : 65;
+
+    db.prepare(`
+      INSERT INTO people (name, gender, height_cm, target_weight_kg)
+      VALUES (?, ?, ?, ?)
+    `).run(defaultName, defaultGender, defaultHeight, defaultTarget);
+  }
+
+  // 1.2 Body Progress & Photos table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS body_progress (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      person_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      weight_kg REAL NOT NULL,
+      chest_cm REAL,
+      waist_cm REAL,
+      hips_cm REAL,
+      arm_cm REAL,
+      thigh_cm REAL,
+      photo_front TEXT,
+      photo_side TEXT,
+      photo_back TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(person_id) REFERENCES people(id) ON DELETE CASCADE
+    )
+  `);
+
   // 2. Recipes table
   db.exec(`
     CREATE TABLE IF NOT EXISTS recipes (
