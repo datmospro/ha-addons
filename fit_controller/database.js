@@ -71,6 +71,12 @@ function initDb() {
     `).run();
   }
 
+  // Migration: Ensure active_week_start exists in user_profile
+  const profileColumns = db.prepare(`PRAGMA table_info(user_profile)`).all();
+  if (!profileColumns.some(c => c.name === 'active_week_start')) {
+    db.exec(`ALTER TABLE user_profile ADD COLUMN active_week_start TEXT`);
+  }
+
   // 1.1 People table (Multi-person progress tracking)
   db.exec(`
     CREATE TABLE IF NOT EXISTS people (
@@ -149,9 +155,16 @@ function initDb() {
       custom_title TEXT,
       people_count INTEGER DEFAULT 1,
       notes TEXT,
+      week_type TEXT DEFAULT 'current',
       FOREIGN KEY(recipe_id) REFERENCES recipes(id) ON DELETE SET NULL
     )
   `);
+
+  // Migration: Ensure week_type exists in meal_plans
+  const mealPlanColumns = db.prepare(`PRAGMA table_info(meal_plans)`).all();
+  if (!mealPlanColumns.some(c => c.name === 'week_type')) {
+    db.exec(`ALTER TABLE meal_plans ADD COLUMN week_type TEXT DEFAULT 'current'`);
+  }
 
   // 4. Exercises table
   db.exec(`

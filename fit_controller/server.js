@@ -239,17 +239,82 @@ app.post('/api/profile', (req, res) => {
 // DIET & MEAL PLAN ENDPOINTS
 // ----------------------------------------------------
 
+function getMondayOfCurrentWeek(d = new Date()) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  date.setDate(diff);
+  return date.toISOString().split('T')[0];
+}
+
+function getNextMonday(d = new Date()) {
+  const mon = new Date(getMondayOfCurrentWeek(d));
+  mon.setDate(mon.getDate() + 7);
+  return mon.toISOString().split('T')[0];
+}
+
+function checkAndPerformWeeklyRollover() {
+  try {
+    const user = db.prepare(`SELECT active_week_start FROM user_profile WHERE id = 1`).get();
+    const currentCalMonday = getMondayOfCurrentWeek();
+
+    if (!user || !user.active_week_start) {
+      db.prepare(`UPDATE user_profile SET active_week_start = ? WHERE id = 1`).run(currentCalMonday);
+      return false;
+    }
+
+    // Rollover is due if calendar monday is newer than stored active_week_start
+    if (currentCalMonday > user.active_week_start) {
+      console.log(`[ROLLOVER] Rollover due! Calendar Monday: ${currentCalMonday} > Stored: ${user.active_week_start}`);
+      const nextMeals = db.prepare(`SELECT COUNT(*) as count FROM meal_plans WHERE week_type = 'next'`).get().count;
+
+      db.exec('BEGIN');
+      try {
+        // 1. Discard old current week
+        db.prepare(`DELETE FROM meal_plans WHERE week_type = 'current'`).run();
+
+        // 2. If next week had meals, promote them to current
+        if (nextMeals > 0) {
+          db.prepare(`UPDATE meal_plans SET week_type = 'current' WHERE week_type = 'next'`).run();
+          console.log(`[ROLLOVER] Promoted ${nextMeals} meals from 'next' to 'current'.`);
+        }
+
+        // 3. Update stored Monday to currentCalMonday
+        db.prepare(`UPDATE user_profile SET active_week_start = ? WHERE id = 1`).run(currentCalMonday);
+        db.exec('COMMIT');
+        backupDb();
+        return true;
+      } catch (err) {
+        db.exec('ROLLBACK');
+        console.error('[ROLLOVER] Transaction failed:', err);
+      }
+    }
+  } catch (err) {
+    console.error('[ROLLOVER] Error checking rollover:', err);
+  }
+  return false;
+}
+
+// Check rollover on startup
+checkAndPerformWeeklyRollover();
+
 app.get('/api/diet/plan', (req, res) => {
   try {
     const peopleCount = parseInt(req.query.people || 1, 10);
+    const requestedWeek = req.query.week === 'next' ? 'next' : 'current';
+
+    // Perform check on access
+    const rolloverOccurred = checkAndPerformWeeklyRollover();
+
     const plans = db.prepare(`
       SELECT mp.*, r.title as recipe_title, r.description, r.category, r.prep_time_min,
              r.servings, r.kcal, r.protein, r.carbs, r.fat, r.fiber,
              r.ingredients_json, r.instructions_json, r.image_url
       FROM meal_plans mp
       LEFT JOIN recipes r ON mp.recipe_id = r.id
+      WHERE mp.week_type = ?
       ORDER BY mp.id ASC
-    `).all();
+    `).all(requestedWeek);
 
     const days = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
     const structured = {};
@@ -305,6 +370,7 @@ app.get('/api/diet/plan', (req, res) => {
         recipe_title: p.recipe_title || p.custom_title || 'Comida Personalizada',
         image_url: p.image_url,
         people_count: pCount,
+        week_type: p.week_type || 'current',
         perPerson,
         scaledTotal,
         ingredients: scaledIngredients,
@@ -324,6 +390,21 @@ app.get('/api/diet/plan', (req, res) => {
       structured[dayKey].totalsAllPeople.fiber += scaledTotal.fiber;
     });
 
+    const user = db.prepare(`SELECT active_week_start FROM user_profile WHERE id = 1`).get();
+    const activeWeekStart = (user && user.active_week_start) || getMondayOfCurrentWeek();
+    const nextWeekStart = getNextMonday(activeWeekStart);
+    const currentWeekMealsCount = db.prepare(`SELECT COUNT(*) as count FROM meal_plans WHERE week_type = 'current'`).get().count;
+    const nextWeekMealsCount = db.prepare(`SELECT COUNT(*) as count FROM meal_plans WHERE week_type = 'next'`).get().count;
+
+    structured._meta = {
+      week: requestedWeek,
+      activeWeekStart,
+      nextWeekStart,
+      currentWeekMealsCount,
+      nextWeekMealsCount,
+      rolloverOccurred
+    };
+
     res.json(structured);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -332,14 +413,18 @@ app.get('/api/diet/plan', (req, res) => {
 
 app.post('/api/diet/plan', (req, res) => {
   try {
-    const { day_of_week, meal_type, recipe_id, custom_title, people_count } = req.body;
+    const { day_of_week, meal_type, recipe_id, custom_title, people_count, week_type } = req.body;
+    const targetWeek = week_type === 'next' ? 'next' : 'current';
 
     if (!day_of_week || !meal_type) {
       return res.status(400).json({ error: 'Faltan campos obligatorios' });
     }
 
-    // Check if slot exists, replace or insert
-    const existing = db.prepare(`SELECT id FROM meal_plans WHERE day_of_week = ? AND meal_type = ?`).get(day_of_week, meal_type);
+    // Check if slot exists in the targeted week, replace or insert
+    const existing = db.prepare(`
+      SELECT id FROM meal_plans 
+      WHERE day_of_week = ? AND meal_type = ? AND week_type = ?
+    `).get(day_of_week, meal_type, targetWeek);
 
     if (existing) {
       db.prepare(`
@@ -347,12 +432,13 @@ app.post('/api/diet/plan', (req, res) => {
       `).run(recipe_id || null, custom_title || null, people_count || 1, existing.id);
     } else {
       db.prepare(`
-        INSERT INTO meal_plans (day_of_week, meal_type, recipe_id, custom_title, people_count)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(day_of_week, meal_type, recipe_id || null, custom_title || null, people_count || 1);
+        INSERT INTO meal_plans (day_of_week, meal_type, recipe_id, custom_title, people_count, week_type)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(day_of_week, meal_type, recipe_id || null, custom_title || null, people_count || 1, targetWeek);
     }
 
-    res.json({ success: true });
+    backupDb();
+    res.json({ success: true, week_type: targetWeek });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -361,7 +447,101 @@ app.post('/api/diet/plan', (req, res) => {
 app.delete('/api/diet/plan/:id', (req, res) => {
   try {
     db.prepare(`DELETE FROM meal_plans WHERE id = ?`).run(req.params.id);
+    backupDb();
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manually trigger rollover: promote next week to current, discard old current week
+app.post('/api/diet/rollover', (req, res) => {
+  try {
+    const nextMeals = db.prepare(`SELECT COUNT(*) as count FROM meal_plans WHERE week_type = 'next'`).get().count;
+
+    db.exec('BEGIN');
+    try {
+      // 1. Delete current week meals
+      db.prepare(`DELETE FROM meal_plans WHERE week_type = 'current'`).run();
+
+      // 2. Promote next week meals to current week
+      if (nextMeals > 0) {
+        db.prepare(`UPDATE meal_plans SET week_type = 'current' WHERE week_type = 'next'`).run();
+      }
+
+      // 3. Update active_week_start in user_profile
+      const currentCalMonday = getMondayOfCurrentWeek();
+      db.prepare(`UPDATE user_profile SET active_week_start = ? WHERE id = 1`).run(currentCalMonday);
+
+      db.exec('COMMIT');
+      backupDb();
+      res.json({
+        success: true,
+        promotedCount: nextMeals,
+        message: nextMeals > 0
+          ? `¡Próxima semana activada con éxito! Se han activado ${nextMeals} comidas y la semana queda lista.`
+          : 'La semana actual ha sido reiniciada.'
+      });
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Copy meal plan from one week to another (e.g. current -> next)
+app.post('/api/diet/copy-week', (req, res) => {
+  try {
+    const fromWeek = req.body.from_week === 'next' ? 'next' : 'current';
+    const toWeek = req.body.to_week === 'current' ? 'current' : 'next';
+
+    const sourceMeals = db.prepare(`SELECT * FROM meal_plans WHERE week_type = ?`).all(fromWeek);
+    if (sourceMeals.length === 0) {
+      return res.status(400).json({ error: `No hay comidas en la ${fromWeek === 'next' ? 'próxima semana' : 'semana actual'} para copiar.` });
+    }
+
+    db.exec('BEGIN');
+    try {
+      // Clear destination week first
+      db.prepare(`DELETE FROM meal_plans WHERE week_type = ?`).run(toWeek);
+
+      const insertStmt = db.prepare(`
+        INSERT INTO meal_plans (day_of_week, meal_type, recipe_id, custom_title, people_count, notes, week_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const m of sourceMeals) {
+        insertStmt.run(m.day_of_week, m.meal_type, m.recipe_id, m.custom_title, m.people_count || 1, m.notes || '', toWeek);
+      }
+
+      db.exec('COMMIT');
+      backupDb();
+      res.json({
+        success: true,
+        count: sourceMeals.length,
+        message: `Se han copiado ${sourceMeals.length} comidas a la ${toWeek === 'next' ? 'próxima semana' : 'semana actual'}.`
+      });
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Clear an entire week's meal plan
+app.post('/api/diet/clear-week', (req, res) => {
+  try {
+    const targetWeek = req.body.week_type === 'next' ? 'next' : 'current';
+    const result = db.prepare(`DELETE FROM meal_plans WHERE week_type = ?`).run(targetWeek);
+    backupDb();
+    res.json({
+      success: true,
+      message: `Se ha vaciado el menú de la ${targetWeek === 'next' ? 'próxima semana' : 'semana actual'}.`
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -374,15 +554,17 @@ app.post('/api/diet/people-count', (req, res) => {
     const count = parseInt(people_count, 10) || 1;
     db.prepare(`UPDATE meal_plans SET people_count = ?`).run(count);
     db.prepare(`UPDATE user_profile SET default_people_count = ? WHERE id = 1`).run(count);
+    backupDb();
     res.json({ success: true, count });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Generate Consolidated Shopping List for the week
+// Generate Consolidated Shopping List for the week (current or next)
 app.get('/api/diet/shopping-list', (req, res) => {
   try {
+    const targetWeek = req.query.week === 'next' ? 'next' : 'current';
     const defaultProfile = db.prepare(`SELECT default_people_count FROM user_profile WHERE id = 1`).get();
     const globalPeople = defaultProfile ? defaultProfile.default_people_count : 1;
 
@@ -390,7 +572,8 @@ app.get('/api/diet/shopping-list', (req, res) => {
       SELECT mp.people_count, r.ingredients_json
       FROM meal_plans mp
       JOIN recipes r ON mp.recipe_id = r.id
-    `).all();
+      WHERE mp.week_type = ?
+    `).all(targetWeek);
 
     const map = {};
 
@@ -540,6 +723,8 @@ app.post('/api/diet/import-json', (req, res) => {
     });
 
     // 2. Process Weekly Plan Items
+    const targetWeek = (req.body.week_type || bodyData.week_type || 'current') === 'next' ? 'next' : 'current';
+
     planList.forEach(item => {
       const day = (item.day_of_week || item.day || '').toLowerCase();
       const mealType = (item.meal_type || item.meal || item.type || '').toLowerCase();
@@ -555,23 +740,26 @@ app.post('/api/diet/import-json', (req, res) => {
         if (found) recipeId = found.id;
       }
 
-      const existingPlan = db.prepare(`SELECT id FROM meal_plans WHERE day_of_week = ? AND meal_type = ?`).get(day, mealType);
+      const existingPlan = db.prepare(`SELECT id FROM meal_plans WHERE day_of_week = ? AND meal_type = ? AND week_type = ?`).get(day, mealType, targetWeek);
       if (existingPlan) {
         db.prepare(`UPDATE meal_plans SET recipe_id = ?, custom_title = ? WHERE id = ?`)
           .run(recipeId, recipeTitle || null, existingPlan.id);
       } else {
-        db.prepare(`INSERT INTO meal_plans (day_of_week, meal_type, recipe_id, custom_title, people_count) VALUES (?, ?, ?, ?, 1)`)
-          .run(day, mealType, recipeId, recipeTitle || null);
+        db.prepare(`INSERT INTO meal_plans (day_of_week, meal_type, recipe_id, custom_title, people_count, week_type) VALUES (?, ?, ?, ?, 1, ?)`)
+          .run(day, mealType, recipeId, recipeTitle || null, targetWeek);
       }
 
       importedPlanCount++;
     });
 
+    backupDb();
+
     res.json({
       success: true,
       importedRecipesCount,
       importedPlanCount,
-      message: `Importación completada: ${importedRecipesCount} platos procesados y ${importedPlanCount} asignaciones de menú actualizadas.`
+      targetWeek,
+      message: `Importación completada: ${importedRecipesCount} platos procesados y ${importedPlanCount} asignaciones añadidas a la ${targetWeek === 'next' ? 'próxima semana' : 'semana actual'}.`
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -4,6 +4,8 @@ window.DietModule = {
   recipeCatalog: [],
   selectedCategoryFilter: 'all',
   selectedDayForDetails: null,
+  selectedWeek: 'current', // 'current' or 'next'
+  meta: null,
 
   init: function() {
     this.bindEvents();
@@ -17,15 +19,178 @@ window.DietModule = {
     await this.loadRecipeCatalog();
   },
 
-  loadPlan: async function() {
+  formatDateRange: function(mondayStr) {
+    if (!mondayStr) return '';
     try {
+      const parts = mondayStr.split('-');
+      const mon = new Date(parts[0], parts[1] - 1, parts[2]);
+      const sun = new Date(mon);
+      sun.setDate(sun.getDate() + 6);
+      const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+      return `${mon.getDate()} ${months[mon.getMonth()]} - ${sun.getDate()} ${months[sun.getMonth()]}`;
+    } catch (e) {
+      return mondayStr;
+    }
+  },
+
+  switchWeekView: async function(week) {
+    this.selectedWeek = week === 'next' ? 'next' : 'current';
+
+    const tabCurrent = document.getElementById('tab-week-current');
+    const tabNext = document.getElementById('tab-week-next');
+    const bannerNext = document.getElementById('next-week-banner');
+
+    if (tabCurrent && tabNext) {
+      if (this.selectedWeek === 'current') {
+        tabCurrent.classList.add('active');
+        tabCurrent.style.background = 'var(--primary)';
+        tabCurrent.style.color = '#000';
+        tabNext.classList.remove('active');
+        tabNext.style.background = 'transparent';
+        tabNext.style.color = 'var(--text-muted)';
+        if (bannerNext) bannerNext.style.display = 'none';
+      } else {
+        tabNext.classList.add('active');
+        tabNext.style.background = 'var(--accent-yellow)';
+        tabNext.style.color = '#000';
+        tabCurrent.classList.remove('active');
+        tabCurrent.style.background = 'transparent';
+        tabCurrent.style.color = 'var(--text-muted)';
+        if (bannerNext) bannerNext.style.display = 'flex';
+      }
+    }
+
+    await this.loadPlan(this.selectedWeek);
+    if (window.lucide) lucide.createIcons();
+  },
+
+  loadPlan: async function(week = this.selectedWeek) {
+    try {
+      this.selectedWeek = week || 'current';
       const people = (window.FitApp && window.FitApp.peopleCount) || 1;
-      const data = await window.apiFetch(`api/diet/plan?people=${people}`);
+      const data = await window.apiFetch(`api/diet/plan?people=${people}&week=${this.selectedWeek}`);
       this.currentPlanData = data;
+      this.meta = data._meta || null;
+
+      this.updateWeekBadges();
+      this.renderWeekActions();
       this.renderWeeklyGrid();
-      this.updateDashboardMacros();
+
+      // If viewing current week, update dashboard directly
+      if (this.selectedWeek === 'current') {
+        this.updateDashboardMacros();
+      } else {
+        // Fetch current week in background for dashboard
+        try {
+          const curData = await window.apiFetch(`api/diet/plan?people=${people}&week=current`);
+          this.updateDashboardMacros(curData);
+        } catch (e) {}
+      }
     } catch (err) {
       console.error('Error loading diet plan:', err);
+    }
+  },
+
+  updateWeekBadges: function() {
+    if (!this.meta) return;
+    const badgeCur = document.getElementById('badge-date-current');
+    const badgeNext = document.getElementById('badge-date-next');
+    const badgeStatusNext = document.getElementById('badge-status-next');
+
+    if (badgeCur && this.meta.activeWeekStart) {
+      badgeCur.textContent = this.formatDateRange(this.meta.activeWeekStart);
+    }
+    if (badgeNext && this.meta.nextWeekStart) {
+      badgeNext.textContent = this.formatDateRange(this.meta.nextWeekStart);
+    }
+    if (badgeStatusNext) {
+      if (this.meta.nextWeekMealsCount > 0) {
+        badgeStatusNext.textContent = `Lista: ${this.meta.nextWeekMealsCount} platos`;
+        badgeStatusNext.style.background = 'rgba(16,185,129,0.2)';
+        badgeStatusNext.style.color = 'var(--primary)';
+      } else {
+        badgeStatusNext.textContent = 'Vacía';
+        badgeStatusNext.style.background = 'rgba(255,255,255,0.1)';
+        badgeStatusNext.style.color = 'var(--text-muted)';
+      }
+    }
+  },
+
+  renderWeekActions: function() {
+    const bar = document.getElementById('week-actions-bar');
+    if (!bar) return;
+
+    if (this.selectedWeek === 'current') {
+      bar.innerHTML = `
+        <button class="btn btn-secondary" onclick="window.DietModule.copyCurrentToNext()" style="font-size: 0.78rem; padding: 6px 12px;" title="Copiar menú actual a la próxima semana">
+          <i data-lucide="copy" style="width: 14px; height: 14px;"></i> Copiar a Próxima Semana
+        </button>
+        <button class="btn btn-secondary" onclick="window.DietModule.clearWeek('current')" style="font-size: 0.78rem; padding: 6px 12px; color: var(--accent-red); border-color: rgba(239,68,68,0.3);" title="Vaciar menú de esta semana">
+          <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Vaciar
+        </button>
+      `;
+    } else {
+      bar.innerHTML = `
+        <button class="btn btn-primary" onclick="window.DietModule.promoteNextWeekNow()" style="font-size: 0.78rem; padding: 6px 12px; background: var(--accent-yellow); color: #000; font-weight: 800; border: none;" title="Activar esta semana como la activa ahora">
+          <i data-lucide="zap" style="width: 14px; height: 14px;"></i> Activar Semana Ya
+        </button>
+        <button class="btn btn-secondary" onclick="window.DietModule.copyCurrentToNext()" style="font-size: 0.78rem; padding: 6px 12px;" title="Traer platos de la semana actual como base">
+          <i data-lucide="copy" style="width: 14px; height: 14px;"></i> Copiar de Semana Actual
+        </button>
+        <button class="btn btn-secondary" onclick="window.DietModule.clearWeek('next')" style="font-size: 0.78rem; padding: 6px 12px; color: var(--accent-red); border-color: rgba(239,68,68,0.3);" title="Vaciar próxima semana">
+          <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Vaciar
+        </button>
+      `;
+    }
+    if (window.lucide) lucide.createIcons();
+  },
+
+  promoteNextWeekNow: async function() {
+    const hasMeals = (this.meta && this.meta.nextWeekMealsCount > 0);
+    const confirmMsg = hasMeals
+      ? '¿Deseas activar el menú de la próxima semana ahora? La semana actual se descartará y esta pasará a ser la semana activa en curso.'
+      : 'La próxima semana está vacía. Si continúas, la semana actual se reiniciará. ¿Deseas continuar?';
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      const res = await window.apiFetch('api/diet/rollover', { method: 'POST' });
+      alert(`⚡ ${res.message || 'Semana activada con éxito.'}`);
+      await this.switchWeekView('current');
+    } catch (err) {
+      alert('Error al activar semana: ' + err.message);
+    }
+  },
+
+  copyCurrentToNext: async function() {
+    if (!confirm('¿Copiar todo el menú de la semana actual a la próxima semana? (Sobrescribirá lo que haya preparado en la próxima semana)')) return;
+
+    try {
+      const res = await window.apiFetch('api/diet/copy-week', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from_week: 'current', to_week: 'next' })
+      });
+      alert(`📋 ${res.message || 'Menú copiado con éxito.'}`);
+      await this.switchWeekView('next');
+    } catch (err) {
+      alert('Error al copiar menú: ' + err.message);
+    }
+  },
+
+  clearWeek: async function(week = this.selectedWeek) {
+    const label = week === 'next' ? 'la próxima semana' : 'la semana actual';
+    if (!confirm(`¿Seguro que deseas vaciar todas las comidas de ${label}?`)) return;
+
+    try {
+      const res = await window.apiFetch('api/diet/clear-week', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ week_type: week })
+      });
+      await this.loadPlan(week);
+    } catch (err) {
+      alert('Error al vaciar menú: ' + err.message);
     }
   },
 
@@ -60,13 +225,14 @@ window.DietModule = {
     ];
 
     const todayKey = this.getCurrentDayOfWeekSpanish();
+    const isCurrentWeek = this.selectedWeek === 'current';
 
     container.style.display = 'grid';
     container.style.gridTemplateColumns = 'repeat(auto-fit, minmax(280px, 1fr))';
     container.style.gap = '16px';
 
     container.innerHTML = days.map(d => {
-      const isToday = d.key === todayKey;
+      const isToday = isCurrentWeek && (d.key === todayKey);
       const dayData = this.currentPlanData[d.key] || { meals: [], totalsPerPerson: { kcal: 0, protein: 0, carbs: 0, fat: 0 } };
 
       const mealTypes = [
@@ -84,6 +250,7 @@ window.DietModule = {
               <div style="display: flex; align-items: center; gap: 8px;">
                 <span style="font-size: 1.1rem; font-weight: 900; text-transform: uppercase; color: ${isToday ? 'var(--primary)' : '#fff'};">${d.label}</span>
                 ${isToday ? `<span class="badge" style="background: var(--primary); color: #000; font-size: 0.68rem; font-weight: 900; padding: 2px 6px; border-radius: 4px;">HOY</span>` : ''}
+                ${!isCurrentWeek ? `<span class="badge" style="background: rgba(245,158,11,0.15); color: var(--accent-yellow); font-size: 0.65rem; padding: 2px 5px; border-radius: 4px;">PRÓX</span>` : ''}
               </div>
               <span class="badge" style="background: rgba(249,115,22,0.15); color: var(--accent-orange); font-size: 0.75rem; font-weight: 800; padding: 3px 8px; border-radius: 6px;">
                 ${dayData.totalsPerPerson.kcal} kcal
@@ -120,7 +287,7 @@ window.DietModule = {
                 return `
                   <div style="background: rgba(15,23,42,0.3); border: 1px dashed var(--border-color); padding: 6px 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted);">${mt.label}</span>
-                    <button class="btn btn-secondary" onclick="window.DietModule.openAssignModal('${d.key}', '${mt.id}')" style="padding: 2px 6px; font-size: 0.68rem;">
+                    <button class="btn btn-secondary" onclick="window.DietModule.openAssignModal('${d.key}', '${mt.id}', '${this.selectedWeek}')" style="padding: 2px 6px; font-size: 0.68rem;">
                       + Añadir
                     </button>
                   </div>
@@ -135,7 +302,7 @@ window.DietModule = {
               <button class="btn btn-primary" onclick="window.DietModule.openDayMealDetailsModal('${d.key}')" style="flex: 1; font-size: 0.8rem; padding: 7px; font-weight: 800; justify-content: center;">
                 <i data-lucide="eye" style="width: 13px; height: 13px;"></i> Ver Menú & Recetas
               </button>
-              <button class="btn btn-secondary" onclick="window.DietModule.openAssignModal('${d.key}', 'almuerzo')" style="font-size: 0.8rem; padding: 7px;" title="Asignar Plato">
+              <button class="btn btn-secondary" onclick="window.DietModule.openAssignModal('${d.key}', 'almuerzo', '${this.selectedWeek}')" style="font-size: 0.8rem; padding: 7px;" title="Asignar Plato">
                 <i data-lucide="plus" style="width: 13px; height: 13px;"></i>
               </button>
             </div>
@@ -317,18 +484,20 @@ window.DietModule = {
         const selectMealType = document.getElementById('diet-assign-meal-type');
         const meal_type = selectMealType ? selectMealType.value : 'almuerzo';
         const recipe_id = document.getElementById('assign-meal-recipe-id').value;
+        const selectWeek = document.getElementById('assign-meal-week-select');
+        const week_type = selectWeek ? selectWeek.value : this.selectedWeek;
 
         try {
           await window.apiFetch('api/diet/plan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ day_of_week, meal_type, recipe_id })
+            body: JSON.stringify({ day_of_week, meal_type, recipe_id, week_type })
           });
           if (modalAssign) {
             modalAssign.style.display = 'none';
             modalAssign.classList.remove('active');
           }
-          await this.loadPlan();
+          await this.loadPlan(this.selectedWeek);
         } catch (err) {
           alert('Error al asignar plato: ' + err.message);
         }
@@ -370,28 +539,29 @@ window.DietModule = {
     const modal = document.getElementById('modal-shopping-list');
     if (!modal) return;
 
+    const week = this.selectedWeek;
     const peopleCount = (window.FitApp && window.FitApp.peopleCount) || 1;
     const subEl = document.getElementById('shopping-list-subtitle');
     if (subEl) {
-      subEl.textContent = `Ingredientes totales acumulados para la semana (${peopleCount} ${peopleCount === 1 ? 'persona' : 'personas'})`;
+      subEl.textContent = `Ingredientes totales para la ${week === 'next' ? 'Próxima Semana' : 'Semana Actual'} (${peopleCount} ${peopleCount === 1 ? 'persona' : 'personas'})`;
     }
 
     try {
-      const items = await window.apiFetch('api/diet/shopping-list');
+      const items = await window.apiFetch(`api/diet/shopping-list?week=${week}`);
       const container = document.getElementById('shopping-list-content');
       if (container) {
         if (!items || items.length === 0) {
-          container.innerHTML = '<p class="text-muted" style="padding: 20px; text-align: center;">No hay ingredientes asignados en el plan semanal.</p>';
+          container.innerHTML = `<p class="text-muted" style="padding: 20px; text-align: center;">No hay ingredientes asignados en el menú de la ${week === 'next' ? 'próxima semana' : 'semana actual'}.</p>`;
         } else {
           container.innerHTML = `
             <div style="display: flex; flex-direction: column; gap: 8px;">
               ${items.map(item => `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(15,23,42,0.85); border: 1px solid var(--border-color); border-radius: 10px;">
-                  <span style="font-weight: 700; color: #fff; font-size: 0.92rem;">${item.name}</span>
-                  <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--primary); font-weight: 900; font-size: 0.88rem; padding: 5px 12px; border-radius: 8px;">
-                    ${item.displayAmount}
-                  </span>
-                </div>
+                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(15,23,42,0.85); border: 1px solid var(--border-color); border-radius: 10px;">
+                   <span style="font-weight: 700; color: #fff; font-size: 0.92rem;">${item.name}</span>
+                   <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--primary); font-weight: 900; font-size: 0.88rem; padding: 5px 12px; border-radius: 8px;">
+                     ${item.displayAmount}
+                   </span>
+                 </div>
               `).join('')}
             </div>
           `;
@@ -435,7 +605,7 @@ window.DietModule = {
     `).join('');
   },
 
-  openAssignModal: function(day = 'lunes', mealType = 'almuerzo') {
+  openAssignModal: function(day = 'lunes', mealType = 'almuerzo', week = null) {
     const modal = document.getElementById('modal-assign-meal-to-day');
     if (!modal) return;
 
@@ -444,6 +614,9 @@ window.DietModule = {
 
     const selectMealType = document.getElementById('diet-assign-meal-type');
     if (selectMealType) selectMealType.value = mealType || 'almuerzo';
+
+    const selectWeek = document.getElementById('assign-meal-week-select');
+    if (selectWeek) selectWeek.value = week || this.selectedWeek;
 
     this.populateAssignModalDropdown();
 
@@ -494,7 +667,7 @@ window.DietModule = {
     try {
       await window.apiFetch(`api/recipes/${recipeId}`, { method: 'DELETE' });
       await this.loadRecipeCatalog();
-      await this.loadPlan();
+      await this.loadPlan(this.selectedWeek);
     } catch (err) {
       alert('Error al eliminar plato: ' + err.message);
     }
@@ -503,7 +676,7 @@ window.DietModule = {
   removeMeal: async function(mealId) {
     try {
       await window.apiFetch(`api/diet/plan/${mealId}`, { method: 'DELETE' });
-      await this.loadPlan();
+      await this.loadPlan(this.selectedWeek);
     } catch (err) {
       alert('Error al quitar plato: ' + err.message);
     }
@@ -788,6 +961,15 @@ window.DietModule = {
     const statusEl = document.getElementById('import-diet-status');
     if (statusEl) statusEl.style.display = 'none';
 
+    // Pre-select radio matching currently viewed week
+    const radCur = document.getElementById('import-week-current');
+    const radNext = document.getElementById('import-week-next');
+    if (this.selectedWeek === 'next' && radNext) {
+      radNext.checked = true;
+    } else if (radCur) {
+      radCur.checked = true;
+    }
+
     modal.style.display = 'flex';
     modal.style.zIndex = '99999';
     modal.classList.add('active');
@@ -915,12 +1097,15 @@ Por favor, crea un menú saludable para toda la semana acorde a mi objetivo de d
       return;
     }
 
+    const radSelected = document.querySelector('input[name="import-target-week"]:checked');
+    const targetWeek = radSelected ? radSelected.value : this.selectedWeek;
+
     try {
       const jsonText = textarea.value.trim();
       const res = await window.apiFetch('api/diet/import-json', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: jsonText })
+        body: JSON.stringify({ body: jsonText, week_type: targetWeek })
       });
 
       if (statusEl) {
@@ -930,7 +1115,12 @@ Por favor, crea un menú saludable para toda la semana acorde a mi objetivo de d
         statusEl.textContent = `✅ ${res.message || 'Importación completada con éxito.'}`;
       }
 
-      await this.loadPlanAndRecipes();
+      // If imported to a different week, switch view so user sees it right away
+      if (targetWeek !== this.selectedWeek) {
+        await this.switchWeekView(targetWeek);
+      } else {
+        await this.loadPlanAndRecipes();
+      }
 
       setTimeout(() => {
         this.closeImportModal();

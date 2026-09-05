@@ -180,15 +180,58 @@
         <!-- 7-DAY MEAL PLANNER CALENDAR -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
           <div>
-            <h3 style="font-size: 1.2rem; font-weight: 700;">Plan Semanal de Comidas (7 Días)</h3>
+            <h3 style="font-size: 1.25rem; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+              <i data-lucide="utensils" style="color: var(--primary);"></i> Plan Semanal de Comidas
+            </h3>
             <p class="text-muted" style="font-size: 0.85rem;">Ingredientes y cantidades ajustados automáticamente según las personas seleccionadas.</p>
           </div>
-          <div style="display: flex; gap: 10px;">
-            <button class="btn btn-secondary" onclick="window.DietModule.openShoppingListModal()">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-secondary" onclick="window.DietModule.openShoppingListModal()" id="btn-diet-shopping-list">
               <i data-lucide="shopping-bag"></i> Lista Compra
             </button>
             <button class="btn btn-primary" onclick="window.DietModule.openAssignModal('lunes', 'almuerzo')">
-              <i data-lucide="plus"></i> Asignar Plato a Plan
+              <i data-lucide="plus"></i> Asignar Plato
+            </button>
+          </div>
+        </div>
+
+        <!-- WEEK SELECTOR & STATUS BAR -->
+        <div class="card" style="margin-bottom: 20px; background: rgba(15,23,42,0.7); border: 1px solid var(--border-color); padding: 14px 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+            
+            <!-- Week Toggle Buttons -->
+            <div style="display: flex; gap: 6px; background: rgba(30,41,59,0.8); padding: 5px; border-radius: 12px; border: 1px solid var(--border-color);">
+              <button class="btn btn-secondary btn-week-tab active" id="tab-week-current" onclick="window.DietModule.switchWeekView('current')" style="padding: 8px 14px; font-size: 0.84rem; font-weight: 800; background: var(--primary); color: #000; border-radius: 8px; display: flex; align-items: center; gap: 8px; border: none; cursor: pointer;">
+                <i data-lucide="calendar-check" style="width: 15px; height: 15px;"></i>
+                <span>Semana Actual</span>
+                <span class="badge" id="badge-date-current" style="background: rgba(0,0,0,0.25); color: #000; font-size: 0.72rem; padding: 2px 6px;">--</span>
+              </button>
+              <button class="btn btn-secondary btn-week-tab" id="tab-week-next" onclick="window.DietModule.switchWeekView('next')" style="padding: 8px 14px; font-size: 0.84rem; font-weight: 800; background: transparent; color: var(--text-muted); border-radius: 8px; display: flex; align-items: center; gap: 8px; border: none; cursor: pointer;">
+                <i data-lucide="calendar-plus" style="width: 15px; height: 15px;"></i>
+                <span>Próxima Semana</span>
+                <span class="badge" id="badge-date-next" style="background: rgba(255,255,255,0.1); color: #fff; font-size: 0.72rem; padding: 2px 6px;">--</span>
+                <span id="badge-status-next" class="badge" style="background: rgba(245,158,11,0.2); color: var(--accent-yellow); font-size: 0.7rem; padding: 2px 6px;">Preparación</span>
+              </button>
+            </div>
+
+            <!-- Dynamic Actions for Current or Next Week -->
+            <div id="week-actions-bar" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+              <!-- Populated dynamically via diet.js -->
+            </div>
+
+          </div>
+
+          <!-- Notice banner when viewing Next Week -->
+          <div id="next-week-banner" style="display: none; margin-top: 12px; padding: 12px 16px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.35); border-radius: 10px; font-size: 0.83rem; color: #fde68a; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <i data-lucide="sparkles" style="color: var(--accent-yellow); width: 20px; height: 20px; flex-shrink: 0;"></i>
+              <div>
+                <strong>Modo Planificación (Próxima Semana):</strong>
+                <span style="opacity: 0.9;"> Prepara con antelación el menú de la siguiente semana. El lunes a las 00:00 se activará automáticamente como la semana en curso, o puedes activarla ya cuando quieras.</span>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="window.DietModule.promoteNextWeekNow()" style="padding: 7px 16px; font-size: 0.82rem; font-weight: 800; white-space: nowrap; background: var(--accent-yellow); color: #000; border: none;">
+              <i data-lucide="zap" style="width: 14px; height: 14px;"></i> Activar Esta Semana Ya
             </button>
           </div>
         </div>
@@ -1146,6 +1189,14 @@
       </div>
 
       <form id="form-assign-meal" style="display: flex; flex-direction: column; gap: 14px;">
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-muted);">Semana de Destino</label>
+          <select id="assign-meal-week-select" class="input-field" style="width: 100%; font-weight: 700;">
+            <option value="current">🟢 Semana Actual (Activa)</option>
+            <option value="next">🟡 Próxima Semana (En preparación)</option>
+          </select>
+        </div>
+
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
           <div>
             <label style="font-size: 0.8rem; color: var(--text-muted);">Día de la Semana</label>
@@ -1247,6 +1298,23 @@
           <button type="button" class="btn btn-secondary" onclick="window.DietModule.copyAiPromptTemplate()" style="font-size: 0.78rem; padding: 6px 12px; color: var(--primary); border-color: rgba(16,185,129,0.3);">
             <i data-lucide="copy"></i> Copiar Prompt para la IA
           </button>
+        </div>
+
+        <!-- Target Week Selector -->
+        <div style="background: rgba(15,23,42,0.6); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <label style="font-size: 0.82rem; font-weight: 700; color: #fff;">
+            <i data-lucide="calendar" style="width: 14px; height: 14px; vertical-align: middle; color: var(--primary);"></i> Destino del Menú Semanal:
+          </label>
+          <div style="display: flex; gap: 14px;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; cursor: pointer; color: var(--primary); font-weight: 700;">
+              <input type="radio" name="import-target-week" id="import-week-current" value="current" style="accent-color: var(--primary); cursor: pointer;">
+              <span>Semana Actual</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; cursor: pointer; color: var(--accent-yellow); font-weight: 700;">
+              <input type="radio" name="import-target-week" id="import-week-next" value="next" checked style="accent-color: var(--accent-yellow); cursor: pointer;">
+              <span>Próxima Semana</span>
+            </label>
+          </div>
         </div>
 
         <textarea id="import-diet-json-input" class="input-field" placeholder='Pega aquí el JSON en formato {"recipes": [...], "plan": [...]} o [{ "title": "..." }]...' style="width: 100%; flex: 1; min-height: 220px; font-family: monospace; font-size: 0.78rem; resize: vertical; line-height: 1.4; padding: 12px;"></textarea>
@@ -1411,11 +1479,11 @@
   </div>
 
   <!-- JavaScript Modules -->
-  <script src="js/app.js?v=1.6.0"></script>
-  <script src="js/diet.js?v=1.6.0"></script>
-  <script src="js/workout.js?v=1.6.0"></script>
-  <script src="js/trainer.js?v=1.6.0"></script>
-  <script src="js/music.js?v=1.6.0"></script>
-  <script src="js/progress.js?v=1.6.0"></script>
+  <script src="js/app.js?v=1.7.0"></script>
+  <script src="js/diet.js?v=1.7.0"></script>
+  <script src="js/workout.js?v=1.7.0"></script>
+  <script src="js/trainer.js?v=1.7.0"></script>
+  <script src="js/music.js?v=1.7.0"></script>
+  <script src="js/progress.js?v=1.7.0"></script>
 </body>
 </html>

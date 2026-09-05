@@ -1,7 +1,7 @@
 name: "Fit Controller"
-version: "1.6.0"
+version: "1.7.0"
 slug: "fit_controller"
-description: "Control de dieta para adelgazar, planificador de comidas con macros, rutinas con animaciones, seguimiento de peso y medidas, comparador visual de fotos antes/después y música gym."
+description: "Control de dieta para adelgazar, planificador semanal con preparación de próxima semana y rotación automática, macros, ejercicios con animaciones, fotos y música gym."
 url: "https://github.com/datmospro/ha-addons/tree/main/fit_controller"
 startup: application
 arch:
