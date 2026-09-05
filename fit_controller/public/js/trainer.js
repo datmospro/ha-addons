@@ -204,8 +204,27 @@ window.TrainerModule = {
       document.getElementById('trainer-total-timer').textContent = `${m}:${s}`;
     }, 1000);
 
-    this.renderCurrentExercise();
     this.renderUpcomingExercisesList();
+
+    // Start with Initial Preparation / Rest period so the user can inspect the first exercise video & form!
+    const firstEx = this.activeRoutine.exercises[0];
+    const initialPrepTime = parseInt(firstEx.rest_sec || 60, 10);
+    const totalEx = this.activeRoutine.exercises.length;
+
+    document.getElementById('trainer-exercise-progress').textContent = `Ejercicio 1 de ${totalEx} (Preparación)`;
+    document.getElementById('trainer-current-set').textContent = `1 / ${firstEx.sets || 3}`;
+    document.getElementById('trainer-target-reps').textContent = `0 / ${firstEx.reps}`;
+    document.getElementById('trainer-weight-kg').textContent = firstEx.weight_kg || 0;
+
+    const firstExInfo = {
+      name: firstEx.name,
+      details: `Serie 1 de ${firstEx.sets || 3} | ${firstEx.reps}${firstEx.is_isometric ? 's' : ' reps'} | ${firstEx.weight_kg || 0} kg`,
+      ex: firstEx
+    };
+
+    this.startRest(initialPrepTime, () => {
+      this.renderCurrentExercise();
+    }, firstExInfo, false, true);
   },
 
   renderCurrentExercise: function() {
@@ -462,7 +481,7 @@ window.TrainerModule = {
     }
   },
 
-  startRest: function(seconds, onComplete, nextExInfo = null, isExerciseChange = false) {
+  startRest: function(seconds, onComplete, nextExInfo = null, isExerciseChange = false, isInitialStart = false) {
     this.restSeconds = seconds;
     this.onRestCompleteCallback = onComplete;
 
@@ -471,8 +490,14 @@ window.TrainerModule = {
     document.getElementById('trainer-rest-seconds').textContent = `${this.restSeconds}s`;
 
     const badge = document.getElementById('trainer-rest-badge');
+    const skipBtn = document.getElementById('btn-skip-rest');
+
     if (badge) {
-      if (isExerciseChange) {
+      if (isInitialStart) {
+        badge.textContent = '🚀 PREPARACIÓN INICIAL - OBSERVA EL EJERCICIO';
+        badge.style.background = 'rgba(6, 182, 212, 0.2)';
+        badge.style.color = 'var(--accent-cyan)';
+      } else if (isExerciseChange) {
         badge.textContent = '⚡ CAMBIO DE EJERCICIO - DESCANSO';
         badge.style.background = 'rgba(249, 115, 22, 0.2)';
         badge.style.color = 'var(--accent-orange)';
@@ -483,6 +508,13 @@ window.TrainerModule = {
       }
     }
 
+    if (skipBtn) {
+      skipBtn.innerHTML = isInitialStart 
+        ? '<i data-lucide="play"></i> EMPEZAR EJERCICIO AHORA' 
+        : '<i data-lucide="fast-forward"></i> OMITIR DESCANSO & EMPEZAR';
+      if (window.lucide) lucide.createIcons();
+    }
+
     if (nextExInfo) {
       const mainNameEl = document.getElementById('trainer-ex-name');
       const mainDescEl = document.getElementById('trainer-ex-instructions');
@@ -490,10 +522,14 @@ window.TrainerModule = {
       const detailsEl = document.getElementById('rest-next-ex-details');
 
       if (mainNameEl) {
-        mainNameEl.textContent = `${isExerciseChange ? '👉 Próximo Ejercicio:' : '👉 Próxima Serie:'} ${nextExInfo.name}`;
+        mainNameEl.textContent = isInitialStart 
+          ? `👉 Primer Ejercicio: ${nextExInfo.name}` 
+          : isExerciseChange 
+            ? `👉 Próximo Ejercicio: ${nextExInfo.name}` 
+            : `👉 Próxima Serie: ${nextExInfo.name}`;
       }
       if (mainDescEl && nextExInfo.ex) {
-        mainDescEl.textContent = nextExInfo.ex.instructions || 'Prepárate para comenzar.';
+        mainDescEl.textContent = nextExInfo.ex.instructions || 'Observa la técnica en el vídeo, ajusta tu peso/postura y prepárate.';
       }
       if (mainAnimBox && nextExInfo.ex) {
         mainAnimBox.innerHTML = window.WorkoutModule.getAnimationGraphicHtml(nextExInfo.ex);
