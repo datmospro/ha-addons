@@ -797,6 +797,28 @@ app.post('/api/workout/routine-exercise', (req, res) => {
   }
 });
 
+app.put('/api/workout/routine-exercises/reorder', (req, res) => {
+  try {
+    const { routine_id, ordered_ids } = req.body;
+    if (!routine_id || !Array.isArray(ordered_ids)) {
+      return res.status(400).json({ error: 'routine_id y ordered_ids son requeridos' });
+    }
+
+    const updateStmt = db.prepare(`UPDATE routine_exercises SET order_index = ? WHERE id = ? AND routine_id = ?`);
+    const updateMany = db.transaction((ids) => {
+      ids.forEach((id, index) => {
+        updateStmt.run(index + 1, id, routine_id);
+      });
+    });
+
+    updateMany(ordered_ids);
+    backupDb();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.put('/api/workout/routine-exercise/:id', (req, res) => {
   try {
     const { sets, reps, weight_kg, rest_sec } = req.body;

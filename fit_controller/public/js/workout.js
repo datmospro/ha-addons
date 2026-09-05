@@ -97,8 +97,8 @@ window.WorkoutModule = {
                 <button class="btn btn-primary" onclick="window.TrainerModule.startRoutine(${routine.id})" style="flex: 1; font-size: 0.82rem; padding: 8px; font-weight: 800; justify-content: center;">
                   <i data-lucide="play" style="width: 14px; height: 14px;"></i> Entrenar
                 </button>
-                <button class="btn btn-secondary" onclick="window.WorkoutModule.openRoutineDetailsModal(${routine.id})" style="font-size: 0.82rem; padding: 8px;" title="Ver Animaciones y Vídeos">
-                  <i data-lucide="eye" style="width: 14px; height: 14px;"></i>
+                <button class="btn btn-secondary" onclick="window.WorkoutModule.openRoutineDetailsModal(${routine.id})" style="font-size: 0.82rem; padding: 8px 12px; color: var(--accent-cyan); border-color: rgba(6,182,212,0.3); font-weight: 700; display: flex; align-items: center; gap: 4px;" title="Ver Vídeos y Ordenar Ejercicios">
+                  <i data-lucide="arrow-up-down" style="width: 14px; height: 14px;"></i> Ordenar
                 </button>
               </div>
 
@@ -619,16 +619,40 @@ window.WorkoutModule = {
 
     this.selectedRoutineForDetails = routine;
     document.getElementById('details-routine-title').innerHTML = `<i data-lucide="activity"></i> ${routine.name}`;
-    document.getElementById('details-routine-subtitle').textContent = `Ejercicios y vídeos para el ${routine.day_of_week} | ${routine.exercises ? routine.exercises.length : 0} Ejercicios`;
+    document.getElementById('details-routine-subtitle').textContent = `Ejercicios y vídeos para el ${routine.day_of_week} | ${routine.exercises ? routine.exercises.length : 0} Ejercicios (reordena con las flechas ⬆️ ⬇️)`;
 
     const grid = document.getElementById('routine-details-exercises-grid');
     if (!routine.exercises || routine.exercises.length === 0) {
       grid.innerHTML = `<p class="text-muted" style="grid-column: 1/-1;">Esta rutina no tiene ejercicios asignados aún.</p>`;
     } else {
-      grid.innerHTML = routine.exercises.map(ex => {
+      const totalCount = routine.exercises.length;
+      grid.innerHTML = routine.exercises.map((ex, idx) => {
         const reId = ex.routine_exercise_id || ex.id;
+        const isFirst = idx === 0;
+        const isLast = idx === totalCount - 1;
+
         return `
-          <div style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; position: relative;">
+            
+            <!-- Order Header with Order Badge & Move Buttons -->
+            <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="badge" style="background: rgba(16,185,129,0.2); color: var(--primary); font-weight: 900; font-size: 0.85rem; padding: 2px 10px; border-radius: 6px;">
+                  #${idx + 1}
+                </span>
+                <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Orden</span>
+              </div>
+
+              <div style="display: flex; gap: 4px; align-items: center;">
+                <button type="button" class="btn btn-secondary" onclick="window.WorkoutModule.moveExerciseOrder(${routine.id}, ${reId}, -1)" ${isFirst ? 'disabled style="opacity: 0.3; cursor: not-allowed; padding: 4px 8px;"' : 'style="padding: 4px 8px; color: var(--primary);"' } title="Mover hacia arriba">
+                  <i data-lucide="arrow-up" style="width: 15px; height: 15px;"></i>
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="window.WorkoutModule.moveExerciseOrder(${routine.id}, ${reId}, 1)" ${isLast ? 'disabled style="opacity: 0.3; cursor: not-allowed; padding: 4px 8px;"' : 'style="padding: 4px 8px; color: var(--accent-cyan);"' } title="Mover hacia abajo">
+                  <i data-lucide="arrow-down" style="width: 15px; height: 15px;"></i>
+                </button>
+              </div>
+            </div>
+
             <div style="width: 100%; height: 160px; background: #050811; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
               ${this.getAnimationGraphicHtml(ex)}
             </div>
@@ -698,6 +722,48 @@ window.WorkoutModule = {
       modalDetails.classList.add('active');
     }
     if (window.lucide) lucide.createIcons();
+  },
+
+  moveExerciseOrder: async function(routineId, reId, direction) {
+    const routine = this.currentRoutines.find(r => Number(r.id) === Number(routineId));
+    if (!routine || !routine.exercises) return;
+
+    const list = [...routine.exercises];
+    const currentIndex = list.findIndex(e => Number(e.routine_exercise_id || e.id) === Number(reId));
+    if (currentIndex === -1) return;
+
+    const targetIndex = currentIndex + direction;
+    if (targetIndex < 0 || targetIndex >= list.length) return;
+
+    // Swap elements in the array
+    const temp = list[currentIndex];
+    list[currentIndex] = list[targetIndex];
+    list[targetIndex] = temp;
+
+    // Optimistically update local routine state
+    routine.exercises = list;
+    this.openRoutineDetailsModal(routineId);
+    this.renderRoutineCalendar();
+
+    const orderedIds = list.map(e => e.routine_exercise_id || e.id);
+    try {
+      await window.apiFetch('api/workout/routine-exercises/reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ routine_id: routineId, ordered_ids: orderedIds })
+      });
+      // Synchronize in background
+      await this.loadRoutines();
+      const updated = this.currentRoutines.find(r => Number(r.id) === Number(routineId));
+      if (updated) {
+        this.selectedRoutineForDetails = updated;
+        this.openRoutineDetailsModal(routineId);
+      }
+    } catch (err) {
+      console.error('Error reordering exercises:', err);
+      alert('Error al guardar el nuevo orden: ' + err.message);
+      await this.loadRoutines();
+    }
   },
 
   openAddExerciseModal: async function(routineId) {
