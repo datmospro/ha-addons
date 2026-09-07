@@ -40,6 +40,10 @@
           <i data-lucide="utensils"></i>
           <span>Plan de Dieta</span>
         </button>
+        <button class="nav-btn" data-tab="recipes-search" id="btn-tab-recipes-search">
+          <i data-lucide="search"></i>
+          <span>Buscar Recetas</span>
+        </button>
         <button class="nav-btn" data-tab="workout" id="btn-tab-workout">
           <i data-lucide="activity"></i>
           <span>Rutinas & Calendario</span>
@@ -273,6 +277,139 @@
         </div>
       </section>
 
+      <!-- ---------------------------------------------------- -->
+      <!-- TAB: BUSCADOR DE RECETAS ONLINE (SPOONACULAR & EDAMAM) -->
+      <!-- ---------------------------------------------------- -->
+      <section class="tab-panel" id="panel-recipes-search">
+        <!-- Search Filters Card -->
+        <div class="card" style="margin-bottom: 24px; background: rgba(15,23,42,0.85); border: 1px solid var(--border-color);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3 class="card-title" style="font-size: 1.25rem;"><i data-lucide="search" style="color: var(--primary);"></i> Filtros de Búsqueda Online</h3>
+              <p class="text-muted" style="font-size: 0.82rem; margin-top: 2px;">Busca recetas saludables filtrando por proveedor, calorías, macronutrientes y vetando ingredientes no deseados.</p>
+            </div>
+            <button type="button" class="btn btn-secondary" id="btn-reset-search-filters" style="font-size: 0.8rem; padding: 6px 12px;">
+              <i data-lucide="rotate-ccw"></i> Limpiar Filtros
+            </button>
+          </div>
+
+          <form id="form-search-recipes">
+            <!-- Row 1: Query & Provider -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 16px;">
+              <div>
+                <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 6px;">Nombre del plato, ingrediente o concepto</label>
+                <div style="position: relative;">
+                  <input type="text" id="search-recipe-query" class="input-field" placeholder="ej: Pollo al limón, ensalada, salmon bowl..." style="width: 100%; padding-left: 36px;">
+                  <i data-lucide="search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted);"></i>
+                </div>
+              </div>
+
+              <div>
+                <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 6px;">Base de Datos / Proveedor</label>
+                <select id="search-recipe-provider" class="input-field" style="width: 100%;">
+                  <option value="all">Todas (Spoonacular + Edamam)</option>
+                  <option value="spoonacular">Spoonacular (Alta Precisión)</option>
+                  <option value="edamam">Edamam Recipe API</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Row 2: Macros & Calories Ranges -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; background: rgba(0,0,0,0.25); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);">
+              <div>
+                <label style="font-size: 0.75rem; color: var(--accent-orange); font-weight: 800; display: block; margin-bottom: 4px;">Kcal Máximas</label>
+                <input type="number" id="search-recipe-max-kcal" class="input-field" placeholder="ej: 600" style="width: 100%;">
+              </div>
+              <div>
+                <label style="font-size: 0.75rem; color: var(--accent-orange); font-weight: 800; display: block; margin-bottom: 4px;">Kcal Mínimas</label>
+                <input type="number" id="search-recipe-min-kcal" class="input-field" placeholder="ej: 250" style="width: 100%;">
+              </div>
+              <div>
+                <label style="font-size: 0.75rem; color: var(--primary); font-weight: 800; display: block; margin-bottom: 4px;">Proteína Mín (g)</label>
+                <input type="number" id="search-recipe-min-protein" class="input-field" placeholder="ej: 25" style="width: 100%;">
+              </div>
+              <div>
+                <label style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 800; display: block; margin-bottom: 4px;">Carbohidratos Máx (g)</label>
+                <input type="number" id="search-recipe-max-carbs" class="input-field" placeholder="ej: 50" style="width: 100%;">
+              </div>
+              <div>
+                <label style="font-size: 0.75rem; color: var(--accent-yellow); font-weight: 800; display: block; margin-bottom: 4px;">Grasas Máx (g)</label>
+                <input type="number" id="search-recipe-max-fat" class="input-field" placeholder="ej: 20" style="width: 100%;">
+              </div>
+            </div>
+
+            <!-- Row 3: Strict Ingredient Vetoing (Veto de Alimentos) -->
+            <div style="margin-bottom: 18px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <label style="font-size: 0.8rem; color: var(--accent-red); font-weight: 800; display: flex; align-items: center; gap: 6px;">
+                  <i data-lucide="shield-alert" style="width: 16px; height: 16px;"></i> Veto Estricto de Alimentos (No se mostrará NINGUNA receta que los contenga)
+                </label>
+                <span class="text-muted" style="font-size: 0.75rem;">Pulsa para activar o escribe personalizados</span>
+              </div>
+
+              <!-- Quick Chips -->
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
+                <button type="button" class="btn btn-secondary veto-chip" data-veto="tomate" style="font-size: 0.8rem; padding: 6px 12px; border-radius: 20px;">
+                  🍅 Sin Tomate
+                </button>
+                <button type="button" class="btn btn-secondary veto-chip" data-veto="cerdo" style="font-size: 0.8rem; padding: 6px 12px; border-radius: 20px;">
+                  🥩 Sin Cerdo / Bacon
+                </button>
+                <button type="button" class="btn btn-secondary veto-chip" data-veto="lactosa" style="font-size: 0.8rem; padding: 6px 12px; border-radius: 20px;">
+                  🥛 Sin Lácteos / Lactosa
+                </button>
+                <button type="button" class="btn btn-secondary veto-chip" data-veto="gluten" style="font-size: 0.8rem; padding: 6px 12px; border-radius: 20px;">
+                  🌾 Sin Gluten
+                </button>
+                <button type="button" class="btn btn-secondary veto-chip" data-veto="marisco" style="font-size: 0.8rem; padding: 6px 12px; border-radius: 20px;">
+                  🦐 Sin Marisco
+                </button>
+                <button type="button" class="btn btn-secondary veto-chip" data-veto="frutos secos" style="font-size: 0.8rem; padding: 6px 12px; border-radius: 20px;">
+                  🥜 Sin Frutos Secos
+                </button>
+                <button type="button" class="btn btn-secondary veto-chip" data-veto="cebolla" style="font-size: 0.8rem; padding: 6px 12px; border-radius: 20px;">
+                  🧅 Sin Cebolla
+                </button>
+                <button type="button" class="btn btn-secondary veto-chip" data-veto="huevo" style="font-size: 0.8rem; padding: 6px 12px; border-radius: 20px;">
+                  🥚 Sin Huevo
+                </button>
+              </div>
+
+              <!-- Custom Veto Input & Tag Container -->
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="text" id="search-recipe-veto-custom" class="input-field" placeholder="Escribe otro alimento y pulsa Enter (ej: champiñones, azúcar, picante...)" style="flex: 1; font-size: 0.82rem;">
+              </div>
+              <div id="custom-veto-tags" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px;"></div>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; font-size: 1rem; justify-content: center;">
+              <i data-lucide="sparkles"></i> Buscar Recetas Online
+            </button>
+          </form>
+        </div>
+
+        <!-- Search Results Header & State -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 style="font-size: 1.15rem; font-weight: 700;">Resultados Encontrados</h3>
+          <span id="recipes-search-count" class="text-muted" style="font-size: 0.85rem;">Ingresa filtros y pulsa Buscar</span>
+        </div>
+
+        <div id="recipes-search-loading" style="display: none; justify-content: center; align-items: center; gap: 12px; padding: 40px; color: var(--primary);">
+          <div class="spinner"></div>
+          <span style="font-weight: 700;">Consultando bases de datos y aplicando filtros de exclusión...</span>
+        </div>
+
+        <!-- Results Grid -->
+        <div id="recipes-search-results-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px;">
+          <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted); background: rgba(15,23,42,0.4); border: 1px dashed var(--border-color); border-radius: 12px;">
+            <i data-lucide="chef-hat" style="width: 44px; height: 44px; margin-bottom: 10px; opacity: 0.6;"></i>
+            <h4 style="color: #fff; margin-bottom: 4px;">Descubre nuevas recetas para tu objetivo</h4>
+            <p style="font-size: 0.85rem;">Puedes buscar por ingrediente, acotar calorías o vetar alimentos. Podrás añadirlas directamente a tu menú semanal de la semana activa o próxima.</p>
+          </div>
+        </div>
+      </section>
+
       <!-- 4. WORKOUT & ROUTINES TAB -->
       <section class="tab-panel" id="panel-workout">
         <!-- CALENDAR WORKOUT VIEW -->
@@ -385,6 +522,91 @@
                 <i data-lucide="chevron-right"></i>
               </button>
             </div>
+          </div>
+
+          <!-- Recipe Search API Keys Card (Spoonacular & Edamam) -->
+          <div class="card" style="grid-column: 1/-1; border: 1px solid rgba(16,185,129,0.3); background: rgba(15,23,42,0.8);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <h3 class="card-title" style="font-size: 1.15rem;"><i data-lucide="key" style="color: var(--primary);"></i> Credenciales de APIs para Búsqueda de Recetas</h3>
+                <p class="text-muted" style="font-size: 0.82rem; margin-top: 2px;">Configura tus claves personales de <strong>Spoonacular</strong> y/o <strong>Edamam</strong>. Ambas ofrecen planes gratuitos con miles de recetas.</p>
+              </div>
+              <span id="api-settings-save-status" style="font-size: 0.85rem; font-weight: 700;"></span>
+            </div>
+
+            <form id="form-api-keys-settings" onsubmit="event.preventDefault(); window.RecipeSearchModule.saveApiSettings();">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 18px;">
+                
+                <!-- Spoonacular Section -->
+                <div style="background: rgba(0,0,0,0.25); padding: 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span class="badge" style="background: rgba(16,185,129,0.2); color: var(--primary); font-weight: 800;">Spoonacular</span>
+                      <span style="font-size: 0.78rem; color: var(--text-muted);">API Nutricional Completa</span>
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="window.RecipeSearchModule.testApi('spoonacular')" style="padding: 4px 10px; font-size: 0.75rem;">
+                      <i data-lucide="check-circle" style="width: 13px; height: 13px;"></i> Probar
+                    </button>
+                  </div>
+                  <label style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Spoonacular API Key</label>
+                  <input type="password" id="setting-spoonacular-key" class="input-field" placeholder="ej: 3a9f0b12..." style="width: 100%; font-family: monospace;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                    <a href="https://spoonacular.com/food-api/console#Dashboard" target="_blank" style="font-size: 0.75rem; color: var(--accent-cyan); text-decoration: underline;">Conseguir gratis en spoonacular.com</a>
+                    <span id="api-test-status-spoonacular" style="font-size: 0.75rem; font-weight: 700;"></span>
+                  </div>
+                </div>
+
+                <!-- Edamam Section -->
+                <div style="background: rgba(0,0,0,0.25); padding: 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span class="badge" style="background: rgba(6,182,212,0.2); color: var(--accent-cyan); font-weight: 800;">Edamam</span>
+                      <span style="font-size: 0.78rem; color: var(--text-muted);">Recipe Search API v2</span>
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="window.RecipeSearchModule.testApi('edamam')" style="padding: 4px 10px; font-size: 0.75rem;">
+                      <i data-lucide="check-circle" style="width: 13px; height: 13px;"></i> Probar
+                    </button>
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                      <label style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Edamam Application ID</label>
+                      <input type="text" id="setting-edamam-app-id" class="input-field" placeholder="ej: b28a1c90" style="width: 100%; font-family: monospace;">
+                    </div>
+                    <div>
+                      <label style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Edamam Application Key</label>
+                      <input type="password" id="setting-edamam-app-key" class="input-field" placeholder="ej: 98df71a..." style="width: 100%; font-family: monospace;">
+                    </div>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                    <a href="https://developer.edamam.com/edamam-recipe-api" target="_blank" style="font-size: 0.75rem; color: var(--accent-cyan); text-decoration: underline;">Conseguir gratis en developer.edamam.com</a>
+                    <span id="api-test-status-edamam" style="font-size: 0.75rem; font-weight: 700;"></span>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Extra Preferences: Preferred Provider & Default Excluded -->
+              <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin-bottom: 16px;">
+                <div>
+                  <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Proveedor Preferido por Defecto</label>
+                  <select id="setting-preferred-provider" class="input-field" style="width: 100%;">
+                    <option value="all">Ambos (Spoonacular + Edamam)</option>
+                    <option value="spoonacular">Spoonacular</option>
+                    <option value="edamam">Edamam</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Alimentos vetados por defecto (separados por coma)</label>
+                  <input type="text" id="setting-default-excluded" class="input-field" placeholder="ej: cerdo, marisco, nata..." style="width: 100%;">
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: flex-end;">
+                <button type="submit" class="btn btn-primary" style="padding: 10px 24px; font-weight: 800;">
+                  <i data-lucide="save"></i> Guardar Configuración de APIs
+                </button>
+              </div>
+            </form>
           </div>
 
         </div>
@@ -1478,12 +1700,145 @@
     </div>
   </div>
 
+  <!-- ---------------------------------------------------- -->
+  <!-- MODAL: DETALLES DE RECETA ONLINE (SPOONACULAR / EDAMAM) -->
+  <!-- ---------------------------------------------------- -->
+  <div class="trainer-overlay" id="modal-recipe-details" style="background: rgba(9, 13, 22, 0.95); backdrop-filter: blur(20px);">
+    <div class="card" style="max-width: 800px; margin: auto; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="card-header" style="align-items: flex-start;">
+        <div style="flex: 1; padding-right: 12px;">
+          <h3 class="card-title" id="modal-recipe-title" style="font-size: 1.3rem; line-height: 1.3;">Detalles de la Receta</h3>
+          <p class="text-muted" style="font-size: 0.82rem; margin-top: 4px;" id="modal-recipe-desc"></p>
+        </div>
+        <button class="btn btn-secondary" id="btn-close-recipe-details" style="padding: 6px 10px;"><i data-lucide="x"></i></button>
+      </div>
+
+      <div style="flex: 1; overflow-y: auto; padding: 12px 16px;">
+        <img id="modal-recipe-image" src="" alt="Receta" style="width: 100%; max-height: 250px; object-fit: cover; border-radius: 10px; margin-bottom: 16px; display: none;">
+
+        <!-- Macros Grid -->
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 10px; text-align: center; margin-bottom: 18px; border: 1px solid rgba(255,255,255,0.05);">
+          <div>
+            <span class="text-muted" style="font-size: 0.72rem; display: block; font-weight: 700;">CALORÍAS</span>
+            <strong id="modal-recipe-kcal" style="font-size: 1.2rem; color: var(--accent-orange);">0 kcal</strong>
+          </div>
+          <div>
+            <span class="text-muted" style="font-size: 0.72rem; display: block; font-weight: 700;">PROTEÍNAS</span>
+            <strong id="modal-recipe-prot" style="font-size: 1.2rem; color: var(--primary);">0 g</strong>
+          </div>
+          <div>
+            <span class="text-muted" style="font-size: 0.72rem; display: block; font-weight: 700;">CARBOHIDRATOS</span>
+            <strong id="modal-recipe-carbs" style="font-size: 1.2rem; color: var(--accent-cyan);">0 g</strong>
+          </div>
+          <div>
+            <span class="text-muted" style="font-size: 0.72rem; display: block; font-weight: 700;">GRASAS</span>
+            <strong id="modal-recipe-fat" style="font-size: 1.2rem; color: var(--accent-yellow);">0 g</strong>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 20px;">
+          <!-- Ingredients Column -->
+          <div>
+            <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--primary); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="list"></i> Ingredientes
+            </h4>
+            <ul id="modal-recipe-ingredients-list" style="padding-left: 20px; color: #fff;"></ul>
+          </div>
+
+          <!-- Instructions Column -->
+          <div>
+            <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--accent-cyan); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="book-open"></i> Preparación
+            </h4>
+            <ol id="modal-recipe-instructions-list" style="padding-left: 20px; color: #cbd5e1;"></ol>
+          </div>
+        </div>
+
+        <div style="margin-top: 14px;">
+          <a id="modal-recipe-source-link" href="#" target="_blank" class="btn btn-secondary" style="font-size: 0.78rem; display: none; gap: 6px;">
+            <i data-lucide="external-link" style="width: 14px; height: 14px;"></i> Ver Receta Original en la Web
+          </a>
+        </div>
+      </div>
+
+      <!-- Action Buttons in Modal Footer -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 14px; border-top: 1px solid var(--border-color); margin-top: 10px; flex-wrap: wrap; gap: 10px;">
+        <button type="button" class="btn btn-secondary" id="btn-save-recipe-only">
+          <i data-lucide="bookmark"></i> Guardar en Mis Platos
+        </button>
+        <button type="button" class="btn btn-primary" id="btn-assign-from-details" style="font-weight: 800;">
+          <i data-lucide="calendar-plus"></i> Asignar al Menú Semanal
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------------------------------------------------- -->
+  <!-- MODAL: ASIGNAR RECETA EXTERNA A DÍA Y COMIDA -->
+  <!-- ---------------------------------------------------- -->
+  <div class="trainer-overlay" id="modal-assign-external-recipe" style="background: rgba(9, 13, 22, 0.95); backdrop-filter: blur(20px);">
+    <div class="card" style="max-width: 500px; margin: auto; width: 95%;">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title"><i data-lucide="calendar-plus"></i> Asignar Receta al Plan</h3>
+          <p class="text-muted" style="font-size: 0.82rem;" id="assign-recipe-name">Selecciona día, comida y semana</p>
+        </div>
+        <button class="btn btn-secondary" id="btn-close-assign-external" style="padding: 6px 10px;"><i data-lucide="x"></i></button>
+      </div>
+
+      <form id="form-assign-external-recipe" style="display: flex; flex-direction: column; gap: 14px; margin-top: 8px;">
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">Semana de Destino</label>
+          <select id="assign-week-type" class="input-field" style="width: 100%; font-weight: 700;">
+            <option value="current">Semana Actual (En curso)</option>
+            <option value="next">Próxima Semana (En preparación)</option>
+          </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">Día de la Semana</label>
+            <select id="assign-day-select" class="input-field" style="width: 100%;" required>
+              <option value="lunes">Lunes</option>
+              <option value="martes">Martes</option>
+              <option value="miercoles">Miércoles</option>
+              <option value="jueves">Jueves</option>
+              <option value="viernes">Viernes</option>
+              <option value="sabado">Sábado</option>
+              <option value="domingo">Domingo</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">Momento de Comida</label>
+            <select id="assign-meal-select" class="input-field" style="width: 100%;" required>
+              <option value="desayuno">Desayuno</option>
+              <option value="almuerzo" selected>Almuerzo</option>
+              <option value="merienda">Merienda</option>
+              <option value="cena">Cena</option>
+              <option value="snack">Snack</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">Personas a cocinar</label>
+          <input type="number" id="assign-people-count" class="input-field" value="1" min="1" max="12" style="width: 100%; font-weight: 700;">
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; justify-content: center; margin-top: 8px;">
+          <i data-lucide="check"></i> Confirmar y Guardar en Plan
+        </button>
+      </form>
+    </div>
+  </div>
+
   <!-- JavaScript Modules -->
-  <script src="js/app.js?v=1.7.0"></script>
-  <script src="js/diet.js?v=1.7.0"></script>
-  <script src="js/workout.js?v=1.7.0"></script>
-  <script src="js/trainer.js?v=1.7.0"></script>
-  <script src="js/music.js?v=1.7.0"></script>
-  <script src="js/progress.js?v=1.7.0"></script>
+  <script src="js/app.js?v=1.8.0"></script>
+  <script src="js/diet.js?v=1.8.0"></script>
+  <script src="js/recipe_search.js?v=1.8.0"></script>
+  <script src="js/workout.js?v=1.8.0"></script>
+  <script src="js/trainer.js?v=1.8.0"></script>
+  <script src="js/music.js?v=1.8.0"></script>
+  <script src="js/progress.js?v=1.8.0"></script>
 </body>
 </html>

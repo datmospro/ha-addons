@@ -27,6 +27,10 @@ window.FitApp = {
       window.ProgressModule.init();
     }
 
+    if (window.RecipeSearchModule) {
+      window.RecipeSearchModule.init();
+    }
+
     if (window.lucide) {
       lucide.createIcons();
     }
@@ -41,10 +45,11 @@ window.FitApp = {
     const tabMeta = {
       'dashboard': { title: 'Dashboard Fit', subtitle: 'Resumen de déficit calórico, macros y rutina de hoy.' },
       'diet': { title: 'Planificador Semanal de Dieta & Mis Platos', subtitle: 'Control de comidas, catálogo de recetas e ingredientes ajustados a las personas.' },
+      'recipes-search': { title: 'Buscador de Recetas Online', subtitle: 'Encuentra recetas en Spoonacular y Edamam con filtros de calorías, macros y veto estricto de ingredientes.' },
       'workout': { title: 'Rutinas & Ejercicios', subtitle: 'Planifica tus entrenamientos con animaciones explicativas.' },
       'progress': { title: 'Seguimiento de Progreso & Fotos', subtitle: 'Evolución de peso, medidas corporales y comparador visual de fotos antes vs después.' },
       'history': { title: 'Historial de Entrenos', subtitle: 'Registro de tus entrenamientos completados y calorías quemadas.' },
-      'settings': { title: 'Configuración & Música', subtitle: 'Administra tus listas de reproducción de música para entrenar y preferencias.' }
+      'settings': { title: 'Configuración & APIs', subtitle: 'Administra tus claves de API para recetas (Spoonacular, Edamam), listas de música y preferencias.' }
     };
 
     navButtons.forEach(btn => {
@@ -65,9 +70,11 @@ window.FitApp = {
 
         // Trigger tab specific loads
         if (tabKey === 'diet' && window.DietModule) window.DietModule.loadPlanAndRecipes();
+        if (tabKey === 'recipes-search' && window.RecipeSearchModule) window.RecipeSearchModule.loadApiSettings();
         if (tabKey === 'workout' && window.WorkoutModule) window.WorkoutModule.loadRoutinesAndCatalog();
         if (tabKey === 'progress' && window.ProgressModule) window.ProgressModule.loadAll();
         if (tabKey === 'history' && window.WorkoutModule) window.WorkoutModule.loadHistory();
+        if (tabKey === 'settings' && window.RecipeSearchModule) window.RecipeSearchModule.loadApiSettings();
       });
     });
   },

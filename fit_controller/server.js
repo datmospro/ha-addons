@@ -3,7 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const { db, initDb, backupDb } = require('./database');
-const { searchLocalRecipes, searchExternalRecipes } = require('./recipe_engine');
+const { searchLocalRecipes, searchOnlineRecipes } = require('./recipe_engine');
 
 // Initialize SQLite DB
 initDb();
@@ -770,20 +770,191 @@ app.post('/api/diet/import-json', (req, res) => {
 // RECIPE SEARCH & MANAGEMENT
 // ----------------------------------------------------
 
+// API Settings endpoints
+app.get('/api/settings/api-keys', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT key, value FROM api_settings').all();
+    const settings = {};
+    for (const r of rows) {
+      settings[r.key] = r.value;
+    }
+    // Return masked or full keys (fit_controller runs locally in HA ingress)
+    res.json({
+      spoonacular_api_key: settings.spoonacular_api_key || '',
+      edamam_app_id: settings.edamam_app_id || '',
+      edamam_app_key: settings.edamam_app_key || '',
+      preferred_provider: settings.preferred_provider || 'all',
+      default_excluded: settings.default_excluded || ''
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/settings/api-keys', (req, res) => {
+  try {
+    const { spoonacular_api_key, edamam_app_id, edamam_app_key, preferred_provider, default_excluded } = req.body;
+    const stmt = db.prepare(`
+      INSERT INTO api_settings (key, value) VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `);
+
+    if (spoonacular_api_key !== undefined) stmt.run('spoonacular_api_key', spoonacular_api_key.trim());
+    if (edamam_app_id !== undefined) stmt.run('edamam_app_id', edamam_app_id.trim());
+    if (edamam_app_key !== undefined) stmt.run('edamam_app_key', edamam_app_key.trim());
+    if (preferred_provider !== undefined) stmt.run('preferred_provider', preferred_provider.trim());
+    if (default_excluded !== undefined) stmt.run('default_excluded', default_excluded.trim());
+
+    backupDb();
+    res.json({ success: true, message: 'Configuración de APIs guardada correctamente.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/settings/test-api', async (req, res) => {
+  try {
+    const { provider } = req.body;
+    const rows = db.prepare('SELECT key, value FROM api_settings').all();
+    const settings = {};
+    for (const r of rows) settings[r.key] = r.value;
+
+    if (provider === 'spoonacular') {
+      const key = req.body.apiKey || settings.spoonacular_api_key;
+      if (!key) return res.status(400).json({ success: false, message: 'Falta API Key de Spoonacular' });
+      const testRes = await fetch(`https://api.spoonacular.com/recipes/complexSearch?apiKey=${encodeURIComponent(key)}&number=1`);
+      if (!testRes.ok) {
+        const body = await testRes.text().catch(() => '');
+        return res.status(400).json({ success: false, message: `Error (${testRes.status}): ${body || testRes.statusText}` });
+      }
+      return res.json({ success: true, message: 'Conexión con Spoonacular exitosa.' });
+    }
+
+    if (provider === 'edamam') {
+      const appId = req.body.appId || settings.edamam_app_id;
+      const appKey = req.body.appKey || settings.edamam_app_key;
+      if (!appId || !appKey) return res.status(400).json({ success: false, message: 'Faltan credenciales de Edamam' });
+      const testRes = await fetch(`https://api.edamam.com/api/recipes/v2?type=public&app_id=${encodeURIComponent(appId)}&app_key=${encodeURIComponent(appKey)}&q=salad`);
+      if (!testRes.ok) {
+        const body = await testRes.text().catch(() => '');
+        return res.status(400).json({ success: false, message: `Error (${testRes.status}): ${body || testRes.statusText}` });
+      }
+      return res.json({ success: true, message: 'Conexión con Edamam exitosa.' });
+    }
+
+    res.status(400).json({ success: false, message: 'Proveedor no reconocido' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Dedicated online recipe search endpoint with macros and strict veto filter
+app.get('/api/recipes/search-online', async (req, res) => {
+  try {
+    const { query, provider, minKcal, maxKcal, minProtein, maxProtein, minCarbs, maxCarbs, minFat, maxFat, excluded } = req.query;
+
+    const result = await searchOnlineRecipes({
+      query: query || '',
+      provider: provider || 'all',
+      minKcal,
+      maxKcal,
+      minProtein,
+      maxProtein,
+      minCarbs,
+      maxCarbs,
+      minFat,
+      maxFat,
+      excluded: excluded || ''
+    });
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Save recipe to local collection and optionally assign directly to meal plan
+app.post('/api/recipes/save-and-assign', (req, res) => {
+  try {
+    const { recipe, assign } = req.body;
+    if (!recipe || !recipe.title) {
+      return res.status(400).json({ error: 'Datos de receta incompletos' });
+    }
+
+    // Check if recipe already exists locally by title
+    let existing = db.prepare('SELECT id FROM recipes WHERE LOWER(title) = LOWER(?)').get(recipe.title);
+    let recipeId = null;
+
+    const ingredientsJson = JSON.stringify(recipe.ingredients || []);
+    const instructionsJson = JSON.stringify(Array.isArray(recipe.instructions) ? recipe.instructions : [recipe.instructions || '']);
+
+    if (existing) {
+      recipeId = existing.id;
+    } else {
+      const stmt = db.prepare(`
+        INSERT INTO recipes (title, description, category, prep_time_min, servings, kcal, protein, carbs, fat, fiber, ingredients_json, instructions_json, image_url, is_custom)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+      `);
+      const result = stmt.run(
+        recipe.title,
+        recipe.description || `Importada de ${recipe.provider || 'Web'}`,
+        recipe.category || 'almuerzo',
+        recipe.prep_time_min || 20,
+        recipe.servings || 1,
+        parseInt(recipe.kcal || 0, 10),
+        parseInt(recipe.protein || 0, 10),
+        parseInt(recipe.carbs || 0, 10),
+        parseInt(recipe.fat || 0, 10),
+        parseInt(recipe.fiber || 0, 10),
+        ingredientsJson,
+        instructionsJson,
+        recipe.image_url || ''
+      );
+      recipeId = result.lastInsertRowid;
+    }
+
+    let assigned = false;
+    if (assign && assign.day_of_week && assign.meal_type) {
+      const targetWeek = assign.week_type === 'next' ? 'next' : 'current';
+      const existingSlot = db.prepare(`
+        SELECT id FROM meal_plans WHERE day_of_week = ? AND meal_type = ? AND week_type = ?
+      `).get(assign.day_of_week, assign.meal_type, targetWeek);
+
+      if (existingSlot) {
+        db.prepare(`
+          UPDATE meal_plans SET recipe_id = ?, custom_title = NULL, people_count = ? WHERE id = ?
+        `).run(recipeId, assign.people_count || 1, existingSlot.id);
+      } else {
+        db.prepare(`
+          INSERT INTO meal_plans (day_of_week, meal_type, recipe_id, people_count, week_type)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(assign.day_of_week, assign.meal_type, recipeId, assign.people_count || 1, targetWeek);
+      }
+      assigned = true;
+    }
+
+    backupDb();
+    res.json({
+      success: true,
+      recipeId,
+      assigned,
+      message: assigned
+        ? `Receta "${recipe.title}" guardada y asignada al menú de la ${assign.week_type === 'next' ? 'próxima semana' : 'semana actual'}.`
+        : `Receta "${recipe.title}" guardada en Mis Platos.`
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/recipes', async (req, res) => {
   try {
-    const { query, category, maxKcal, minProtein, maxCarbs, source } = req.query;
-
+    const { query, category, maxKcal, minProtein, maxCarbs } = req.query;
     const localResults = searchLocalRecipes({ query, category, maxKcal, minProtein, maxCarbs });
-
-    let externalResults = [];
-    if (source === 'external' || source === 'all' || (query && localResults.length < 3)) {
-      externalResults = await searchExternalRecipes(query || 'chicken');
-    }
 
     res.json({
       local: localResults,
-      external: externalResults
+      external: []
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

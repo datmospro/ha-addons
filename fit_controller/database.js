@@ -242,6 +242,14 @@ function initDb() {
     )
   `);
 
+  // 9. External Recipe API Settings
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS api_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )
+  `);
+
   seedDefaultData();
 }
 

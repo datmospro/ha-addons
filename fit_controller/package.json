@@ -1,7 +1,7 @@
 {
   "name": "fit-controller",
-  "version": "1.7.0",
-  "description": "Control de dieta para adelgazar, planificador semanal con preparación de próxima semana y rotación automática, macros, ejercicios con animaciones, fotos y música gym.",
+  "version": "1.8.0",
+  "description": "Control de dieta para adelgazar, buscador de recetas Spoonacular/Edamam con veto estricto y macros, planificador semanal, ejercicios con animaciones, fotos y música gym.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
