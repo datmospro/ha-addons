@@ -1,6 +1,6 @@
 {
   "name": "fit-controller",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "description": "Control de dieta para adelgazar, buscador de recetas Spoonacular/Edamam con veto estricto y macros, planificador semanal, ejercicios con animaciones, fotos y música gym.",
   "main": "server.js",
   "scripts": {

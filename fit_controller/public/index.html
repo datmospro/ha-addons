@@ -294,8 +294,8 @@
           </div>
 
           <form id="form-search-recipes">
-            <!-- Row 1: Query & Provider -->
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 16px;">
+            <!-- Row 1: Query & Provider & Limit -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px; margin-bottom: 16px;">
               <div>
                 <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 6px;">Nombre del plato, ingrediente o concepto</label>
                 <div style="position: relative;">
@@ -310,6 +310,16 @@
                   <option value="all">Todas (Spoonacular + Edamam)</option>
                   <option value="spoonacular">Spoonacular (Alta Precisión)</option>
                   <option value="edamam">Edamam Recipe API</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 6px;">Cantidad por Página</label>
+                <select id="search-recipe-limit" class="input-field" style="width: 100%;">
+                  <option value="24" selected>24 recetas</option>
+                  <option value="48">48 recetas</option>
+                  <option value="72">72 recetas</option>
+                  <option value="96">96 recetas</option>
                 </select>
               </div>
             </div>
@@ -401,12 +411,28 @@
         </div>
 
         <!-- Results Grid -->
-        <div id="recipes-search-results-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px;">
+        <div id="recipes-search-results-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; margin-bottom: 24px;">
           <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted); background: rgba(15,23,42,0.4); border: 1px dashed var(--border-color); border-radius: 12px;">
             <i data-lucide="chef-hat" style="width: 44px; height: 44px; margin-bottom: 10px; opacity: 0.6;"></i>
             <h4 style="color: #fff; margin-bottom: 4px;">Descubre nuevas recetas para tu objetivo</h4>
             <p style="font-size: 0.85rem;">Puedes buscar por ingrediente, acotar calorías o vetar alimentos. Podrás añadirlas directamente a tu menú semanal de la semana activa o próxima.</p>
           </div>
+        </div>
+
+        <!-- Pagination Bar -->
+        <div id="recipes-search-pagination" style="display: none; align-items: center; justify-content: center; gap: 16px; margin: 24px 0; background: rgba(15,23,42,0.6); padding: 14px; border-radius: 12px; border: 1px solid var(--border-color);">
+          <button type="button" class="btn btn-secondary" id="btn-search-prev-page" onclick="window.RecipeSearchModule.changePage(-1)" style="padding: 8px 16px; font-weight: 700;">
+            <i data-lucide="chevron-left"></i> Página Anterior
+          </button>
+          
+          <div style="display: flex; align-items: center; gap: 6px; font-size: 0.9rem; font-weight: 800; color: #fff;">
+            <span>Página</span>
+            <span id="search-current-page-num" style="background: var(--primary); color: #000; padding: 2px 10px; border-radius: 8px; font-size: 0.95rem;">1</span>
+          </div>
+
+          <button type="button" class="btn btn-primary" id="btn-search-next-page" onclick="window.RecipeSearchModule.changePage(1)" style="padding: 8px 16px; font-weight: 700;">
+            Página Siguiente <i data-lucide="chevron-right"></i>
+          </button>
         </div>
       </section>
 
@@ -1833,12 +1859,12 @@
   </div>
 
   <!-- JavaScript Modules -->
-  <script src="js/app.js?v=1.8.0"></script>
-  <script src="js/diet.js?v=1.8.0"></script>
-  <script src="js/recipe_search.js?v=1.8.0"></script>
-  <script src="js/workout.js?v=1.8.0"></script>
-  <script src="js/trainer.js?v=1.8.0"></script>
-  <script src="js/music.js?v=1.8.0"></script>
-  <script src="js/progress.js?v=1.8.0"></script>
+  <script src="js/app.js?v=1.8.1"></script>
+  <script src="js/diet.js?v=1.8.1"></script>
+  <script src="js/recipe_search.js?v=1.8.1"></script>
+  <script src="js/workout.js?v=1.8.1"></script>
+  <script src="js/trainer.js?v=1.8.1"></script>
+  <script src="js/music.js?v=1.8.1"></script>
+  <script src="js/progress.js?v=1.8.1"></script>
 </body>
 </html>

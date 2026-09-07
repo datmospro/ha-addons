@@ -3,6 +3,9 @@ window.RecipeSearchModule = {
   activeVetoes: new Set(),
   currentResults: [],
   selectedRecipeForAssign: null,
+  currentPage: 1,
+  currentLimit: 24,
+  hasMore: false,
 
   init: function() {
     this.bindSearchEvents();
@@ -71,6 +74,16 @@ window.RecipeSearchModule = {
     if (form) {
       form.addEventListener('submit', (e) => {
         e.preventDefault();
+        this.currentPage = 1;
+        this.performSearch();
+      });
+    }
+
+    const limitSelect = document.getElementById('search-recipe-limit');
+    if (limitSelect) {
+      limitSelect.addEventListener('change', () => {
+        this.currentLimit = parseInt(limitSelect.value, 10) || 24;
+        this.currentPage = 1;
         this.performSearch();
       });
     }
@@ -80,6 +93,7 @@ window.RecipeSearchModule = {
       btnReset.addEventListener('click', () => {
         if (form) form.reset();
         this.activeVetoes.clear();
+        this.currentPage = 1;
         document.querySelectorAll('.veto-chip').forEach(c => c.classList.remove('active'));
         const container = document.getElementById('custom-veto-tags');
         if (container) container.innerHTML = '';
@@ -87,13 +101,31 @@ window.RecipeSearchModule = {
         if (resultsContainer) {
           resultsContainer.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">Usa los filtros superiores para buscar recetas en Spoonacular o Edamam.</div>';
         }
+        const paginationBar = document.getElementById('recipes-search-pagination');
+        if (paginationBar) paginationBar.style.display = 'none';
       });
+    }
+  },
+
+  changePage: function(delta) {
+    const targetPage = this.currentPage + delta;
+    if (targetPage < 1) return;
+    this.currentPage = targetPage;
+    this.performSearch();
+
+    // Scroll smoothly to top of results
+    const resultsContainer = document.getElementById('recipes-search-results-grid');
+    if (resultsContainer) {
+      resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   },
 
   performSearch: async function() {
     const query = (document.getElementById('search-recipe-query')?.value || '').trim();
     const provider = document.getElementById('search-recipe-provider')?.value || 'all';
+    const limitSelect = document.getElementById('search-recipe-limit');
+    if (limitSelect) this.currentLimit = parseInt(limitSelect.value, 10) || 24;
+
     const minKcal = document.getElementById('search-recipe-min-kcal')?.value || '';
     const maxKcal = document.getElementById('search-recipe-max-kcal')?.value || '';
     const minProtein = document.getElementById('search-recipe-min-protein')?.value || '';
@@ -108,14 +140,20 @@ window.RecipeSearchModule = {
     const resultsContainer = document.getElementById('recipes-search-results-grid');
     const loadingEl = document.getElementById('recipes-search-loading');
     const countEl = document.getElementById('recipes-search-count');
+    const paginationBar = document.getElementById('recipes-search-pagination');
+    const pageNumEl = document.getElementById('search-current-page-num');
+    const prevBtn = document.getElementById('btn-search-prev-page');
+    const nextBtn = document.getElementById('btn-search-next-page');
 
     if (loadingEl) loadingEl.style.display = 'flex';
     if (resultsContainer) resultsContainer.innerHTML = '';
-    if (countEl) countEl.textContent = 'Buscando recetas...';
+    if (countEl) countEl.textContent = `Buscando recetas (Página ${this.currentPage})...`;
 
     const params = new URLSearchParams();
     if (query) params.set('query', query);
     if (provider) params.set('provider', provider);
+    params.set('page', String(this.currentPage));
+    params.set('limit', String(this.currentLimit));
     if (minKcal) params.set('minKcal', minKcal);
     if (maxKcal) params.set('maxKcal', maxKcal);
     if (minProtein) params.set('minProtein', minProtein);
@@ -131,6 +169,7 @@ window.RecipeSearchModule = {
       if (loadingEl) loadingEl.style.display = 'none';
 
       this.currentResults = data.recipes || [];
+      this.hasMore = data.hasMore !== undefined ? data.hasMore : (this.currentResults.length >= this.currentLimit);
 
       if (data.errors && data.errors.length > 0 && this.currentResults.length === 0) {
         if (resultsContainer) {
@@ -145,11 +184,31 @@ window.RecipeSearchModule = {
           if (window.lucide) lucide.createIcons();
         }
         if (countEl) countEl.textContent = '0 recetas encontradas';
+        if (paginationBar) paginationBar.style.display = 'none';
         return;
       }
 
-      if (countEl) countEl.textContent = `${this.currentResults.length} recetas encontradas`;
+      if (countEl) countEl.textContent = `${this.currentResults.length} recetas en página ${this.currentPage}`;
       this.renderResults(this.currentResults);
+
+      // Render Pagination Bar
+      if (paginationBar) {
+        if (this.currentResults.length > 0 || this.currentPage > 1) {
+          paginationBar.style.display = 'flex';
+          if (pageNumEl) pageNumEl.textContent = String(this.currentPage);
+          if (prevBtn) {
+            prevBtn.disabled = this.currentPage <= 1;
+            prevBtn.style.opacity = this.currentPage <= 1 ? '0.4' : '1';
+            prevBtn.style.cursor = this.currentPage <= 1 ? 'not-allowed' : 'pointer';
+          }
+          if (nextBtn) {
+            nextBtn.disabled = !this.hasMore && this.currentResults.length === 0;
+            nextBtn.style.opacity = (!this.hasMore && this.currentResults.length === 0) ? '0.4' : '1';
+          }
+        } else {
+          paginationBar.style.display = 'none';
+        }
+      }
     } catch (err) {
       if (loadingEl) loadingEl.style.display = 'none';
       if (resultsContainer) {
@@ -160,6 +219,7 @@ window.RecipeSearchModule = {
         `;
       }
       if (countEl) countEl.textContent = 'Error en la búsqueda';
+      if (paginationBar) paginationBar.style.display = 'none';
     }
   },
 

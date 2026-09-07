@@ -848,10 +848,10 @@ app.post('/api/settings/test-api', async (req, res) => {
   }
 });
 
-// Dedicated online recipe search endpoint with macros and strict veto filter
+// Dedicated online recipe search endpoint with macros, pagination and strict veto filter
 app.get('/api/recipes/search-online', async (req, res) => {
   try {
-    const { query, provider, minKcal, maxKcal, minProtein, maxProtein, minCarbs, maxCarbs, minFat, maxFat, excluded } = req.query;
+    const { query, provider, minKcal, maxKcal, minProtein, maxProtein, minCarbs, maxCarbs, minFat, maxFat, excluded, page, limit } = req.query;
 
     const result = await searchOnlineRecipes({
       query: query || '',
@@ -864,7 +864,9 @@ app.get('/api/recipes/search-online', async (req, res) => {
       maxCarbs,
       minFat,
       maxFat,
-      excluded: excluded || ''
+      excluded: excluded || '',
+      page: page || 1,
+      limit: limit || 24
     });
 
     res.json(result);

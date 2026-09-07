@@ -200,13 +200,14 @@ function passesVetoFilter(recipe, vetoKeywords) {
 /**
  * Fetch Spoonacular Complex Search
  */
-async function searchSpoonacular({ apiKey, query, minKcal, maxKcal, minProtein, maxProtein, minCarbs, maxCarbs, minFat, maxFat, excludedList }) {
+async function searchSpoonacular({ apiKey, query, minKcal, maxKcal, minProtein, maxProtein, minCarbs, maxCarbs, minFat, maxFat, excludedList, offset = 0, number = 24 }) {
   if (!apiKey) throw new Error('API Key de Spoonacular no configurada');
 
   const englishQuery = translateText(query || '');
   const url = new URL('https://api.spoonacular.com/recipes/complexSearch');
   url.searchParams.set('apiKey', apiKey);
-  url.searchParams.set('number', '16');
+  url.searchParams.set('number', String(number));
+  url.searchParams.set('offset', String(offset));
   url.searchParams.set('addRecipeInformation', 'true');
   url.searchParams.set('addRecipeNutrition', 'true');
   url.searchParams.set('fillIngredients', 'true');
@@ -240,6 +241,7 @@ async function searchSpoonacular({ apiKey, query, minKcal, maxKcal, minProtein, 
 
   const data = await res.json();
   const results = data.results || [];
+  const totalResults = data.totalResults || results.length;
 
   const mapped = results.map(item => {
     const nutrients = (item.nutrition && item.nutrition.nutrients) ? item.nutrition.nutrients : [];
@@ -418,7 +420,7 @@ async function searchEdamam({ appId, appKey, query, minKcal, maxKcal, minProtein
 }
 
 /**
- * Unified search handler for external online recipe databases
+ * Unified search handler for external online recipe databases with pagination support
  */
 async function searchOnlineRecipes({
   query = '',
@@ -431,8 +433,14 @@ async function searchOnlineRecipes({
   maxCarbs,
   minFat,
   maxFat,
-  excluded = ''
+  excluded = '',
+  page = 1,
+  limit = 24
 }) {
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const pageSize = Math.max(8, Math.min(100, parseInt(limit, 10) || 24));
+  const offset = (pageNum - 1) * pageSize;
+
   const settingsRows = db.prepare('SELECT key, value FROM api_settings').all();
   const settings = {};
   for (const row of settingsRows) {
@@ -456,7 +464,9 @@ async function searchOnlineRecipes({
     maxCarbs: maxCarbs ? Number(maxCarbs) : undefined,
     minFat: minFat ? Number(minFat) : undefined,
     maxFat: maxFat ? Number(maxFat) : undefined,
-    excludedList: combinedExcluded
+    excludedList: combinedExcluded,
+    offset,
+    number: pageSize
   };
 
   const results = [];
@@ -499,7 +509,10 @@ async function searchOnlineRecipes({
   return {
     recipes: results,
     errors: errors.length > 0 ? errors : undefined,
-    count: results.length
+    count: results.length,
+    page: pageNum,
+    limit: pageSize,
+    hasMore: results.length >= Math.min(12, Math.floor(pageSize / 2))
   };
 }
 
