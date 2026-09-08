@@ -84,7 +84,7 @@ logger = logging.getLogger("Roverr")
 logger.info("=" * 80)
 logger.info("🚀 ROVERR - MEDIA MANAGER")
 logger.info("=" * 80)
-logger.info(f"📦 Version: 4.4.87")
+logger.info(f"📦 Version: 4.4.97")
 logger.info(f"🔧 Log Level: {logging.getLevelName(logger.getEffectiveLevel())}")
 logger.info("=" * 80)
 
@@ -158,67 +158,76 @@ async def ws_progress_broadcast_task():
     last_sent_progress = None
     while True:
         try:
-            if manager.active_connections:
-                # Get active copy progress
-                progress_data = get_copy_progress() # {hash: {percent, speed, status}}
-                
-                # Get active downloading torrents progress
-                settings = load_settings()
-                
-                # Use to_thread to avoid blocking event loop
-                qb = await asyncio.to_thread(get_qb_client, settings)
-                await asyncio.to_thread(qb.auth_log_in)
-                torrents = await asyncio.to_thread(qb.torrents_info)
-                
-                from logic import update_torrent_client_status
-                update_torrent_client_status(True, settings=settings)
-                
-                active_progress = {}
-                # 1. Add downloading torrents
-                for t in torrents:
-                    if t.state in ['downloading', 'metaDL', 'allocating', 'queuedDL', 'checkingDL']:
-                        active_progress[t.hash] = {
-                            "type": "downloading",
-                            "progress": t.progress,
-                            "speed": round(t.dlspeed / 1024 / 1024, 2),
-                            "eta": t.eta,
-                            "state": t.state
-                        }
-                
-                # 2. Add copying progress
-                for t_hash, prog in progress_data.items():
-                    active_progress[t_hash] = {
-                        "type": "copying",
-                        "progress": prog.get('percent', 0) / 100.0, # Normalise to 0-1
-                        "speed": prog.get('speed', 0),
-                        "state": prog.get('status', 'copying')
+            if not manager.active_connections:
+                # When no web UI client is connected, check less frequently
+                await asyncio.sleep(3)
+                continue
+
+            # Get active copy progress
+            progress_data = get_copy_progress() # {hash: {percent, speed, status}}
+            
+            # Get active downloading torrents progress
+            settings = load_settings()
+            
+            # Use to_thread to avoid blocking event loop
+            qb = await asyncio.to_thread(get_qb_client, settings)
+            await asyncio.to_thread(qb.auth_log_in)
+            torrents = await asyncio.to_thread(qb.torrents_info)
+            
+            from logic import update_torrent_client_status
+            update_torrent_client_status(True, settings=settings)
+            
+            active_progress = {}
+            # 1. Add downloading torrents
+            for t in torrents:
+                if t.state in ['downloading', 'metaDL', 'allocating', 'queuedDL', 'checkingDL']:
+                    active_progress[t.hash] = {
+                        "type": "downloading",
+                        "progress": t.progress,
+                        "speed": round(t.dlspeed / 1024 / 1024, 2),
+                        "eta": t.eta,
+                        "state": t.state
                     }
+            
+            # 2. Add copying progress
+            for t_hash, prog in progress_data.items():
+                active_progress[t_hash] = {
+                    "type": "copying",
+                    "progress": prog.get('percent', 0) / 100.0, # Normalise to 0-1
+                    "speed": prog.get('speed', 0),
+                    "state": prog.get('status', 'copying')
+                }
+            
+            # Detect completion
+            if last_sent_progress:
+                completed_hashes = []
+                for h in last_sent_progress.keys():
+                    if h not in active_progress:
+                        completed_hashes.append(h)
                 
-                # Detect completion
-                if last_sent_progress:
-                    completed_hashes = []
-                    for h in last_sent_progress.keys():
-                        if h not in active_progress:
-                            completed_hashes.append(h)
-                    
-                    if completed_hashes:
-                        logger.info(f"Detected copy/download completion for hashes: {completed_hashes}. Syncing DB.")
-                        await asyncio.to_thread(process_torrents, None)
-                        await broadcast_movies_update()
-                
-                if active_progress or last_sent_progress:
-                    await manager.broadcast({
-                        "type": "progress",
-                        "progress": active_progress
-                    })
-                    last_sent_progress = active_progress if active_progress else None
+                if completed_hashes:
+                    logger.info(f"Detected copy/download completion for hashes: {completed_hashes}. Syncing DB.")
+                    await asyncio.to_thread(process_torrents, None)
+                    await broadcast_movies_update()
+            
+            if active_progress or last_sent_progress:
+                await manager.broadcast({
+                    "type": "progress",
+                    "progress": active_progress
+                })
+                last_sent_progress = active_progress if active_progress else None
+
+            # Adaptive interval: 1s if there is active downloading/copying progress; 3s if idle
+            if active_progress:
+                await asyncio.sleep(1)
+            else:
+                await asyncio.sleep(3)
+
         except Exception as e:
             logger.debug(f"Error in ws_progress_broadcast_task: {e}")
             from logic import update_torrent_client_status
             update_torrent_client_status(False, error=e)
-            await asyncio.sleep(4)
-            
-        await asyncio.sleep(1)
+            await asyncio.sleep(5)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
