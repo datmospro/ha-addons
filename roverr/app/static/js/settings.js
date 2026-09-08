@@ -70,6 +70,25 @@ export function initSettings() {
         editRssAutoAdd.addEventListener('change', () => toggleAutoDownloadSettings('edit-rss-auto-add', 'edit-rss-auto-download-settings'));
     }
 
+    // Live backdrop options preview
+    const blurInput = document.getElementById('setting-backdrop-blur');
+    if (blurInput) {
+        blurInput.addEventListener('input', () => {
+            const val = parseInt(blurInput.value);
+            const blurVal = isNaN(val) ? 35 : val;
+            document.documentElement.style.setProperty('--backdrop-blur', `${blurVal}px`);
+        });
+    }
+
+    const opacityInput = document.getElementById('setting-backdrop-opacity');
+    if (opacityInput) {
+        opacityInput.addEventListener('input', () => {
+            const val = parseInt(opacityInput.value);
+            const opacityVal = isNaN(val) ? 18 : val;
+            document.documentElement.style.setProperty('--backdrop-opacity', (opacityVal / 100).toString());
+        });
+    }
+
     // Settings tabs navigation
     setupSettingsTabs();
 

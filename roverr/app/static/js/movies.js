@@ -315,7 +315,7 @@ function createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel)
         if (globalBackdrop && document.getElementById('view-dashboard').classList.contains('active')) {
             globalBackdrop.style.opacity = '0';
             setTimeout(() => {
-                if (globalBackdrop.style.opacity === '0') {
+                if (globalBackdrop.style.opacity === '0' && state.getCurrentView() !== 'movie-details') {
                     globalBackdrop.style.backgroundImage = 'none';
                 }
             }, 800);
@@ -334,6 +334,22 @@ export async function showMovieDetails(hash) {
     const container = document.getElementById('movie-details-content');
     container.setAttribute('data-hash', hash);
     container.innerHTML = '<div style="text-align: center; padding: 2rem;">Loading details...</div>';
+
+    // Pre-apply backdrop immediately if cached in state
+    const globalBackdrop = document.getElementById('global-backdrop');
+    if (globalBackdrop) {
+        const cachedMovie = (state.getMovies() || []).find(m => m.torrent_hash === hash);
+        if (cachedMovie) {
+            let bgUrl = cachedMovie.backdrop_url || cachedMovie.poster_url;
+            if (bgUrl && !bgUrl.includes('placeholder')) {
+                const formattedBg = bgUrl.startsWith('http') ? bgUrl : (bgUrl.startsWith('/') ? bgUrl : `/${bgUrl}`);
+                globalBackdrop.style.backgroundImage = `url('${formattedBg}')`;
+                const settings = state.getSettings ? state.getSettings() : {};
+                const opacity = settings.backdrop_opacity !== undefined ? (settings.backdrop_opacity / 100) : 0.18;
+                globalBackdrop.style.opacity = opacity.toString();
+            }
+        }
+    }
 
     const movie = await getMovieDetails(hash);
 
@@ -387,7 +403,9 @@ function renderMovieDetails(container, movie, hash) {
         if (bgUrl) {
             const formattedBg = bgUrl.startsWith('http') ? bgUrl : (bgUrl.startsWith('/') ? bgUrl : `/${bgUrl}`);
             globalBackdrop.style.backgroundImage = `url('${formattedBg}')`;
-            globalBackdrop.style.opacity = ''; // Let CSS stylesheet/custom property handle it
+            const settings = state.getSettings ? state.getSettings() : {};
+            const opacity = settings.backdrop_opacity !== undefined ? (settings.backdrop_opacity / 100) : 0.18;
+            globalBackdrop.style.opacity = opacity.toString();
         } else {
             globalBackdrop.style.backgroundImage = 'none';
             globalBackdrop.style.opacity = '0';
@@ -537,7 +555,7 @@ function setupMovieDetailsListeners(hash) {
             if (globalBackdrop) {
                 globalBackdrop.style.opacity = '0';
                 setTimeout(() => {
-                    if (globalBackdrop.style.opacity === '0') {
+                    if (globalBackdrop.style.opacity === '0' && state.getCurrentView() !== 'movie-details') {
                         globalBackdrop.style.backgroundImage = 'none';
                     }
                 }, 800);
