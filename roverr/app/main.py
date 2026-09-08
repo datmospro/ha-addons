@@ -84,7 +84,7 @@ logger = logging.getLogger("Roverr")
 logger.info("=" * 80)
 logger.info("🚀 ROVERR - MEDIA MANAGER")
 logger.info("=" * 80)
-logger.info(f"📦 Version: 4.4.99")
+logger.info(f"📦 Version: 4.5.0")
 logger.info(f"🔧 Log Level: {logging.getLevelName(logger.getEffectiveLevel())}")
 logger.info("=" * 80)
 
@@ -235,6 +235,39 @@ async def ws_progress_broadcast_task():
             logger.error(f"Error in ws_progress_broadcast_task: {e}")
             await asyncio.sleep(3)
 
+async def auto_heal_all_movies_task():
+    """
+    On startup, inspects existing movies in the database.
+    If posters or backdrops are missing from disk, auto-heals them in background.
+    """
+    await asyncio.sleep(6) # Wait for network and app to settle
+    try:
+        from database import Movie
+        from logic import heal_movie_images_background, load_settings, POSTERS_DIR
+        settings = load_settings()
+        api_key = settings.get('tmdb_api_key')
+        if not api_key:
+            return
+            
+        logger.info("🔍 [AUTO-HEAL] Checking movies for missing local poster/backdrop files...")
+        movies_to_heal = []
+        for m in Movie.select().where(Movie.ignored == False):
+            p_file = os.path.join(POSTERS_DIR, f"{m.torrent_hash}_poster.jpg")
+            b_file = os.path.join(POSTERS_DIR, f"{m.torrent_hash}_backdrop.jpg")
+            p_missing = not (os.path.exists(p_file) and os.path.getsize(p_file) > 100)
+            b_missing = not (os.path.exists(b_file) and os.path.getsize(b_file) > 100)
+            if p_missing or b_missing:
+                movies_to_heal.append(m.torrent_hash)
+                
+        if movies_to_heal:
+            logger.info(f"🎨 [AUTO-HEAL] Healing images for {len(movies_to_heal)} movie(s)...")
+            for h in movies_to_heal:
+                await asyncio.to_thread(heal_movie_images_background, h, api_key)
+                await asyncio.sleep(0.5) # Gentle TMDB rate-limiting
+            logger.info("✅ [AUTO-HEAL] Finished image healing check.")
+    except Exception as e:
+        logger.warning(f"Auto-heal startup error: {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -250,6 +283,9 @@ async def lifespan(app: FastAPI):
     
     # Start WebSocket progress broadcast task
     asyncio.create_task(ws_progress_broadcast_task())
+    
+    # Start background auto-heal for missing images
+    asyncio.create_task(auto_heal_all_movies_task())
     
     yield
     # Shutdown
@@ -1061,7 +1097,32 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-# Serve Frontend
+# Serve Frontend and Persistent Posters
 import os
+import shutil
 static_dir = os.path.join(os.path.dirname(__file__), "static")
+posters_dir = "/data/posters" if os.path.exists("/data") else os.path.join(static_dir, "posters")
+os.makedirs(posters_dir, exist_ok=True)
+
+# Ensure default placeholder is present in posters_dir
+default_placeholder = os.path.join(static_dir, "posters", "placeholder_unidentified.png")
+target_placeholder = os.path.join(posters_dir, "placeholder_unidentified.png")
+if os.path.exists(default_placeholder) and not os.path.exists(target_placeholder):
+    try:
+        shutil.copy2(default_placeholder, target_placeholder)
+    except Exception as e:
+        logger.warning(f"Could not copy default placeholder: {e}")
+
+# Migrate existing images from static/posters to /data/posters if in Home Assistant Docker
+if os.path.exists("/data") and os.path.exists(os.path.join(static_dir, "posters")):
+    try:
+        for fname in os.listdir(os.path.join(static_dir, "posters")):
+            s_file = os.path.join(static_dir, "posters", fname)
+            d_file = os.path.join(posters_dir, fname)
+            if os.path.isfile(s_file) and not os.path.exists(d_file):
+                shutil.copy2(s_file, d_file)
+    except Exception as e:
+        logger.warning(f"Error migrating posters to /data/posters: {e}")
+
+app.mount("/posters", StaticFiles(directory=posters_dir), name="posters")
 app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")

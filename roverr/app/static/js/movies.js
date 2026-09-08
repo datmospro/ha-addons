@@ -180,8 +180,8 @@ function renderMovieCards(movies) {
         // Use poster_updated timestamp for cache-busting (only changes when poster updates)
         const cacheKey = movie.poster_updated || movie.torrent_hash.substring(0, 8);
         const posterSrc = movie.poster_url
-            ? `${movie.poster_url}?v=${cacheKey}`
-            : 'https://via.placeholder.com/300x450?text=No+Cover';
+            ? (movie.poster_url.startsWith('http') ? movie.poster_url : `${movie.poster_url}?v=${cacheKey}`)
+            : 'posters/placeholder_unidentified.png';
 
         if (card) {
             // Update existing card
@@ -359,10 +359,11 @@ function renderMovieDetails(container, movie, hash) {
     const runtime = movie.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m` : 'N/A';
     const { icon: statusIcon, label: statusLabel } = getStatusIconAndLabel(movie.status);
     const statusClass = getStatusClass(movie.status);
+    const defaultAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2364748b'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
 
     const castHTML = movie.cast && movie.cast.length > 0 ? movie.cast.map(person => `
         <div class="cast-card">
-            <img src="${person.profile_path || 'https://via.placeholder.com/185x278?text=No+Photo'}" alt="${escapeHtml(person.name)}">
+            <img src="${person.profile_path || defaultAvatar}" alt="${escapeHtml(person.name)}" onerror="this.onerror=null;this.src='${defaultAvatar}';">
             <div class="cast-name">${escapeHtml(person.name)}</div>
             <div class="cast-character">como ${escapeHtml(person.character)}</div>
         </div>
@@ -370,7 +371,7 @@ function renderMovieDetails(container, movie, hash) {
 
     const crewHTML = movie.crew && movie.crew.length > 0 ? movie.crew.map(person => `
         <div class="cast-card">
-            <img src="${person.profile_path || 'https://via.placeholder.com/185x278?text=No+Photo'}" alt="${escapeHtml(person.name)}">
+            <img src="${person.profile_path || defaultAvatar}" alt="${escapeHtml(person.name)}" onerror="this.onerror=null;this.src='${defaultAvatar}';">
             <div class="cast-name">${escapeHtml(person.name)}</div>
             <div class="cast-character">como ${escapeHtml(person.job)}</div>
         </div>
@@ -379,8 +380,13 @@ function renderMovieDetails(container, movie, hash) {
     // Update global cinematic backdrop
     const globalBackdrop = document.getElementById('global-backdrop');
     if (globalBackdrop) {
-        if (movie.backdrop_url) {
-            globalBackdrop.style.backgroundImage = `url('${movie.backdrop_url}')`;
+        let bgUrl = movie.backdrop_url;
+        if (!bgUrl && movie.poster_url && !movie.poster_url.includes('placeholder')) {
+            bgUrl = movie.poster_url;
+        }
+        if (bgUrl) {
+            const formattedBg = bgUrl.startsWith('http') ? bgUrl : (bgUrl.startsWith('/') ? bgUrl : `/${bgUrl}`);
+            globalBackdrop.style.backgroundImage = `url('${formattedBg}')`;
             globalBackdrop.style.opacity = ''; // Let CSS stylesheet/custom property handle it
         } else {
             globalBackdrop.style.backgroundImage = 'none';
@@ -388,7 +394,7 @@ function renderMovieDetails(container, movie, hash) {
         }
     }
 
-    // Este es el mismo HTML que en app.js líneas 1312-1428
+    // Modal details layout
     container.innerHTML = `
         <div class="movie-sticky-header">
             <div class="header-top">
@@ -410,7 +416,9 @@ function renderMovieDetails(container, movie, hash) {
         
         <div class="movie-details-layout">
             <div class="movie-poster-large">
-                <img src="${movie.poster_url ? `${movie.poster_url}?v=${movie.poster_updated || 0}` : 'https://via.placeholder.com/500x750?text=No+Cover'}" alt="${escapeHtml(movie.title)}">
+                <img src="${movie.poster_url ? (movie.poster_url.startsWith('http') ? movie.poster_url : `${movie.poster_url}?v=${movie.poster_updated || 0}`) : 'posters/placeholder_unidentified.png'}" 
+                     alt="${escapeHtml(movie.title)}"
+                     onerror="this.onerror=null;this.src='posters/placeholder_unidentified.png';">
             </div>
             <div class="movie-info-panel">
                 <h1>${escapeHtml(movie.title)} <span class="year">(${movie.year || 'N/A'})</span></h1>
@@ -782,8 +790,9 @@ function renderIdentifySearchResults(container, results) {
         <div class="identify-movie-result-item" 
              style="display: flex; gap: 1rem; padding: 0.75rem; border-bottom: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: background 0.2s;"
              onclick="window.executeIdentifyMovie('${movie.tmdb_id}', '${escapeHtml(movie.title)}')">
-            <img src="${movie.poster || 'https://via.placeholder.com/60x90?text=No+Cover'}" 
+            <img src="${movie.poster || 'posters/placeholder_unidentified.png'}" 
                  alt="${escapeHtml(movie.title)}" 
+                 onerror="this.onerror=null;this.src='posters/placeholder_unidentified.png';"
                  style="width: 50px; height: 75px; object-fit: cover; border-radius: 4px; flex-shrink: 0; background: var(--bg-tertiary);">
             <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center;">
                 <div style="font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem;">

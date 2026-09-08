@@ -14,6 +14,8 @@ from .mover import clean_torrent_name, sanitize_path_component, manual_move, get
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_DIR = os.path.join(APP_DIR, 'static')
+POSTERS_DIR = "/data/posters" if os.path.exists("/data") else os.path.join(STATIC_DIR, 'posters')
+os.makedirs(POSTERS_DIR, exist_ok=True)
 
 # Global TMDB cache
 _TMDB_SEARCH_CACHE = {}
@@ -39,7 +41,7 @@ def cache_tmdb_result(title, year, result):
 
 def download_image(url, filename, force=False):
     """
-    Downloads an image from url and saves it to app/static/posters/filename.
+    Downloads an image from url and saves it to POSTERS_DIR/filename.
     Returns the relative path for the frontend (e.g., 'posters/filename').
     If force=True, re-downloads even if file exists.
     """
@@ -47,32 +49,47 @@ def download_image(url, filename, force=False):
         return None
     
     try:
-        # Ensure directory exists
-        save_dir = os.path.join(STATIC_DIR, 'posters')
-        os.makedirs(save_dir, exist_ok=True)
+        os.makedirs(POSTERS_DIR, exist_ok=True)
+        save_path = os.path.join(POSTERS_DIR, filename)
         
-        save_path = os.path.join(save_dir, filename)
-        
-        # If file exists and not forcing, skip download (cache)
-        if os.path.exists(save_path) and not force:
+        # If file exists, has valid size (> 100 bytes) and not forcing, skip download (cache)
+        if os.path.exists(save_path) and os.path.getsize(save_path) > 100 and not force:
             return f"posters/{filename}"
         
-        # Log the download attempt
         old_size = os.path.getsize(save_path) if os.path.exists(save_path) else 0
-        logger.info(f"­ƒû╝´©Å [DOWNLOAD] Downloading: {url}")
-        logger.info(f"­ƒû╝´©Å [DOWNLOAD] Saving to: {save_path} (force={force}, old_size={old_size})")
+        logger.info(f"🖼️ [DOWNLOAD] Downloading: {url}")
+        logger.info(f"🖼️ [DOWNLOAD] Saving to: {save_path} (force={force}, old_size={old_size})")
         
-        res = requests.get(url, stream=True, timeout=10)
+        temp_path = f"{save_path}.tmp"
+        res = requests.get(url, stream=True, timeout=15)
         if res.status_code == 200:
-            with open(save_path, 'wb') as f:
+            with open(temp_path, 'wb') as f:
                 shutil.copyfileobj(res.raw, f)
-            new_size = os.path.getsize(save_path)
-            logger.info(f"­ƒû╝´©Å [DOWNLOAD] Success! New size: {new_size} bytes")
-            return f"posters/{filename}"
+            new_size = os.path.getsize(temp_path)
+            if new_size > 100:
+                if os.path.exists(save_path):
+                    try:
+                        os.remove(save_path)
+                    except Exception:
+                        pass
+                os.replace(temp_path, save_path)
+                logger.info(f"🖼️ [DOWNLOAD] Success! New size: {new_size} bytes")
+                return f"posters/{filename}"
+            else:
+                logger.warning(f"🖼️ [DOWNLOAD] Image too small ({new_size} bytes), discarding")
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
         else:
-            logger.error(f"­ƒû╝´©Å [DOWNLOAD] Failed! HTTP status: {res.status_code}")
+            logger.error(f"🖼️ [DOWNLOAD] Failed! HTTP status: {res.status_code}")
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
     except Exception as e:
         logger.error(f"Error downloading image {url}: {e}")
+        if 'temp_path' in locals() and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
     
     return None
 
@@ -83,8 +100,6 @@ def download_image_background(url, filename, movie_id, is_poster=True):
     try:
         local_path = download_image(url, filename, force=True)
         if local_path:
-            # Update database in a thread-safe way (create new connection if needed)
-            # Since Peewee handles connection pooling, we can just use the model
             from database import Movie
             try:
                 movie = Movie.get_by_id(movie_id)
@@ -92,8 +107,10 @@ def download_image_background(url, filename, movie_id, is_poster=True):
                     movie.poster_path = local_path
                 else:
                     movie.backdrop_path = local_path
+                movie.metadata_updated_at = datetime.now()
                 movie.save()
                 logger.info(f"Background download complete for {filename}")
+                trigger_movies_update_callback()
             except Exception as e:
                 logger.error(f"Error updating DB after background download: {e}")
     except Exception as e:
@@ -887,18 +904,21 @@ def enrich_missing_metadata_background(api_key):
                     if cleaned_year:
                         search_year = cleaned_year
 
-                metadata = fetch_complete_movie_metadata(search_title, search_year, api_key)
+                metadata = fetch_complete_movie_metadata(search_title, search_year, api_key, tmdb_id=m.tmdb_id)
                 if metadata:
                     poster_local = m.poster_path
                     backdrop_local = m.backdrop_path
 
-                    if metadata.get('poster_path') and not poster_local:
-                        poster_url = f"https://image.tmdb.org/t/p/w500{metadata.get('poster_path')}"
-                        poster_local = download_image(poster_url, f"{m.torrent_hash}_poster.jpg")
+                    p_file = os.path.join(POSTERS_DIR, f"{m.torrent_hash}_poster.jpg")
+                    b_file = os.path.join(POSTERS_DIR, f"{m.torrent_hash}_backdrop.jpg")
 
-                    if metadata.get('backdrop_path') and not backdrop_local:
+                    if metadata.get('poster_path') and (not poster_local or not (os.path.exists(p_file) and os.path.getsize(p_file) > 100)):
+                        poster_url = f"https://image.tmdb.org/t/p/w500{metadata.get('poster_path')}"
+                        poster_local = download_image(poster_url, f"{m.torrent_hash}_poster.jpg", force=True)
+
+                    if metadata.get('backdrop_path') and (not backdrop_local or not (os.path.exists(b_file) and os.path.getsize(b_file) > 100)):
                         backdrop_url = f"https://image.tmdb.org/t/p/w1280{metadata.get('backdrop_path')}"
-                        backdrop_local = download_image(backdrop_url, f"{m.torrent_hash}_backdrop.jpg")
+                        backdrop_local = download_image(backdrop_url, f"{m.torrent_hash}_backdrop.jpg", force=True)
 
                     m.title = metadata.get('title', m.title)
                     m.year = metadata.get('year', m.year)
@@ -914,43 +934,95 @@ def enrich_missing_metadata_background(api_key):
                     m.imdb_id = metadata.get('imdb_id')
                     m.imdb_rating = metadata.get('imdb_rating')
                     m.imdb_votes = metadata.get('imdb_votes')
-                    m.tmdb_id = metadata.get('tmdb_id')
+                    m.tmdb_id = metadata.get('tmdb_id') or m.tmdb_id
                     m.country_code = metadata.get('country_code')
                     m.watch_providers = metadata.get('watch_providers')
                     m.metadata_updated_at = datetime.now()
                     m.save()
                     updated_any = True
-                    logger.info(f"Ô£à [TMDB AUTO-ENRICH] Successfully updated '{m.title}' ({m.year})")
+                    logger.info(f"✅ [TMDB AUTO-ENRICH] Successfully updated '{m.title}' ({m.year})")
             except Exception as e:
-                logger.warning(f"ÔÜá´©Å [TMDB AUTO-ENRICH] Failed for '{m.title}': {e}")
+                logger.warning(f"⚠️ [TMDB AUTO-ENRICH] Failed for '{m.title}': {e}")
 
         if updated_any:
             trigger_movies_update_callback()
     except Exception as e:
-        logger.error(f"ÔØî [TMDB AUTO-ENRICH] Background thread error: {e}")
+        logger.error(f"❌ [TMDB AUTO-ENRICH] Background thread error: {e}")
+
+def heal_movie_images_background(torrent_hash, api_key):
+    """
+    Auto-heals missing poster and backdrop for a movie using TMDB ID or title/year.
+    Downloads images to POSTERS_DIR, updates DB, and notifies UI via WebSocket.
+    """
+    if not api_key or not torrent_hash:
+        return
+    try:
+        from database import Movie
+        movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
+        if not movie:
+            return
+
+        poster_file = f"{torrent_hash}_poster.jpg"
+        backdrop_file = f"{torrent_hash}_backdrop.jpg"
+
+        poster_full_path = os.path.join(POSTERS_DIR, poster_file)
+        backdrop_full_path = os.path.join(POSTERS_DIR, backdrop_file)
+
+        poster_needed = not (os.path.exists(poster_full_path) and os.path.getsize(poster_full_path) > 100)
+        backdrop_needed = not (os.path.exists(backdrop_full_path) and os.path.getsize(backdrop_full_path) > 100)
+
+        if not poster_needed and not backdrop_needed:
+            return
+
+        tmdb_data = None
+        # 1. Try exact TMDB ID first
+        if movie.tmdb_id:
+            try:
+                url = f"https://api.themoviedb.org/3/movie/{movie.tmdb_id}"
+                res = requests.get(url, params={"api_key": api_key, "language": get_language()}, timeout=5)
+                if res.status_code == 200:
+                    tmdb_data = res.json()
+            except Exception as e:
+                logger.warning(f"Failed fetching TMDB ID {movie.tmdb_id} for healing: {e}")
+
+        # 2. Try title/year search if no TMDB ID or fetch failed
+        if not tmdb_data and movie.title:
+            try:
+                tmdb_data = fetch_complete_movie_metadata(movie.title, movie.year, api_key, images_only=True)
+            except Exception as e:
+                logger.warning(f"Failed searching TMDB for healing '{movie.title}': {e}")
+
+        if tmdb_data:
+            updated = False
+            if poster_needed and tmdb_data.get('poster_path'):
+                p_url = f"https://image.tmdb.org/t/p/w500{tmdb_data.get('poster_path')}"
+                downloaded_poster = download_image(p_url, poster_file, force=True)
+                if downloaded_poster:
+                    movie.poster_path = downloaded_poster
+                    updated = True
+
+            if backdrop_needed and tmdb_data.get('backdrop_path'):
+                b_url = f"https://image.tmdb.org/t/p/w1280{tmdb_data.get('backdrop_path')}"
+                downloaded_backdrop = download_image(b_url, backdrop_file, force=True)
+                if downloaded_backdrop:
+                    movie.backdrop_path = downloaded_backdrop
+                    updated = True
+
+            if not movie.tmdb_id and tmdb_data.get('id'):
+                movie.tmdb_id = tmdb_data.get('id')
+                updated = True
+
+            if updated:
+                movie.metadata_updated_at = datetime.now()
+                movie.save()
+                logger.info(f"✅ Auto-healed images for '{movie.title}'")
+                trigger_movies_update_callback()
+    except Exception as e:
+        logger.error(f"Error in heal_movie_images_background for {torrent_hash}: {e}")
 
 def re_download_poster_background(title, year, torrent_hash, api_key):
-    """
-    Re-downloads missing poster asynchronously without blocking API responses.
-    """
-    try:
-        search_url = "https://api.themoviedb.org/3/search/movie"
-        params = {"api_key": api_key, "query": title, "language": get_language(), "year": year}
-        res = requests.get(search_url, params=params, timeout=5)
-        if res.status_code == 200:
-            data = res.json()
-            if data.get('results'):
-                result = data['results'][0]
-                if result.get('poster_path'):
-                    poster_url = f"https://image.tmdb.org/t/p/w500{result.get('poster_path')}"
-                    new_poster = download_image(poster_url, f"{torrent_hash}_poster.jpg", force=True)
-                    if new_poster:
-                        movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
-                        if movie:
-                            movie.poster_path = new_poster
-                            movie.save()
-    except Exception as e:
-        logger.warning(f"Background poster re-download failed for {title}: {e}")
+    """Backwards-compatible alias for heal_movie_images_background"""
+    heal_movie_images_background(torrent_hash, api_key)
 
 from .client import get_torrent_client_status, get_qb_client
 
@@ -964,27 +1036,39 @@ def get_movie_data(torrents, api_key):
     
     # Return all movies from DB (excluding ignored)
     movies = []
-    base_dir = STATIC_DIR
     
     for m in Movie.select().where((Movie.ignored == False) & ((Movie.watchlist == False) | (Movie.watchlist.is_null()))).order_by(Movie.added_at.desc()):
-        # Check if poster file exists, if not use placeholder and re-download in background
         poster_display = 'posters/placeholder_unidentified.png'
+        poster_missing = True
         if m.poster_path:
-            poster_full_path = os.path.join(base_dir, m.poster_path)
-            if os.path.exists(poster_full_path):
-                poster_display = m.poster_path
-            else:
-                logger.warning(f"Poster file missing on disk for {m.title}, triggering background download")
-                threading.Thread(
-                    target=re_download_poster_background,
-                    args=(m.title, m.year, m.torrent_hash, api_key)
-                ).start()
+            poster_filename = os.path.basename(m.poster_path)
+            poster_full_path = os.path.join(POSTERS_DIR, poster_filename)
+            if os.path.exists(poster_full_path) and os.path.getsize(poster_full_path) > 100:
+                poster_display = f"posters/{poster_filename}"
+                poster_missing = False
+        
+        backdrop_display = None
+        backdrop_missing = True
+        if m.backdrop_path:
+            backdrop_filename = os.path.basename(m.backdrop_path)
+            backdrop_full_path = os.path.join(POSTERS_DIR, backdrop_filename)
+            if os.path.exists(backdrop_full_path) and os.path.getsize(backdrop_full_path) > 100:
+                backdrop_display = f"posters/{backdrop_filename}"
+                backdrop_missing = False
+        
+        # If either image is missing on disk, auto-heal in background
+        if (poster_missing or backdrop_missing) and api_key and (m.tmdb_id or m.title):
+            threading.Thread(
+                target=heal_movie_images_background,
+                args=(m.torrent_hash, api_key),
+                daemon=True
+            ).start()
         
         movies.append({
             "title": m.title,
             "year": m.year,
             "poster_url": poster_display,
-            "backdrop_url": m.backdrop_path,
+            "backdrop_url": backdrop_display,
             "overview": m.overview,
             "torrent_hash": m.torrent_hash,
             "status": m.status,
@@ -1408,53 +1492,62 @@ def get_movie_details(torrent_hash, api_key):
             cast = json.loads(movie.cast) if movie.cast else []
             crew = json.loads(movie.crew) if movie.crew else []
             
-            # Validate image paths - ensure they exist, re-download if missing
+            # Validate image paths - ensure they exist on disk, heal if missing
             poster_url = None
             backdrop_url = None
             
-            if movie.poster_path:
-                # Check if file actually exists
-                poster_full_path = os.path.join(STATIC_DIR, movie.poster_path)
-                if os.path.exists(poster_full_path):
-                    poster_url = movie.poster_path
-                else:
-                    # Image missing, try to re-download from TMDB if we have metadata
-                    logger.warning(f"Poster missing for {movie.title}, attempting re-download")
-                    try:
-                        # Use images_only=True to be much faster
-                        metadata = fetch_complete_movie_metadata(movie.title, movie.year, api_key, images_only=True)
-                        if metadata and metadata.get('poster_path'):
-                            # Use remote URL immediately
-                            poster_url = f"https://image.tmdb.org/t/p/w500{metadata.get('poster_path')}"
-                            # Trigger background download
-                            threading.Thread(
-                                target=download_image_background,
-                                args=(poster_url, f"{torrent_hash}_poster.jpg", movie.id, True)
-                            ).start()
-                    except Exception as e:
-                        logger.error(f"Error triggering background poster download: {e}")
+            poster_file = os.path.basename(movie.poster_path) if movie.poster_path else f"{torrent_hash}_poster.jpg"
+            poster_full_path = os.path.join(POSTERS_DIR, poster_file)
+            
+            backdrop_file = os.path.basename(movie.backdrop_path) if movie.backdrop_path else f"{torrent_hash}_backdrop.jpg"
+            backdrop_full_path = os.path.join(POSTERS_DIR, backdrop_file)
+            
+            if os.path.exists(poster_full_path) and os.path.getsize(poster_full_path) > 100:
+                poster_url = f"posters/{poster_file}"
+                
+            if os.path.exists(backdrop_full_path) and os.path.getsize(backdrop_full_path) > 100:
+                backdrop_url = f"posters/{backdrop_file}"
+                
+            # If poster or backdrop is missing on disk, resolve from TMDB immediately!
+            if (not poster_url or not backdrop_url) and api_key:
+                logger.warning(f"Images missing on disk for '{movie.title}', resolving from TMDB...")
+                try:
+                    tmdb_data = None
+                    if movie.tmdb_id:
+                        url = f"https://api.themoviedb.org/3/movie/{movie.tmdb_id}"
+                        res = requests.get(url, params={"api_key": api_key, "language": get_language()}, timeout=5)
+                        if res.status_code == 200:
+                            tmdb_data = res.json()
                     
-            if movie.backdrop_path:
-                # Check if file actually exists
-                backdrop_full_path = os.path.join(STATIC_DIR, movie.backdrop_path)
-                if os.path.exists(backdrop_full_path):
-                    backdrop_url = movie.backdrop_path
-                else:
-                    # Image missing, try to re-download from TMDB if we have metadata
-                    logger.warning(f"Backdrop missing for {movie.title}, attempting re-download")
-                    try:
-                        # Use images_only=True to be much faster
-                        metadata = fetch_complete_movie_metadata(movie.title, movie.year, api_key, images_only=True)
-                        if metadata and metadata.get('backdrop_path'):
-                            # Use remote URL immediately
-                            backdrop_url = f"https://image.tmdb.org/t/p/w1280{metadata.get('backdrop_path')}"
-                            # Trigger background download
+                    if not tmdb_data and movie.title:
+                        tmdb_data = fetch_complete_movie_metadata(movie.title, movie.year, api_key, images_only=True)
+                    
+                    if tmdb_data:
+                        if not poster_url and tmdb_data.get('poster_path'):
+                            remote_poster = f"https://image.tmdb.org/t/p/w500{tmdb_data.get('poster_path')}"
+                            poster_url = remote_poster
                             threading.Thread(
                                 target=download_image_background,
-                                args=(backdrop_url, f"{torrent_hash}_backdrop.jpg", movie.id, False)
+                                args=(remote_poster, poster_file, movie.id, True),
+                                daemon=True
                             ).start()
-                    except Exception as e:
-                        logger.error(f"Error triggering background backdrop download: {e}")
+                            
+                        if not backdrop_url and tmdb_data.get('backdrop_path'):
+                            remote_backdrop = f"https://image.tmdb.org/t/p/w1280{tmdb_data.get('backdrop_path')}"
+                            backdrop_url = remote_backdrop
+                            threading.Thread(
+                                target=download_image_background,
+                                args=(remote_backdrop, backdrop_file, movie.id, False),
+                                daemon=True
+                            ).start()
+                except Exception as e:
+                    logger.error(f"Error resolving missing images from TMDB for {movie.title}: {e}")
+                    
+            if not poster_url:
+                poster_url = 'posters/placeholder_unidentified.png'
+                
+            if not backdrop_url and poster_url and not 'placeholder' in poster_url:
+                backdrop_url = poster_url
             
             watch_prov_raw = movie.watch_providers if hasattr(movie, 'watch_providers') else None
             source_info = detect_source_info(movie.torrent_name or name, watch_prov_raw)
