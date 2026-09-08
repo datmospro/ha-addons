@@ -10,7 +10,7 @@ import {
     batchCopyMovies, batchDeleteMovies, stopCopy as apiStopCopy,
     searchIndexers, addTorrent
 } from './api.js';
-import { showToast, formatBytes, getProgressClass, escapeHtml, openModal, closeModal } from './ui.js';
+import { showToast, formatBytes, getProgressClass, escapeHtml, openModal, closeModal, updateTorrentClientAlert } from './ui.js';
 import { getStatusClass, getStatusIconAndLabel } from './templates.js';
 import { switchView, getCurrentView } from './navigation.js';
 
@@ -91,6 +91,22 @@ export function initMovies() {
             }
         });
     }
+
+    // Setup retry client connection button
+    const retryClientBtn = document.getElementById('retry-client-btn');
+    if (retryClientBtn) {
+        retryClientBtn.addEventListener('click', async () => {
+            const { setButtonLoading } = await import('./ui.js');
+            setButtonLoading(retryClientBtn, true, 'Reintentando...');
+            try {
+                const { fetchTorrents } = await import('./dashboard.js');
+                await fetchTorrents();
+                await fetchMovies();
+            } finally {
+                setButtonLoading(retryClientBtn, false);
+            }
+        });
+    }
 }
 
 /**
@@ -107,6 +123,9 @@ export async function fetchMovies(isPolling = false) {
     const data = await getMovies();
     const movies = data.movies;
     const ignored = data.ignored_series;
+
+    // Update Torrent Client Status Alert
+    updateTorrentClientAlert(data.client_status);
 
     // Update Series Notification
     updateSeriesNotification(ignored);

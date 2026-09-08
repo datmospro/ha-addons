@@ -52,11 +52,25 @@ export async function getMovies() {
         // Handle new response format
         return {
             movies: Array.isArray(data) ? data : (data.movies || []),
-            ignored_series: data.ignored_series || []
+            ignored_series: data.ignored_series || [],
+            client_status: data.client_status || null
         };
     } catch (e) {
         console.error("Error fetching movies:", e);
-        return { movies: [], ignored_series: [] };
+        return { movies: [], ignored_series: [], client_status: null };
+    }
+}
+
+/**
+ * Obtiene el estado de conexión del cliente torrent (qBittorrent)
+ */
+export async function getClientStatus() {
+    try {
+        const res = await fetch(`${API_BASE}/client-status?t=${Date.now()}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+    } catch (e) {
+        return { connected: false, error_type: 'offline', last_error: 'No se puede conectar con el servidor Roverr' };
     }
 }
 

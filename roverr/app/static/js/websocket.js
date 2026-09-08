@@ -38,8 +38,20 @@ export function connectWebSocket() {
                 const { updateSeriesNotification, renderMovieCards } = await import('./movies.js');
                 updateSeriesNotification(data.ignored_series || []);
                 renderMovieCards(data.movies || []);
+
+                if (data.client_status !== undefined) {
+                    const { updateTorrentClientAlert } = await import('./ui.js');
+                    updateTorrentClientAlert(data.client_status);
+                }
             } else if (data.type === 'progress') {
                 updateRealtimeProgress(data.progress);
+                if (data.client_status !== undefined) {
+                    const { updateTorrentClientAlert } = await import('./ui.js');
+                    updateTorrentClientAlert(data.client_status);
+                }
+            } else if (data.type === 'client_status') {
+                const { updateTorrentClientAlert } = await import('./ui.js');
+                updateTorrentClientAlert(data.client_status);
             }
         } catch (e) {
             console.error('Error handling WebSocket message:', e);

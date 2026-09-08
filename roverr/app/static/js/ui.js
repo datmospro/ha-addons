@@ -215,3 +215,71 @@ export function getProgressClass(state) {
     if (state === 'error') return 'error';
     return 'completed';
 }
+
+/**
+ * Actualiza el banner de alerta y el indicador de estado del cliente torrent (qBittorrent)
+ * @param {Object} status - Estado del cliente { connected, last_error, error_type, host, port }
+ */
+export function updateTorrentClientAlert(status) {
+    const alertBanner = document.getElementById('torrent-client-alert');
+    const sidebarIndicator = document.getElementById('sidebar-qb-status');
+    const alertTitle = document.getElementById('client-alert-title-text');
+    const alertDesc = document.getElementById('client-alert-desc');
+    const alertTips = document.getElementById('client-alert-tips-list');
+    
+    if (!status || status.connected) {
+        if (alertBanner) alertBanner.style.display = 'none';
+        if (sidebarIndicator) {
+            sidebarIndicator.className = 'qb-status-indicator online';
+            sidebarIndicator.title = `qBittorrent: Conectado (${status?.host || 'OK'})`;
+            const text = sidebarIndicator.querySelector('.qb-status-text');
+            if (text) text.textContent = 'qBittorrent OK';
+        }
+        return;
+    }
+
+    // Torrent client is disconnected!
+    if (sidebarIndicator) {
+        sidebarIndicator.className = 'qb-status-indicator offline';
+        sidebarIndicator.title = `qBittorrent: Desconectado (${status.host}:${status.port})`;
+        const text = sidebarIndicator.querySelector('.qb-status-text');
+        if (text) text.textContent = 'qBittorrent Desconectado';
+    }
+
+    if (alertBanner) {
+        alertBanner.style.display = 'flex';
+        
+        const hostPort = `${escapeHtml(status.host || '192.168.0.169')}:${escapeHtml(String(status.port || '8080'))}`;
+        
+        if (status.error_type === 'connection_refused') {
+            if (alertTitle) alertTitle.textContent = '⚠️ qBittorrent no responde (Conexión rechazada)';
+            if (alertDesc) alertDesc.innerHTML = `No se puede conectar con qBittorrent en <strong>${hostPort}</strong>. La aplicación o contenedor parece estar <strong>cerrado</strong> o su Web UI inactiva.`;
+            if (alertTips) {
+                alertTips.innerHTML = `
+                    <li><strong>1.</strong> Abre la aplicación o contenedor de <strong>qBittorrent</strong> si se ha cerrado.</li>
+                    <li><strong>2.</strong> En qBittorrent, entra en <em>Herramientas → Opciones → Interfaz Web</em> y comprueba que esté habilitada en el puerto <strong>${escapeHtml(String(status.port || '8080'))}</strong>.</li>
+                    <li><strong>3.</strong> Una vez abierto qBittorrent, haz clic en <strong>Reintentar</strong> a la derecha.</li>
+                `;
+            }
+        } else if (status.error_type === 'timeout') {
+            if (alertTitle) alertTitle.textContent = '⚠️ Tiempo de espera agotado con qBittorrent';
+            if (alertDesc) alertDesc.innerHTML = `No hay respuesta de <strong>${hostPort}</strong>.`;
+            if (alertTips) {
+                alertTips.innerHTML = `
+                    <li><strong>1.</strong> Comprueba que el equipo donde corre qBittorrent esté encendido y conectado a la red.</li>
+                    <li><strong>2.</strong> Verifica si la dirección IP del equipo ha cambiado por DHCP.</li>
+                    <li><strong>3.</strong> Revisa si el cortafuegos está bloqueando el puerto <strong>${escapeHtml(String(status.port || '8080'))}</strong>.</li>
+                `;
+            }
+        } else {
+            if (alertTitle) alertTitle.textContent = '⚠️ Error de conexión con qBittorrent';
+            if (alertDesc) alertDesc.textContent = status.last_error || 'Error al conectar con el cliente torrent.';
+            if (alertTips) {
+                alertTips.innerHTML = `
+                    <li><strong>1.</strong> Comprueba el usuario y contraseña de qBittorrent en Ajustes de Roverr.</li>
+                    <li><strong>2.</strong> Verifica que la Web UI de qBittorrent permita conexiones desde la red local.</li>
+                `;
+            }
+        }
+    }
+}

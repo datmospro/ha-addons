@@ -176,3 +176,138 @@
     color: var(--status-downloading-text);
     border-color: rgba(99, 102, 241, 0.2) !important;
 }
+
+/* ========== Torrent Client Alert Banner ========== */
+.client-alert-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.16) 0%, rgba(185, 28, 28, 0.1) 100%);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 14px 0 20px 0;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.15);
+}
+
+.client-alert-icon-box {
+    font-size: 1.8rem;
+    color: #ef4444;
+    padding-top: 2px;
+    flex-shrink: 0;
+}
+
+.client-alert-content {
+    flex: 1;
+}
+
+.client-alert-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #fca5a5;
+    margin-bottom: 4px;
+}
+
+.client-alert-desc {
+    font-size: 0.9rem;
+    color: #e2e8f0;
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+.client-alert-tips {
+    font-size: 0.82rem;
+    color: #cbd5e1;
+    background: rgba(0, 0, 0, 0.35);
+    padding: 10px 14px;
+    border-radius: 8px;
+    border-left: 3px solid #ef4444;
+}
+
+.client-alert-tips strong {
+    color: #f87171;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.client-alert-tips li {
+    margin-bottom: 4px;
+    line-height: 1.4;
+}
+
+.client-alert-tips li:last-child {
+    margin-bottom: 0;
+}
+
+.client-alert-actions {
+    align-self: center;
+    flex-shrink: 0;
+}
+
+.btn-alert-retry {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fff;
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    padding: 9px 18px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-alert-retry:hover {
+    background: #ef4444;
+    border-color: #ef4444;
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.5);
+    transform: translateY(-1px);
+}
+
+/* ========== Sidebar qBittorrent Indicator ========== */
+.qb-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    padding: 5px 10px;
+    border-radius: 20px;
+    margin-bottom: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+}
+
+.qb-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 8px #22c55e;
+    flex-shrink: 0;
+}
+
+.qb-status-indicator.offline {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.35);
+}
+
+.qb-status-indicator.offline .qb-status-dot {
+    background: #ef4444;
+    box-shadow: 0 0 8px #ef4444;
+    animation: pulseDot 1.5s infinite;
+}
+
+.qb-status-indicator.offline .qb-status-text {
+    color: #fca5a5;
+    font-weight: 600;
+}
+
+@keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+}

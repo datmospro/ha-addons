@@ -54,10 +54,12 @@ async def broadcast_movies_update():
                     if prog['status'] == 'copying':
                         movie['status'] = 'copying'
                         
+        from logic import get_torrent_client_status
         await manager.broadcast({
             "type": "movies",
             "movies": data.get("movies", []) if data else [],
-            "ignored_series": data.get("ignored_series", []) if data else []
+            "ignored_series": data.get("ignored_series", []) if data else [],
+            "client_status": get_torrent_client_status()
         })
     except Exception as e:
         logger.error(f"Error broadcasting movies update: {e}")
@@ -168,6 +170,9 @@ async def ws_progress_broadcast_task():
                 await asyncio.to_thread(qb.auth_log_in)
                 torrents = await asyncio.to_thread(qb.torrents_info)
                 
+                from logic import update_torrent_client_status
+                update_torrent_client_status(True, settings=settings)
+                
                 active_progress = {}
                 # 1. Add downloading torrents
                 for t in torrents:
@@ -209,6 +214,9 @@ async def ws_progress_broadcast_task():
                     last_sent_progress = active_progress if active_progress else None
         except Exception as e:
             logger.debug(f"Error in ws_progress_broadcast_task: {e}")
+            from logic import update_torrent_client_status
+            update_torrent_client_status(False, error=e)
+            await asyncio.sleep(4)
             
         await asyncio.sleep(1)
 
@@ -308,12 +316,18 @@ def get_indexer_stats(indexer_id: int):
         return {"success": False, "message": str(e)}
 
 
+@app.get("/api/client-status")
+def api_get_client_status():
+    from logic import get_torrent_client_status
+    return get_torrent_client_status()
+
 @app.get("/api/movies")
 def get_movies():
     settings = load_settings()
+    from logic import get_torrent_client_status
     api_key = settings.get('tmdb_api_key')
     if not api_key:
-        return {"movies": [], "ignored_series": []}
+        return {"movies": [], "ignored_series": [], "client_status": get_torrent_client_status()}
     
     torrents = get_active_torrents(None)
     from logic import get_movie_data # Import here to avoid circular dependency if any
@@ -332,6 +346,11 @@ def get_movies():
                 if prog['status'] == 'copying':
                     movie['status'] = 'copying'
                     logger.info(f"[API Movies] Forcing status to copying for {t_hash}")
+    
+    if data:
+        data['client_status'] = get_torrent_client_status()
+    else:
+        data = {'movies': [], 'ignored_series': [], 'client_status': get_torrent_client_status()}
     
     return data
 
@@ -996,10 +1015,12 @@ async def websocket_endpoint(websocket: WebSocket):
                     if prog['status'] == 'copying':
                         movie['status'] = 'copying'
                         
+        from logic import get_torrent_client_status
         await websocket.send_json({
             "type": "initial",
             "movies": data.get("movies", []) if data else [],
-            "ignored_series": data.get("ignored_series", []) if data else []
+            "ignored_series": data.get("ignored_series", []) if data else [],
+            "client_status": get_torrent_client_status()
         })
         
         while True:

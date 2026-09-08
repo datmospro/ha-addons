@@ -100,6 +100,73 @@ RSS_LAST_FETCH = {} # {feed_url: timestamp} - Track last fetch time for each RSS
 RESERVED_SPACE = {} # {dest_path: reserved_bytes} - Track space reserved by active copies
 SPACE_LOCK = threading.Lock() # Thread-safe access to RESERVED_SPACE
 
+# Global torrent client connection status
+_torrent_client_status = {
+    "connected": True,
+    "last_error": None,
+    "error_type": None,
+    "host": None,
+    "port": None,
+    "last_checked": None
+}
+
+def get_torrent_client_status():
+    global _torrent_client_status
+    return dict(_torrent_client_status)
+
+def update_torrent_client_status(success: bool, error: Exception = None, settings: dict = None):
+    global _torrent_client_status
+    now_iso = datetime.now().isoformat()
+    if settings is None:
+        try:
+            settings = load_settings()
+        except Exception:
+            settings = {}
+    host = settings.get('qb_host', 'localhost')
+    port = settings.get('qb_port', 8080)
+    
+    prev_connected = _torrent_client_status.get("connected", True)
+    
+    if success:
+        _torrent_client_status = {
+            "connected": True,
+            "last_error": None,
+            "error_type": None,
+            "host": host,
+            "port": port,
+            "last_checked": now_iso
+        }
+        if not prev_connected:
+            logger.info("✅ [TORRENT CLIENT] Connection to qBittorrent restored!")
+            trigger_movies_update_callback()
+    else:
+        err_str = str(error) if error else "Error desconocido"
+        is_refused = "Connection refused" in err_str or "111" in err_str or "refused" in err_str.lower()
+        is_timeout = "timeout" in err_str.lower() or "timed out" in err_str.lower()
+        
+        if is_refused:
+            err_type = "connection_refused"
+            friendly_msg = f"Conexión rechazada al conectar a qBittorrent ({host}:{port}). Asegúrate de que qBittorrent esté abierto y con la Web UI activa."
+        elif is_timeout:
+            err_type = "timeout"
+            friendly_msg = f"Tiempo de espera agotado al conectar a qBittorrent ({host}:{port}). Comprueba la IP o el cortafuegos."
+        else:
+            err_type = "connection_error"
+            friendly_msg = f"Error al conectar con qBittorrent ({host}:{port}): {err_str}"
+            
+        _torrent_client_status = {
+            "connected": False,
+            "last_error": friendly_msg,
+            "error_type": err_type,
+            "raw_error": err_str,
+            "host": host,
+            "port": port,
+            "last_checked": now_iso
+        }
+        if prev_connected:
+            logger.warning(f"⚠️ [TORRENT CLIENT] Connection lost: {friendly_msg}")
+            trigger_movies_update_callback()
+
 # ✅ PHASE 2: TMDB Search Cache
 _TMDB_SEARCH_CACHE = {}  # {cache_key: (timestamp, result)}
 TMDB_CACHE_TTL = 3600  # 1 hour cache TTL
@@ -1409,7 +1476,7 @@ def get_movie_data(torrents, api_key):
         if is_series(t['name']) and not Movie.select().where(Movie.torrent_hash == t['hash']).exists():
             ignored_series.append(t['name'])
             
-    return {"movies": movies, "ignored_series": ignored_series}
+    return {"movies": movies, "ignored_series": ignored_series, "client_status": get_torrent_client_status()}
 
 def identify_movie(torrent_hash, tmdb_id, api_key):
     """
@@ -2573,7 +2640,9 @@ def process_torrents(config_ignored=None):
     try:
         qb = get_qb_client(settings)
         qb.auth_log_in()
+        update_torrent_client_status(True, settings=settings)
     except Exception as e:
+        update_torrent_client_status(False, error=e, settings=settings)
         logger.error(f"Failed to connect to torrent client: {e}")
         return
 
@@ -2610,6 +2679,7 @@ def get_active_torrents(config_ignored=None):
     try:
         qb = get_qb_client(settings)
         qb.auth_log_in()
+        update_torrent_client_status(True, settings=settings)
         
         # Get all torrents
         torrents = qb.torrents_info()
@@ -2688,6 +2758,7 @@ def get_active_torrents(config_ignored=None):
             
         return results
     except Exception as e:
+        update_torrent_client_status(False, error=e, settings=settings)
         logger.error(f"Error getting torrents: {e}")
         return []
 

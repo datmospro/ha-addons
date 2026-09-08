@@ -45,7 +45,11 @@
                 </button>
             </nav>
             <div class="sidebar-footer">
-                <span id="version-info">v4.4.87</span>
+                <div id="sidebar-qb-status" class="qb-status-indicator online" title="qBittorrent: Conectado">
+                    <span class="qb-status-dot"></span>
+                    <span class="qb-status-text">qBittorrent OK</span>
+                </div>
+                <span id="version-info">v4.4.96</span>
             </div>
         </aside>
 
@@ -84,6 +88,31 @@
                             <button id="refresh-btn" class="btn secondary"><i class="fa-solid fa-rotate"></i>
                                 Refresh</button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Torrent Client Alert Banner -->
+                <div id="torrent-client-alert" class="client-alert-banner" style="display: none;">
+                    <div class="client-alert-icon-box">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div class="client-alert-content">
+                        <div class="client-alert-title" id="client-alert-title-text">⚠️ qBittorrent no responde (Conexión rechazada)</div>
+                        <div class="client-alert-desc" id="client-alert-desc">
+                            No se puede conectar con qBittorrent en 192.168.0.169:8080.
+                        </div>
+                        <div class="client-alert-tips">
+                            <strong>¿Qué puedes hacer?</strong>
+                            <ul id="client-alert-tips-list" style="margin: 4px 0 0 16px; padding: 0;">
+                                <li>Abre qBittorrent si se ha cerrado en tu ordenador o servidor.</li>
+                                <li>En qBittorrent ve a <em>Herramientas → Opciones → Interfaz Web</em> y verifica que esté activa.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="client-alert-actions">
+                        <button id="retry-client-btn" class="btn-alert-retry">
+                            <i class="fa-solid fa-rotate"></i> Reintentar
+                        </button>
                     </div>
                 </div>
 
