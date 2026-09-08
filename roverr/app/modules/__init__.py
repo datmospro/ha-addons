@@ -25,7 +25,8 @@ from .mover import (
 )
 from .client import (
     _torrent_client_status, get_torrent_client_status, update_torrent_client_status,
-    check_torrent_size_available, get_qb_client, process_torrents, get_active_torrents
+    check_torrent_size_available, get_qb_client, process_torrents, get_active_torrents,
+    test_qbittorrent_connection
 )
 from .tmdb import (
     _TMDB_SEARCH_CACHE, TMDB_CACHE_TTL, _TITLE_CACHE,
@@ -66,6 +67,7 @@ __all__ = [
     'manual_move', 'mark_as_moved', 'process_single_torrent',
     '_torrent_client_status', 'get_torrent_client_status', 'update_torrent_client_status',
     'check_torrent_size_available', 'get_qb_client', 'process_torrents', 'get_active_torrents',
+    'test_qbittorrent_connection',
     '_TMDB_SEARCH_CACHE', 'TMDB_CACHE_TTL', '_TITLE_CACHE',
     'get_cached_tmdb_result', 'cache_tmdb_result',
     'download_image', 'download_image_background',

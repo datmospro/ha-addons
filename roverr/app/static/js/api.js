@@ -277,6 +277,20 @@ export async function testTelegram(token, chatId) {
 /**
  * Prueba la conexion al Receptor localmente a través del backend python
  */
+export async function testQBittorrent(host, port, username, password) {
+    try {
+        const res = await fetch(`${API_BASE}/test_qbittorrent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ host, port, username, password })
+        });
+        return await res.json();
+    } catch (e) {
+        console.error("Error testing qBittorrent:", e);
+        return { success: false, message: 'Failed to reach qBittorrent test endpoint.' };
+    }
+}
+
 export async function testReceptor(host, port) {
     try {
         const res = await fetch(`${API_BASE}/test_receptor`, {

@@ -22,6 +22,7 @@ export function initSettings() {
 
     // Setup event listeners
     document.getElementById('save-settings-btn')?.addEventListener('click', handleSaveSettings);
+    document.getElementById('test-qb-btn')?.addEventListener('click', handleTestQBittorrent);
     document.getElementById('add-indexer-btn')?.addEventListener('click', addIndexer);
     document.getElementById('test-indexer-btn')?.addEventListener('click', handleTestIndexer);
     document.getElementById('add-rss-btn')?.addEventListener('click', addRSSFeed);
@@ -427,7 +428,49 @@ async function handleTestReceptor() {
 }
 
 /**
- * AÃ±ade un RSS feed
+ * Prueba la conexion a qBittorrent
+ */
+async function handleTestQBittorrent() {
+    const host = document.getElementById('setting-qb-host').value.trim();
+    const port = parseInt(document.getElementById('setting-qb-port').value) || 8080;
+    const username = document.getElementById('setting-qb-user').value.trim();
+    const password = document.getElementById('setting-qb-pass').value;
+
+    if (!host) {
+        showToast('Please enter the qBittorrent Host or IP', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('test-qb-btn');
+    setButtonLoading(btn, true, 'Testing...');
+
+    try {
+        const { testQBittorrent } = await import('./api.js');
+        const startTime = Date.now();
+        const data = await testQBittorrent(host, port, username, password);
+        const duration = Date.now() - startTime;
+        if (duration < 500) {
+            await new Promise(resolve => setTimeout(resolve, 500 - duration));
+        }
+
+        if (data.success) {
+            showToast(data.message, 'success', 5000);
+            const { updateTorrentClientAlert } = await import('./ui.js');
+            updateTorrentClientAlert({ connected: true, host, port });
+        } else {
+            showToast(data.message, 'error', 7000);
+            const { updateTorrentClientAlert } = await import('./ui.js');
+            updateTorrentClientAlert({ connected: false, host, port, last_error: data.message });
+        }
+    } catch (e) {
+        showToast('Error testing qBittorrent connection locally', 'error');
+    }
+
+    setButtonLoading(btn, false);
+}
+
+/**
+ * Añade un RSS feed
  * LÃ­neas 869-913 de app.js
  */
 function addRSSFeed() {

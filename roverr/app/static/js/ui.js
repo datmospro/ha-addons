@@ -227,11 +227,32 @@ export function updateTorrentClientAlert(status) {
     const alertDesc = document.getElementById('client-alert-desc');
     const alertTips = document.getElementById('client-alert-tips-list');
     
+    if (sidebarIndicator && !sidebarIndicator._hasClick) {
+        sidebarIndicator._hasClick = true;
+        sidebarIndicator.addEventListener('click', () => {
+            const navSettings = document.querySelector('[data-view="settings"]');
+            if (navSettings) {
+                navSettings.click();
+                setTimeout(() => {
+                    const qbHost = document.getElementById('setting-qb-host');
+                    if (qbHost) {
+                        qbHost.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        qbHost.focus();
+                    }
+                }, 150);
+            }
+            if (sidebarIndicator.dataset.lastError) {
+                showToast(sidebarIndicator.dataset.lastError, 'warning', 6000);
+            }
+        });
+    }
+
     if (!status || status.connected) {
         if (alertBanner) alertBanner.style.display = 'none';
         if (sidebarIndicator) {
             sidebarIndicator.className = 'qb-status-indicator online';
-            sidebarIndicator.title = `qBittorrent: Conectado (${status?.host || 'OK'})`;
+            sidebarIndicator.title = `qBittorrent: Conectado (${status?.host || 'OK'}) - Clic para configurar`;
+            sidebarIndicator.dataset.lastError = '';
             const text = sidebarIndicator.querySelector('.qb-status-text');
             if (text) text.textContent = 'qBittorrent OK';
         }
@@ -241,7 +262,8 @@ export function updateTorrentClientAlert(status) {
     // Torrent client is disconnected!
     if (sidebarIndicator) {
         sidebarIndicator.className = 'qb-status-indicator offline';
-        sidebarIndicator.title = `qBittorrent: Desconectado (${status.host}:${status.port})`;
+        sidebarIndicator.title = `qBittorrent: Desconectado (${status.host}:${status.port}) - Clic para configurar`;
+        sidebarIndicator.dataset.lastError = status.last_error || 'qBittorrent no responde.';
         const text = sidebarIndicator.querySelector('.qb-status-text');
         if (text) text.textContent = 'qBittorrent Desconectado';
     }

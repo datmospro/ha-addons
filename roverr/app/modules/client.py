@@ -50,7 +50,7 @@ def update_torrent_client_status(success: bool, error: Exception = None, setting
         
         if is_refused:
             err_type = "connection_refused"
-            friendly_msg = f"Conexi├│n rechazada al conectar a qBittorrent ({host}:{port}). Aseg├║rate de que qBittorrent est├® abierto y con la Web UI activa."
+            friendly_msg = f"Conexión rechazada al conectar a qBittorrent ({host}:{port}). Asegúrate de que qBittorrent esté abierto y con la Web UI activa."
         elif is_timeout:
             err_type = "timeout"
             friendly_msg = f"Tiempo de espera agotado al conectar a qBittorrent ({host}:{port}). Comprueba la IP o el cortafuegos."
@@ -68,8 +68,48 @@ def update_torrent_client_status(success: bool, error: Exception = None, setting
             "last_checked": now_iso
         }
         if prev_connected:
-            logger.warning(f"ÔÜá´©Å [TORRENT CLIENT] Connection lost: {friendly_msg}")
+            logger.warning(f"⚠️ [TORRENT CLIENT] Connection lost: {friendly_msg}")
             trigger_movies_update_callback()
+
+
+def test_qbittorrent_connection(host=None, port=None, username=None, password=None):
+    """
+    Tests connection and authentication to qBittorrent Web UI.
+    Returns: (success: bool, message: str)
+    """
+    settings = load_settings()
+    host = host or settings.get('qb_host', 'localhost')
+    try:
+        port = int(port) if port else int(settings.get('qb_port', 8080))
+    except (ValueError, TypeError):
+        port = 8080
+    username = username if username is not None else settings.get('qb_user', 'admin')
+    password = password if password is not None else settings.get('qb_pass', 'adminpass')
+    
+    try:
+        qb = qbittorrentapi.Client(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            REQUESTS_ARGS={'timeout': (6, 6)}
+        )
+        qb.auth_log_in()
+        ver = qb.app_version()
+        update_torrent_client_status(True, settings={'qb_host': host, 'qb_port': port})
+        return True, f"Conexión exitosa con qBittorrent v{ver} en {host}:{port}"
+    except Exception as e:
+        err_str = str(e)
+        if "LoginFailed" in type(e).__name__ or "403" in err_str or "unauthorized" in err_str.lower():
+            friendly = f"Fallo de autenticación en {host}:{port}. Comprueba el usuario y la contraseña de qBittorrent."
+        elif "111" in err_str or "refused" in err_str.lower() or "connection refused" in err_str.lower():
+            friendly = f"Conexión rechazada en {host}:{port}. Asegúrate de que qBittorrent esté abierto, con la Web UI habilitada en el puerto {port} y permitiendo conexiones de red."
+        elif "timeout" in err_str.lower() or "timed out" in err_str.lower():
+            friendly = f"Tiempo de espera agotado conectando a {host}:{port}. Comprueba la IP del equipo y que el cortafuegos permita el puerto {port}."
+        else:
+            friendly = f"Error al conectar con qBittorrent ({host}:{port}): {err_str}"
+        update_torrent_client_status(False, error=e, settings={'qb_host': host, 'qb_port': port})
+        return False, friendly
 
 def check_torrent_size_available(title, year, preferred_size, max_size):
     """

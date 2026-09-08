@@ -84,7 +84,7 @@ logger = logging.getLogger("Roverr")
 logger.info("=" * 80)
 logger.info("🚀 ROVERR - MEDIA MANAGER")
 logger.info("=" * 80)
-logger.info(f"📦 Version: 4.4.97")
+logger.info(f"📦 Version: 4.4.98")
 logger.info(f"🔧 Log Level: {logging.getLevelName(logger.getEffectiveLevel())}")
 logger.info("=" * 80)
 
@@ -647,6 +647,19 @@ def test_telegram(payload: dict):
         return {"success": False, "message": "Missing Token or Chat ID"}
         
     success, message = test_telegram_connection(token, chat_id)
+    return {"success": success, "message": message}
+
+@app.post("/api/test_qbittorrent")
+def test_qbittorrent(payload: dict):
+    """Test qBittorrent Web UI connectivity and authentication"""
+    from logic import test_qbittorrent_connection
+    
+    host = payload.get('host')
+    port = payload.get('port')
+    user = payload.get('username')
+    pw = payload.get('password')
+    
+    success, message = test_qbittorrent_connection(host, port, user, pw)
     return {"success": success, "message": message}
 
 @app.post("/api/test_receptor")
