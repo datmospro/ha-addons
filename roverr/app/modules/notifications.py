@@ -1,4 +1,5 @@
 import requests
+import threading
 from .config import logger, load_settings
 
 def send_telegram_notification(message):
@@ -44,7 +45,7 @@ def test_telegram_connection(token, chat_id):
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         payload = {
             "chat_id": chat_id,
-            "text": "­ƒöö <b>Roverr Test Message</b>\n\nIf you are reading this, your Telegram configuration is correct!",
+            "text": "🔔 <b>Roverr Test Message</b>\n\nIf you are reading this, your Telegram configuration is correct!",
             "parse_mode": "HTML"
         }
         

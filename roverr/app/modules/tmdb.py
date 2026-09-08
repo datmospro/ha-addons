@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import json
 import requests
 import threading
 import hashlib
@@ -9,7 +10,10 @@ from datetime import datetime
 from database import Movie, MoveHistory
 from .config import logger, load_settings, get_language, trigger_movies_update_callback, MANUAL_SEARCH_TAG
 from .notifications import send_telegram_notification
-from .mover import clean_torrent_name, sanitize_path_component, manual_move, get_copy_progress
+from .mover import clean_torrent_name, sanitize_path_component, manual_move, get_copy_progress, COPY_PROGRESS
+
+APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STATIC_DIR = os.path.join(APP_DIR, 'static')
 
 # Global TMDB cache
 _TMDB_SEARCH_CACHE = {}
@@ -23,7 +27,7 @@ def get_cached_tmdb_result(title, year):
     if cache_key in _TMDB_SEARCH_CACHE:
         timestamp, result = _TMDB_SEARCH_CACHE[cache_key]
         if time.time() - timestamp < TMDB_CACHE_TTL:
-            logger.debug(f"­ƒùä´©Å TMDB cache hit for '{title}' ({year})")
+            logger.debug(f"TMDB cache hit for '{title}' ({year})")
             return result
     return None
 
@@ -31,7 +35,7 @@ def cache_tmdb_result(title, year, result):
     """Cache a TMDB search result."""
     cache_key = f"{title.lower().strip()}_{year}"
     _TMDB_SEARCH_CACHE[cache_key] = (time.time(), result)
-    logger.debug(f"­ƒùä´©Å TMDB result cached for '{title}' ({year})")
+    logger.debug(f"TMDB result cached for '{title}' ({year})")
 
 def download_image(url, filename, force=False):
     """
@@ -44,7 +48,7 @@ def download_image(url, filename, force=False):
     
     try:
         # Ensure directory exists
-        save_dir = os.path.join(os.path.dirname(__file__), 'static', 'posters')
+        save_dir = os.path.join(STATIC_DIR, 'posters')
         os.makedirs(save_dir, exist_ok=True)
         
         save_path = os.path.join(save_dir, filename)
@@ -414,7 +418,7 @@ def get_provider_local_logo(p_name, logo_path=None):
         try:
             filename = f"prov_{abs(hash(p_name))}.png"
             remote_url = f"https://image.tmdb.org/t/p/w92{logo_path}" if logo_path.startswith('/') else logo_path
-            save_dir = os.path.join(os.path.dirname(__file__), 'static', 'posters')
+            save_dir = os.path.join(STATIC_DIR, 'posters')
             os.makedirs(save_dir, exist_ok=True)
             save_path = os.path.join(save_dir, filename)
             if not os.path.exists(save_path):
@@ -960,7 +964,7 @@ def get_movie_data(torrents, api_key):
     
     # Return all movies from DB (excluding ignored)
     movies = []
-    base_dir = os.path.join(os.path.dirname(__file__), 'static')
+    base_dir = STATIC_DIR
     
     for m in Movie.select().where((Movie.ignored == False) & ((Movie.watchlist == False) | (Movie.watchlist.is_null()))).order_by(Movie.added_at.desc()):
         # Check if poster file exists, if not use placeholder and re-download in background
@@ -1133,7 +1137,7 @@ def delete_movie(torrent_hash, ignore_movie=True):
     
     # Delete images  
     try:
-        base_dir = os.path.join(os.path.dirname(__file__), 'static')
+        base_dir = STATIC_DIR
         if movie.poster_path:
             p = os.path.join(base_dir, movie.poster_path)
             if os.path.exists(p): os.remove(p)
@@ -1410,7 +1414,7 @@ def get_movie_details(torrent_hash, api_key):
             
             if movie.poster_path:
                 # Check if file actually exists
-                poster_full_path = os.path.join(os.path.dirname(__file__), 'static', movie.poster_path)
+                poster_full_path = os.path.join(STATIC_DIR, movie.poster_path)
                 if os.path.exists(poster_full_path):
                     poster_url = movie.poster_path
                 else:
@@ -1432,7 +1436,7 @@ def get_movie_details(torrent_hash, api_key):
                     
             if movie.backdrop_path:
                 # Check if file actually exists
-                backdrop_full_path = os.path.join(os.path.dirname(__file__), 'static', movie.backdrop_path)
+                backdrop_full_path = os.path.join(STATIC_DIR, movie.backdrop_path)
                 if os.path.exists(backdrop_full_path):
                     backdrop_url = movie.backdrop_path
                 else:

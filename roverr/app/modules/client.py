@@ -1,8 +1,10 @@
 import os
+import re
 from datetime import datetime
 import qbittorrentapi
-from database import Movie
+from database import Movie, MoveHistory
 from .config import logger, load_settings, trigger_movies_update_callback
+from .mover import get_copy_progress, sanitize_path_component
 
 # Global torrent client connection status
 _torrent_client_status = {
@@ -130,8 +132,8 @@ def check_torrent_size_available(title, year, preferred_size, max_size):
     
     for indexer in indexers:
         try:
-            # Search each indexer
-            search_results = search_indexer(indexer, title, year)
+            from .indexers import search_indexers
+            search_results = search_indexers(f"{title} {year}", settings)
             
             for result in search_results:
                 size_bytes = result.get('size', 0)
@@ -213,11 +215,14 @@ def get_active_torrents(config_ignored=None):
     try:
         qb = get_qb_client(settings)
         qb.auth_log_in()
-        update_torrent_client_status(True, settings=settings)
-        
-        # Get all torrents
         torrents = qb.torrents_info()
-        
+        update_torrent_client_status(True, settings=settings)
+    except Exception as e:
+        update_torrent_client_status(False, error=e, settings=settings)
+        logger.error(f"Error connecting to qBittorrent: {e}")
+        return []
+
+    try:
         # Get global progress data
         progress_data = get_copy_progress()
         
@@ -292,7 +297,6 @@ def get_active_torrents(config_ignored=None):
             
         return results
     except Exception as e:
-        update_torrent_client_status(False, error=e, settings=settings)
-        logger.error(f"Error getting torrents: {e}")
+        logger.error(f"Error processing torrents list: {e}", exc_info=True)
         return []
 

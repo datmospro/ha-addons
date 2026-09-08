@@ -84,7 +84,7 @@ logger = logging.getLogger("Roverr")
 logger.info("=" * 80)
 logger.info("🚀 ROVERR - MEDIA MANAGER")
 logger.info("=" * 80)
-logger.info(f"📦 Version: 4.4.98")
+logger.info(f"📦 Version: 4.4.99")
 logger.info(f"🔧 Log Level: {logging.getLevelName(logger.getEffectiveLevel())}")
 logger.info("=" * 80)
 
@@ -166,16 +166,21 @@ async def ws_progress_broadcast_task():
             # Get active copy progress
             progress_data = get_copy_progress() # {hash: {percent, speed, status}}
             
-            # Get active downloading torrents progress
+            # Query qBittorrent
             settings = load_settings()
-            
-            # Use to_thread to avoid blocking event loop
-            qb = await asyncio.to_thread(get_qb_client, settings)
-            await asyncio.to_thread(qb.auth_log_in)
-            torrents = await asyncio.to_thread(qb.torrents_info)
-            
-            from logic import update_torrent_client_status
-            update_torrent_client_status(True, settings=settings)
+            try:
+                qb = await asyncio.to_thread(get_qb_client, settings)
+                await asyncio.to_thread(qb.auth_log_in)
+                torrents = await asyncio.to_thread(qb.torrents_info)
+                
+                from logic import update_torrent_client_status
+                update_torrent_client_status(True, settings=settings)
+            except Exception as qb_err:
+                logger.debug(f"Error querying qBittorrent in ws_progress: {qb_err}")
+                from logic import update_torrent_client_status
+                update_torrent_client_status(False, error=qb_err, settings=settings)
+                await asyncio.sleep(5)
+                continue
             
             active_progress = {}
             # 1. Add downloading torrents
@@ -207,8 +212,11 @@ async def ws_progress_broadcast_task():
                 
                 if completed_hashes:
                     logger.info(f"Detected copy/download completion for hashes: {completed_hashes}. Syncing DB.")
-                    await asyncio.to_thread(process_torrents, None)
-                    await broadcast_movies_update()
+                    try:
+                        await asyncio.to_thread(process_torrents, None)
+                        await broadcast_movies_update()
+                    except Exception as sync_err:
+                        logger.error(f"Error during post-completion sync: {sync_err}")
             
             if active_progress or last_sent_progress:
                 await manager.broadcast({
@@ -224,10 +232,8 @@ async def ws_progress_broadcast_task():
                 await asyncio.sleep(3)
 
         except Exception as e:
-            logger.debug(f"Error in ws_progress_broadcast_task: {e}")
-            from logic import update_torrent_client_status
-            update_torrent_client_status(False, error=e)
-            await asyncio.sleep(5)
+            logger.error(f"Error in ws_progress_broadcast_task: {e}")
+            await asyncio.sleep(3)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

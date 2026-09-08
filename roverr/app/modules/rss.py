@@ -2,6 +2,7 @@ import os
 import re
 import time
 import asyncio
+import hashlib
 import requests
 from datetime import datetime
 from database import Movie
