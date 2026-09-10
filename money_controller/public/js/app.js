@@ -3000,13 +3000,15 @@ async function linkBank() {
     if (data.link) {
       showToast('Redirigiendo a la pasarela de autenticación de tu banco...', 'indigo');
       setTimeout(() => {
-        try {
-          if (window.top && window.top !== window) {
-            window.top.location.href = data.link;
-          } else {
-            window.location.href = data.link;
+        const isIframe = (window.top !== window);
+        if (isIframe) {
+          const opened = window.open(data.link, '_blank');
+          if (!opened || opened.closed || typeof opened.closed === 'undefined') {
+            if (confirm('Debido al bloqueo de seguridad del iframe de Home Assistant, debes vincular tu banco desde la URL directa:\n\nmoneycontroller.famrover.xyz\n\n¿Deseas abrirla ahora en una nueva pestaña?')) {
+              window.open('https://moneycontroller.famrover.xyz', '_blank');
+            }
           }
-        } catch (e) {
+        } else {
           window.location.href = data.link;
         }
       }, 1000);
