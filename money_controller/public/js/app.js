@@ -3000,8 +3000,16 @@ async function linkBank() {
     if (data.link) {
       showToast('Redirigiendo a la pasarela de autenticación de tu banco...', 'indigo');
       setTimeout(() => {
-        window.location.href = data.link;
-      }, 1200);
+        try {
+          if (window.top && window.top !== window) {
+            window.top.location.href = data.link;
+          } else {
+            window.location.href = data.link;
+          }
+        } catch (e) {
+          window.location.href = data.link;
+        }
+      }, 1000);
     } else {
       throw new Error('No se recibió el enlace de redirección.');
     }
