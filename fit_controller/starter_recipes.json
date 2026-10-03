@@ -1,0 +1,621 @@
+[
+  {
+    "title": "Bowl de pollo coreano con arroz",
+    "description": "Receta de la colección Cocina con ganas. Ajusta condimentos, cantidades y marcas a vuestro gusto.",
+    "category": "almuerzo",
+    "prep_time_min": 35,
+    "servings": 1,
+    "ingredients_basis": "portion",
+    "kcal": 540,
+    "protein": 45,
+    "carbs": 63,
+    "fat": 12,
+    "fiber": 0,
+    "nutrition_source": "estimated",
+    "nutrition_notes": "Estimación orientativa por ración, no cálculo verificado con marcas concretas. La fibra no está calculada. Revisa las etiquetas de tus ingredientes.",
+    "ingredients": [
+      {
+        "name": "Pechuga de pollo cruda",
+        "amount": 180,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Arroz en seco",
+        "amount": 55,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Brócoli",
+        "amount": 150,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Maicena",
+        "amount": 10,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Salsa de soja",
+        "amount": 15,
+        "unit": "ml",
+        "fresh": false
+      },
+      {
+        "name": "Gochujang",
+        "amount": 10,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Miel",
+        "amount": 8,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Aceite de oliva",
+        "amount": 5,
+        "unit": "ml",
+        "fresh": false
+      },
+      {
+        "name": "Vinagre de arroz",
+        "amount": 10,
+        "unit": "ml",
+        "fresh": false
+      }
+    ],
+    "instructions": [
+      "Cocer el arroz siguiendo el envase. Cocinar el brócoli al vapor.",
+      "Cortar el pollo en dados, secarlo y mezclar con la maicena. Usar toda la cantidad medida en esta versión.",
+      "Dorar el pollo con el aceite en tandas sin amontonar, hasta que esté completamente cocinado.",
+      "Mezclar soja, gochujang, miel y vinagre con un poco de agua. Calentar hasta formar una salsa y mezclar con el pollo.",
+      "Repartir arroz, brócoli y pollo en las raciones previstas."
+    ],
+    "tags": "Bowl, coreano, salsa",
+    "freezer": "yes",
+    "freeze_notes": "Repartir arroz y pollo en compartimentos. La cobertura pierde parte del crujiente al congelar. Enfriar el arroz con especial rapidez.",
+    "reheat_notes": "Descongelar en nevera. Recalentar el arroz con unas gotas de agua y el pollo aparte, hasta que todo esté bien caliente."
+  },
+  {
+    "title": "Burrito de pollo, frijoles y queso",
+    "description": "Receta de la colección Cocina con ganas. Ajusta condimentos, cantidades y marcas a vuestro gusto.",
+    "category": "almuerzo",
+    "prep_time_min": 35,
+    "servings": 1,
+    "ingredients_basis": "portion",
+    "kcal": 585,
+    "protein": 48,
+    "carbs": 57,
+    "fat": 17,
+    "fiber": 0,
+    "nutrition_source": "estimated",
+    "nutrition_notes": "Estimación orientativa por ración, no cálculo verificado con marcas concretas. La fibra no está calculada. Revisa las etiquetas de tus ingredientes.",
+    "ingredients": [
+      {
+        "name": "Pechuga de pollo cruda",
+        "amount": 150,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Tortilla de trigo grande",
+        "amount": 1,
+        "unit": "ud",
+        "fresh": false
+      },
+      {
+        "name": "Frijoles cocidos escurridos",
+        "amount": 60,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Pimiento rojo",
+        "amount": 80,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Cebolla",
+        "amount": 40,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Queso rallado",
+        "amount": 20,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Tomate triturado",
+        "amount": 60,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Aceite de oliva",
+        "amount": 5,
+        "unit": "ml",
+        "fresh": false
+      },
+      {
+        "name": "Comino",
+        "amount": 1,
+        "unit": "g",
+        "fresh": false
+      }
+    ],
+    "instructions": [
+      "Cortar pollo, cebolla y pimiento. Saltear las verduras con el aceite.",
+      "Añadir el pollo y comino; cocinar completamente. Incorporar tomate y frijoles, reducir hasta que el relleno quede poco húmedo.",
+      "Distribuir el relleno y el queso en las tortillas, cerrar doblando primero los laterales.",
+      "Dorar en sartén por ambas caras para servir o dejar enfriar el relleno antes de montar las unidades para congelar."
+    ],
+    "tags": "Burrito, mexicano, gratinado",
+    "freezer": "yes",
+    "freeze_notes": "Enfriar el relleno, montar y envolver los burritos individualmente. No añadir lechuga ni salsas frías antes de congelar.",
+    "reheat_notes": "Descongelar en nevera y calentar el interior por completo; terminar en sartén para recuperar la textura."
+  },
+  {
+    "title": "Albóndigas de pavo con tomate y pasta",
+    "description": "Receta de la colección Cocina con ganas. Ajusta condimentos, cantidades y marcas a vuestro gusto.",
+    "category": "almuerzo",
+    "prep_time_min": 40,
+    "servings": 1,
+    "ingredients_basis": "portion",
+    "kcal": 555,
+    "protein": 47,
+    "carbs": 62,
+    "fat": 12,
+    "fiber": 0,
+    "nutrition_source": "estimated",
+    "nutrition_notes": "Estimación orientativa por ración, no cálculo verificado con marcas concretas. La fibra no está calculada. Revisa las etiquetas de tus ingredientes.",
+    "ingredients": [
+      {
+        "name": "Pavo picado crudo",
+        "amount": 180,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Pasta en seco",
+        "amount": 60,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Tomate triturado",
+        "amount": 180,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Calabacín",
+        "amount": 120,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Pan rallado",
+        "amount": 10,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Aceite de oliva",
+        "amount": 5,
+        "unit": "ml",
+        "fresh": false
+      },
+      {
+        "name": "Ajo",
+        "amount": 3,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Orégano",
+        "amount": 1,
+        "unit": "g",
+        "fresh": false
+      }
+    ],
+    "instructions": [
+      "Mezclar el pavo con pan rallado, ajo picado y orégano. Formar albóndigas pequeñas.",
+      "Dorar con el aceite. Añadir el calabacín troceado y el tomate, tapar y cocinar hasta que las albóndigas estén completamente hechas.",
+      "Cocer la pasta al dente según el envase y escurrir.",
+      "Repartir las albóndigas con salsa y la pasta entre las raciones."
+    ],
+    "tags": "Pasta, italiano, salsa",
+    "freezer": "yes",
+    "freeze_notes": "Congelar las albóndigas cubiertas de salsa. Guardar la pasta al dente por separado para que conserve mejor la textura.",
+    "reheat_notes": "Descongelar en nevera. Recalentar la salsa con las albóndigas, removiendo; añadir la pasta al final."
+  },
+  {
+    "title": "Chili de ternera con arroz",
+    "description": "Receta de la colección Cocina con ganas. Ajusta condimentos, cantidades y marcas a vuestro gusto.",
+    "category": "almuerzo",
+    "prep_time_min": 40,
+    "servings": 1,
+    "ingredients_basis": "portion",
+    "kcal": 585,
+    "protein": 43,
+    "carbs": 63,
+    "fat": 16,
+    "fiber": 0,
+    "nutrition_source": "estimated",
+    "nutrition_notes": "Estimación orientativa por ración, no cálculo verificado con marcas concretas. La fibra no está calculada. Revisa las etiquetas de tus ingredientes.",
+    "ingredients": [
+      {
+        "name": "Ternera picada magra cruda",
+        "amount": 150,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Alubias rojas cocidas escurridas",
+        "amount": 100,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Arroz en seco",
+        "amount": 40,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Tomate triturado",
+        "amount": 180,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Cebolla",
+        "amount": 60,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Pimiento rojo",
+        "amount": 80,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Aceite de oliva",
+        "amount": 5,
+        "unit": "ml",
+        "fresh": false
+      },
+      {
+        "name": "Comino",
+        "amount": 1,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Pimentón",
+        "amount": 1,
+        "unit": "g",
+        "fresh": false
+      }
+    ],
+    "instructions": [
+      "Rehogar cebolla y pimiento con el aceite.",
+      "Añadir la ternera y cocinar desmenuzándola hasta que esté hecha.",
+      "Incorporar tomate, alubias y especias; cocinar a fuego suave hasta espesar, removiendo.",
+      "Cocer el arroz según el envase. Dividir el chili y el arroz en las raciones previstas."
+    ],
+    "tags": "Bowl, mexicano, cuchara",
+    "freezer": "yes",
+    "freeze_notes": "Congelar el chili en recipientes individuales, con el arroz en otro compartimento. Enfriar el arroz rápidamente.",
+    "reheat_notes": "Descongelar en nevera. Recalentar el chili removiendo y el arroz con unas gotas de agua."
+  },
+  {
+    "title": "Lasaña de pollo y calabacín",
+    "description": "Receta de la colección Cocina con ganas. Ajusta condimentos, cantidades y marcas a vuestro gusto.",
+    "category": "almuerzo",
+    "prep_time_min": 55,
+    "servings": 1,
+    "ingredients_basis": "portion",
+    "kcal": 550,
+    "protein": 51,
+    "carbs": 40,
+    "fat": 18,
+    "fiber": 0,
+    "nutrition_source": "estimated",
+    "nutrition_notes": "Estimación orientativa por ración, no cálculo verificado con marcas concretas. La fibra no está calculada. Revisa las etiquetas de tus ingredientes.",
+    "ingredients": [
+      {
+        "name": "Pollo picado crudo",
+        "amount": 180,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Placas de lasaña secas",
+        "amount": 40,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Calabacín",
+        "amount": 150,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Tomate triturado",
+        "amount": 150,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Queso cottage",
+        "amount": 80,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Queso rallado",
+        "amount": 15,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Aceite de oliva",
+        "amount": 5,
+        "unit": "ml",
+        "fresh": false
+      }
+    ],
+    "instructions": [
+      "Preparar las placas según el envase. Cortar el calabacín en láminas finas.",
+      "Saltear el pollo con el aceite hasta cocinarlo completamente; añadir el tomate y reducir.",
+      "En una fuente, alternar placas, calabacín, pollo y cottage; terminar con el queso rallado.",
+      "Hornear a 190 °C hasta que las placas y el calabacín estén tiernos y el centro esté bien caliente; unos 25–35 minutos según grosor."
+    ],
+    "tags": "Lasaña, cremoso, gratinado",
+    "freezer": "yes",
+    "freeze_notes": "Dejar enfriar con rapidez, cortar en porciones y congelar individualmente. El calabacín puede soltar algo de agua al descongelar.",
+    "reheat_notes": "Descongelar en nevera y recalentar tapada para que no se seque; destapar al final para gratinar."
+  },
+  {
+    "title": "Curry de pollo y garbanzos",
+    "description": "Receta de la colección Cocina con ganas. Ajusta condimentos, cantidades y marcas a vuestro gusto.",
+    "category": "almuerzo",
+    "prep_time_min": 35,
+    "servings": 1,
+    "ingredients_basis": "portion",
+    "kcal": 545,
+    "protein": 48,
+    "carbs": 46,
+    "fat": 17,
+    "fiber": 0,
+    "nutrition_source": "estimated",
+    "nutrition_notes": "Estimación orientativa por ración, no cálculo verificado con marcas concretas. La fibra no está calculada. Revisa las etiquetas de tus ingredientes.",
+    "ingredients": [
+      {
+        "name": "Pechuga de pollo cruda",
+        "amount": 170,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Garbanzos cocidos escurridos",
+        "amount": 100,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Leche de coco ligera",
+        "amount": 70,
+        "unit": "ml",
+        "fresh": false
+      },
+      {
+        "name": "Tomate triturado",
+        "amount": 120,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Espinacas",
+        "amount": 100,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Cebolla",
+        "amount": 50,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Aceite de oliva",
+        "amount": 5,
+        "unit": "ml",
+        "fresh": false
+      },
+      {
+        "name": "Curry en polvo",
+        "amount": 3,
+        "unit": "g",
+        "fresh": false
+      }
+    ],
+    "instructions": [
+      "Rehogar la cebolla con el aceite. Añadir el curry y remover unos segundos.",
+      "Añadir el pollo troceado y dorarlo. Incorporar tomate y leche de coco.",
+      "Cocinar a fuego suave hasta que el pollo esté completamente hecho. Añadir garbanzos y espinacas y terminar la cocción.",
+      "Ajustar la textura con un poco de agua y repartir en raciones."
+    ],
+    "tags": "Curry, cremoso, cuchara",
+    "freezer": "yes",
+    "freeze_notes": "Congelar el curry en recipientes individuales dejando espacio de expansión. Remover al recalentar para reunir la salsa.",
+    "reheat_notes": "Descongelar en nevera. Recalentar en cazuela o microondas, removiendo para que el centro se caliente bien."
+  },
+  {
+    "title": "Pasta cremosa de pollo y pimiento asado",
+    "description": "Receta de la colección Cocina con ganas. Ajusta condimentos, cantidades y marcas a vuestro gusto.",
+    "category": "almuerzo",
+    "prep_time_min": 30,
+    "servings": 1,
+    "ingredients_basis": "portion",
+    "kcal": 565,
+    "protein": 50,
+    "carbs": 56,
+    "fat": 14,
+    "fiber": 0,
+    "nutrition_source": "estimated",
+    "nutrition_notes": "Estimación orientativa por ración, no cálculo verificado con marcas concretas. La fibra no está calculada. Revisa las etiquetas de tus ingredientes.",
+    "ingredients": [
+      {
+        "name": "Pechuga de pollo cruda",
+        "amount": 160,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Pasta en seco",
+        "amount": 65,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Pimiento asado escurrido",
+        "amount": 100,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Queso cottage",
+        "amount": 80,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Tomate triturado",
+        "amount": 70,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Aceite de oliva",
+        "amount": 5,
+        "unit": "ml",
+        "fresh": false
+      },
+      {
+        "name": "Ajo",
+        "amount": 3,
+        "unit": "g",
+        "fresh": false
+      }
+    ],
+    "instructions": [
+      "Cocer la pasta al dente según el envase, reservando un poco del agua.",
+      "Cocinar completamente el pollo troceado con el aceite y el ajo.",
+      "Triturar el pimiento con el cottage y el tomate. Añadir al pollo y calentar suavemente.",
+      "Mezclar con la pasta y añadir agua de cocción hasta lograr una salsa cremosa."
+    ],
+    "tags": "Pasta, cremoso, queso",
+    "freezer": "yes",
+    "freeze_notes": "Congelar porciones con pasta al dente y salsa. La salsa puede separarse ligeramente: remover al recalentar.",
+    "reheat_notes": "Descongelar en nevera y recalentar con un poco de agua, removiendo con cuidado."
+  },
+  {
+    "title": "Bowl de kebab de pollo con salsa de yogur",
+    "description": "Receta de la colección Cocina con ganas. Ajusta condimentos, cantidades y marcas a vuestro gusto.",
+    "category": "almuerzo",
+    "prep_time_min": 35,
+    "servings": 1,
+    "ingredients_basis": "portion",
+    "kcal": 545,
+    "protein": 47,
+    "carbs": 54,
+    "fat": 14,
+    "fiber": 0,
+    "nutrition_source": "estimated",
+    "nutrition_notes": "Estimación orientativa por ración, no cálculo verificado con marcas concretas. La fibra no está calculada. Revisa las etiquetas de tus ingredientes.",
+    "ingredients": [
+      {
+        "name": "Pechuga de pollo cruda",
+        "amount": 170,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Arroz en seco",
+        "amount": 55,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Pimiento rojo",
+        "amount": 100,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Cebolla",
+        "amount": 50,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Aceite de oliva",
+        "amount": 5,
+        "unit": "ml",
+        "fresh": false
+      },
+      {
+        "name": "Comino",
+        "amount": 1,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Pimentón",
+        "amount": 1,
+        "unit": "g",
+        "fresh": false
+      },
+      {
+        "name": "Yogur griego natural",
+        "amount": 60,
+        "unit": "g",
+        "fresh": true
+      },
+      {
+        "name": "Pepino",
+        "amount": 80,
+        "unit": "g",
+        "fresh": true
+      },
+      {
+        "name": "Zumo de limón",
+        "amount": 10,
+        "unit": "ml",
+        "fresh": true
+      }
+    ],
+    "instructions": [
+      "Mezclar pollo en tiras con el aceite, comino y pimentón.",
+      "Cocinar el pollo con pimiento y cebolla en sartén, por tandas, hasta que quede completamente hecho.",
+      "Cocer el arroz siguiendo el envase y repartir junto al pollo.",
+      "Al servir, mezclar yogur con limón y añadir pepino troceado como acompañamiento fresco."
+    ],
+    "tags": "Bowl, kebab, salsa",
+    "freezer": "components",
+    "freeze_notes": "Congelar solo pollo, verduras cocinadas y arroz, en raciones. Reservar yogur y pepino para el día de consumo.",
+    "reheat_notes": "Descongelar la base en nevera y recalentar por completo. Añadir la salsa fría y el pepino justo antes de comer."
+  }
+]

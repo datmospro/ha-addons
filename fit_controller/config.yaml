@@ -1,7 +1,7 @@
 name: "Fit Controller"
-version: "1.8.1"
+version: "1.9.0"
 slug: "fit_controller"
-description: "Control de dieta para adelgazar, buscador de recetas Spoonacular/Edamam con veto estricto y macros, planificador semanal, ejercicios con animaciones, fotos y música gym."
+description: "Recetas visuales, planificación semanal, compra y cocina por lotes, entrenamiento y seguimiento corporal."
 url: "https://github.com/datmospro/ha-addons/tree/main/fit_controller"
 startup: application
 arch:

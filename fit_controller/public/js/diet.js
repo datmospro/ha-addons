@@ -228,7 +228,7 @@ window.DietModule = {
     const isCurrentWeek = this.selectedWeek === 'current';
 
     container.style.display = 'grid';
-    container.style.gridTemplateColumns = 'repeat(auto-fit, minmax(280px, 1fr))';
+    container.style.gridTemplateColumns = 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))';
     container.style.gap = '16px';
 
     container.innerHTML = days.map(d => {
@@ -277,9 +277,9 @@ window.DietModule = {
                           <i data-lucide="x" style="width: 12px; height: 12px;"></i>
                         </button>
                       </div>
-                      <h5 style="font-size: 0.85rem; font-weight: 700; color: #fff; margin: 2px 0 4px 0;">${meal.recipe_title}</h5>
+                      <h5 style="font-size: 0.85rem; font-weight: 700; color: #fff; margin: 2px 0 4px 0;">${window.escapeHTML(meal.recipe_title)}</h5>
                       <div style="font-size: 0.72rem; color: var(--accent-cyan); font-weight: 700;">
-                        ${meal.perPerson.kcal} kcal | ${meal.perPerson.protein}g P
+                        ${meal.nutrition_source === 'unknown' ? 'Macros pendientes' : `${meal.perPerson.kcal} kcal | ${meal.perPerson.protein}g P`}
                       </div>
                     </div>
                   `;
@@ -332,7 +332,7 @@ window.DietModule = {
       <div class="recipe-card">
         <div style="width: 100%; height: 160px; background: #090d16; border-radius: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
           ${r.image_url && r.image_url.length > 5 ? `
-            <img src="${r.image_url}" alt="${r.title}" style="width: 100%; height: 100%; object-fit: cover;">
+            <img src="${r.image_url}" alt="${window.escapeHTML(r.title)}" style="width: 100%; height: 100%; object-fit: cover;">
           ` : `
             <div style="text-align: center; padding: 20px; color: var(--primary);">
               <i data-lucide="utensils" style="width: 48px; height: 48px; opacity: 0.6;"></i>
@@ -344,7 +344,7 @@ window.DietModule = {
         </div>
 
         <div class="recipe-body">
-          <h4 style="font-size: 1rem; font-weight: 800; color: #fff;">${r.title}</h4>
+          <h4 style="font-size: 1rem; font-weight: 800; color: #fff;">${window.escapeHTML(r.title)}</h4>
           <p class="text-muted" style="font-size: 0.8rem; margin: 4px 0 10px 0;">${r.description || 'Plato saludable personalizado'}</p>
 
           <div style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); padding: 8px 10px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; text-align: center; margin-bottom: 12px;">
@@ -601,7 +601,7 @@ window.DietModule = {
     if (!select) return;
 
     select.innerHTML = this.recipeCatalog.map(r => `
-      <option value="${r.id}">${r.title} (${r.kcal} kcal | ${r.protein}g P)</option>
+      <option value="${r.id}">${window.escapeHTML(r.title)} (${r.kcal} kcal | ${r.protein}g P)</option>
     `).join('');
   },
 
@@ -657,7 +657,7 @@ window.DietModule = {
     } catch (e) {}
     document.getElementById('new-recipe-instructions').value = instructionsArr.join('\n');
 
-    document.getElementById('modal-create-recipe-title').innerHTML = `<i data-lucide="edit-3"></i> Editar Plato: ${r.title}`;
+    document.getElementById('modal-create-recipe-title').innerHTML = `<i data-lucide="edit-3"></i> Editar Plato: ${window.escapeHTML(r.title)}`;
     modal.style.display = 'flex';
     modal.classList.add('active');
     if (window.lucide) lucide.createIcons();
@@ -701,7 +701,7 @@ window.DietModule = {
     if (dayTitleEl) dayTitleEl.innerHTML = `<i data-lucide="utensils" style="color: var(--primary);"></i> Menú Completo del ${dayKey.toUpperCase()}`;
     if (daySubtitleEl) {
       daySubtitleEl.textContent = dayData 
-        ? `Total del Día: ${dayData.totalsPerPerson.kcal} kcal/persona (${dayData.totalsPerPerson.protein}g P | ${dayData.totalsPerPerson.carbs}g C | ${dayData.totalsPerPerson.fat}g G)`
+        ? `${dayData.incompleteNutrition ? 'Total parcial (faltan macros)' : 'Total del Día'}: ${dayData.totalsPerPerson.kcal} kcal/persona (${dayData.totalsPerPerson.protein}g P | ${dayData.totalsPerPerson.carbs}g C | ${dayData.totalsPerPerson.fat}g G)`
         : 'Sin platos asignados a este día';
     }
 
@@ -762,6 +762,7 @@ window.DietModule = {
       }
 
       // Render Active Meal Content
+      if (modalSelect && activeMeal) modalSelect.value = String(activeMeal.people_count || peopleCount);
       this.renderDayMealTabContent(activeMeal, dayKey, peopleCount);
     }
 
@@ -786,7 +787,7 @@ window.DietModule = {
       await window.apiFetch('api/diet/people-count', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ people_count: count })
+        body: JSON.stringify({ people_count: count, week: this.selectedWeek })
       });
       await this.loadPlan();
       if (this.currentDayKey) {
@@ -806,6 +807,7 @@ window.DietModule = {
   },
 
   renderDayMealTabContent: function(meal, dayKey, peopleCount) {
+    peopleCount = meal?.people_count || peopleCount;
     const contentArea = document.getElementById('day-meal-tab-content');
     if (!contentArea || !meal) return;
 
@@ -828,7 +830,7 @@ window.DietModule = {
                 <i data-lucide="clock" style="width: 13px; height: 13px;"></i> Prep: ${meal.prep_time_min || 15} min
               </span>
             </div>
-            <h3 style="font-size: 1.35rem; font-weight: 800; color: #fff; line-height: 1.2;">${meal.recipe_title}</h3>
+            <h3 style="font-size: 1.35rem; font-weight: 800; color: #fff; line-height: 1.2;">${window.escapeHTML(meal.recipe_title)}</h3>
           </div>
 
           <!-- Actions -->
@@ -884,8 +886,8 @@ window.DietModule = {
               <ul style="font-size: 0.85rem; color: #e2e8f0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 6px;">
                 ${ingredients.map(ing => `
                   <li style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: rgba(15,23,42,0.6); border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);">
-                    <span>${ing.name}</span>
-                    <strong style="color: var(--primary); font-size: 0.88rem;">${ing.scaledAmount} ${ing.unit || ''}</strong>
+                    <span>${window.escapeHTML(ing.name)}</span>
+                    <strong style="color: var(--primary); font-size: 0.88rem;">${window.escapeHTML(ing.scaledAmount)} ${window.escapeHTML(ing.unit || '')}</strong>
                   </li>
                 `).join('')}
               </ul>
@@ -900,7 +902,7 @@ window.DietModule = {
             </div>
             ${instructions.length === 0 ? '<p class="text-muted" style="font-size: 0.8rem;">Sin instrucciones registradas.</p>' : `
               <ol style="font-size: 0.83rem; color: #cbd5e1; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; line-height: 1.4;">
-                ${instructions.map(ins => `<li>${ins}</li>`).join('')}
+                ${instructions.map(ins => `<li>${window.escapeHTML(ins)}</li>`).join('')}
               </ol>
             `}
           </div>
@@ -938,7 +940,7 @@ window.DietModule = {
     const txtCarbs = document.getElementById('macro-txt-carbs');
     const txtFat = document.getElementById('macro-txt-fat');
 
-    if (txtKcal) txtKcal.textContent = `${dayData.totalsPerPerson.kcal} / ${targetKcal} kcal`;
+    if (txtKcal) txtKcal.textContent = `${dayData.incompleteNutrition ? 'Parcial · ' : ''}${dayData.totalsPerPerson.kcal} / ${targetKcal} kcal`;
     if (txtProtein) txtProtein.textContent = `${dayData.totalsPerPerson.protein} / ${targetProtein} g`;
     if (txtCarbs) txtCarbs.textContent = `${dayData.totalsPerPerson.carbs} / ${targetCarbs} g`;
     if (txtFat) txtFat.textContent = `${dayData.totalsPerPerson.fat} / ${targetFat} g`;
@@ -1042,14 +1044,23 @@ window.DietModule = {
   },
 
   copyAiPromptTemplate: function() {
-    const promptText = `Por favor, actúa como un nutricionista experto y genera una respuesta ÚNICAMENTE en formato JSON válido (sin texto extra fuera del bloque JSON) para importar en mi aplicación de dietas con la siguiente estructura:
+    const promptText = `Extrae o adapta recetas apetecibles (bowls, burritos, pollo crujiente, pasta cremosa) y genera una respuesta ÚNICAMENTE en formato JSON válido (sin texto extra fuera del bloque JSON) para importar en mi aplicación de dietas con la siguiente estructura:
 
 {
   "recipes": [
     {
       "title": "Nombre exacto del plato",
       "category": "desayuno|almuerzo|merienda|cena|snack",
-      "prep_time_min": 15,
+      "prep_time_min": 30,
+      "servings": 1,
+      "ingredients_basis": "portion",
+      "nutrition_source": "estimated",
+      "nutrition_notes": "Estimación a revisar según marcas y cantidades.",
+      "freezer": "unknown",
+      "freeze_notes": "",
+      "reheat_notes": "",
+      "source_url": "",
+      "tags": "",
       "kcal": 450,
       "protein": 35,
       "carbs": 40,
@@ -1070,7 +1081,7 @@ window.DietModule = {
   ]
 }
 
-Por favor, crea un menú saludable para toda la semana acorde a mi objetivo de déficit calórico.`;
+Los macros deben ser por ración. Las cantidades de ingredientes de este ejemplo son para UNA ración (ingredients_basis=portion). Si usas cantidades para toda la receta indica ingredients_basis=recipe y servings con el número de raciones. No inventes datos de la fuente ni pasos ausentes: anota las dudas. Marca las estimaciones con nutrition_source=estimated. No presentes estimaciones como macros verificados. freezer puede ser yes, components, no o unknown; usa unknown si no conoces su conservación. Separa amount numérico de unit; no conviertas tazas a gramos sin una equivalencia del ingrediente. Para platos por partes, marca fresh=true en acompañamientos que se añaden al servir. Quiero platos apetecibles con proteína y verduras, que se puedan preparar por lotes cuando sea apropiado.`;
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(promptText).then(() => {

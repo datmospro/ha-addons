@@ -1,3 +1,4 @@
+window.escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Core Application State & Global Helper Module
 
 // Robust fetch helper for HA Ingress relative routing
@@ -6,8 +7,9 @@ window.apiFetch = async function(endpoint, options = {}) {
   const res = await fetch(cleanEndpoint, options);
   
   if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Error ${res.status}: ${errorText}`);
+    let errorText = await res.text();
+    try { errorText = JSON.parse(errorText).error || errorText; } catch {}
+    throw new Error(errorText || `Error ${res.status}`);
   }
   
   return res.json();
@@ -90,7 +92,7 @@ window.FitApp = {
         await window.apiFetch('api/diet/people-count', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ people_count: this.peopleCount })
+          body: JSON.stringify({ people_count: this.peopleCount, week: window.DietModule?.selectedWeek || 'current' })
         });
       } catch (err) {
         console.error('Error saving people count:', err);

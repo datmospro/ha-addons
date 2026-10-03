@@ -1,4 +1,5 @@
 const { db } = require('./database');
+const { ingredient } = require('./kitchen_engine');
 
 /**
  * Common Spanish-to-English dictionary for ingredients, dishes, and vetoes
@@ -258,7 +259,7 @@ async function searchSpoonacular({ apiKey, query, minKcal, maxKcal, minProtein, 
 
     const ingredients = (item.extendedIngredients || []).map(ing => ({
       name: ing.nameClean || ing.name || ing.originalName || 'Ingrediente',
-      amount: ing.measures && ing.measures.metric ? ing.measures.metric.amount : (ing.amount || 1),
+      amount: (ing.measures && ing.measures.metric ? ing.measures.metric.amount : (ing.amount || 1)) / (item.servings || 1),
       unit: ing.measures && ing.measures.metric ? ing.measures.metric.unitShort : (ing.unit || 'g'),
       original: ing.original || ing.name
     }));
@@ -292,7 +293,8 @@ async function searchSpoonacular({ apiKey, query, minKcal, maxKcal, minProtein, 
       description: item.summary ? item.summary.replace(/<[^>]*>?/gm, '').slice(0, 200) + '...' : `Receta de Spoonacular (${item.sourceName || 'Web'})`,
       category,
       prep_time_min: item.readyInMinutes || 25,
-      servings: item.servings || 1,
+      servings: 1,
+      ingredients_basis: 'portion',
       kcal,
       protein,
       carbs,
@@ -554,7 +556,7 @@ function searchLocalRecipes({ query, category, maxKcal, minProtein, maxCarbs }) 
   const rows = db.prepare(sql).all(...params);
   return rows.map(r => ({
     ...r,
-    ingredients: JSON.parse(r.ingredients_json || '[]'),
+    ingredients: JSON.parse(r.ingredients_json || '[]').map(ingredient),
     instructions: JSON.parse(r.instructions_json || '[]')
   }));
 }

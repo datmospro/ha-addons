@@ -3,8 +3,8 @@ const path = require('path');
 const fs = require('fs');
 
 // Permanent backup directory in Home Assistant config volume
-const configBackupDir = '/config/fit_controller';
-if (fs.existsSync('/config') && !fs.existsSync(configBackupDir)) {
+const configBackupDir = process.env.CONFIG_BACKUP_DIR || '/config/fit_controller';
+if ((process.env.CONFIG_BACKUP_DIR || fs.existsSync('/config')) && !fs.existsSync(configBackupDir)) {
   try { fs.mkdirSync(configBackupDir, { recursive: true }); } catch (e) {}
 }
 
@@ -30,7 +30,7 @@ console.log(`Initializing FitController database at: ${dbPath}`);
 const db = new DatabaseSync(dbPath);
 
 function backupDb() {
-  if (fs.existsSync('/config') && fs.existsSync(dbPath)) {
+  if ((process.env.CONFIG_BACKUP_DIR || fs.existsSync('/config')) && fs.existsSync(dbPath)) {
     try {
       if (!fs.existsSync(configBackupDir)) {
         fs.mkdirSync(configBackupDir, { recursive: true });
@@ -259,7 +259,7 @@ function seedDefaultData() {
     const defaultRecipes = [
       {
         title: "Tortilla Fit de Claras y Espinacas",
-        description: "Desayuno alto en proteína y muy bajo en calorías, ideal para quemar grasa.",
+        description: "Tortilla de claras y espinacas con queso fresco.",
         category: "desayuno",
         prep_time_min: 10,
         servings: 1,
@@ -316,7 +316,7 @@ function seedDefaultData() {
       },
       {
         title: "Salmón al Horno con Espárragos y Limón",
-        description: "Cena rica en Omega-3 y súper saciante para optimizar la quema de grasa nocturna.",
+        description: "Salmón al horno con espárragos, limón y eneldo.",
         category: "cena",
         prep_time_min: 25,
         servings: 1,

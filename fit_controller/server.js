@@ -4,6 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const { db, initDb, backupDb } = require('./database');
 const { searchLocalRecipes, searchOnlineRecipes } = require('./recipe_engine');
+const { scaledIngredients } = require('./kitchen_engine');
+const { installKitchen } = require('./kitchen_routes');
 
 // Initialize SQLite DB
 initDb();
@@ -12,8 +14,8 @@ const app = express();
 const PORT = process.env.PORT || 8099;
 
 // Ensure persistent uploads directories exist
-const dataUploadsDir = fs.existsSync('/data') ? '/data/uploads' : path.join(__dirname, 'public', 'uploads');
-const configUploadsDir = '/config/fit_controller/uploads';
+const dataUploadsDir = process.env.UPLOADS_DIR || (fs.existsSync('/data') ? '/data/uploads' : path.join(__dirname, 'public', 'uploads'));
+const configUploadsDir = process.env.CONFIG_BACKUP_DIR ? path.join(process.env.CONFIG_BACKUP_DIR, 'uploads') : '/config/fit_controller/uploads';
 
 [
   dataUploadsDir,
@@ -47,6 +49,8 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public'), { etag: false, maxAge: 0 }));
+
+installKitchen(app, { db, backupDb, rollover: checkAndPerformWeeklyRollover, uploadsDir: dataUploadsDir, backupUploadsDir: configUploadsDir });
 
 // Endpoint: Upload custom exercise MP4 video or animation file
 app.post('/api/upload-video', (req, res) => {
@@ -244,13 +248,13 @@ function getMondayOfCurrentWeek(d = new Date()) {
   const day = date.getDay();
   const diff = date.getDate() - day + (day === 0 ? -6 : 1);
   date.setDate(diff);
-  return date.toISOString().split('T')[0];
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function getNextMonday(d = new Date()) {
-  const mon = new Date(getMondayOfCurrentWeek(d));
+  const mon = new Date(getMondayOfCurrentWeek(d) + 'T12:00:00');
   mon.setDate(mon.getDate() + 7);
-  return mon.toISOString().split('T')[0];
+  return `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
 }
 
 function checkAndPerformWeeklyRollover() {
@@ -308,7 +312,7 @@ app.get('/api/diet/plan', (req, res) => {
 
     const plans = db.prepare(`
       SELECT mp.*, r.title as recipe_title, r.description, r.category, r.prep_time_min,
-             r.servings, r.kcal, r.protein, r.carbs, r.fat, r.fiber,
+             r.servings, r.ingredients_basis, r.nutrition_source, r.kcal, r.protein, r.carbs, r.fat, r.fiber,
              r.ingredients_json, r.instructions_json, r.image_url
       FROM meal_plans mp
       LEFT JOIN recipes r ON mp.recipe_id = r.id
@@ -323,6 +327,7 @@ app.get('/api/diet/plan', (req, res) => {
       structured[day] = {
         day,
         meals: [],
+        incompleteNutrition: false,
         totalsPerPerson: { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
         totalsAllPeople: { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
       };
@@ -333,8 +338,8 @@ app.get('/api/diet/plan', (req, res) => {
       if (!structured[dayKey]) return;
 
       const pCount = p.people_count || peopleCount;
-      const ingredients = JSON.parse(p.ingredients_json || '[]');
       const instructions = JSON.parse(p.instructions_json || '[]');
+      if (!p.recipe_id || p.nutrition_source === 'unknown') structured[dayKey].incompleteNutrition = true;
 
       // Single portion values
       const perPerson = {
@@ -355,13 +360,7 @@ app.get('/api/diet/plan', (req, res) => {
       };
 
       // Scaled ingredients
-      const scaledIngredients = ingredients.map(ing => {
-        const amt = parseFloat(ing.amount);
-        return {
-          ...ing,
-          scaledAmount: !isNaN(amt) ? (amt * pCount).toFixed(1).replace(/\.0$/, '') : ing.amount
-        };
-      });
+      const scaled = scaledIngredients(p, pCount).map(ing => ({ ...ing, scaledAmount: String(ing.amount) }));
 
       structured[dayKey].meals.push({
         id: p.id,
@@ -369,11 +368,13 @@ app.get('/api/diet/plan', (req, res) => {
         recipe_id: p.recipe_id,
         recipe_title: p.recipe_title || p.custom_title || 'Comida Personalizada',
         image_url: p.image_url,
+        prep_time_min: p.prep_time_min,
+        nutrition_source: p.nutrition_source,
         people_count: pCount,
         week_type: p.week_type || 'current',
         perPerson,
         scaledTotal,
-        ingredients: scaledIngredients,
+        ingredients: scaled,
         instructions
       });
 
@@ -429,12 +430,12 @@ app.post('/api/diet/plan', (req, res) => {
     if (existing) {
       db.prepare(`
         UPDATE meal_plans SET recipe_id = ?, custom_title = ?, people_count = ? WHERE id = ?
-      `).run(recipe_id || null, custom_title || null, people_count || 1, existing.id);
+      `).run(recipe_id || null, custom_title || null, people_count || db.prepare('SELECT default_people_count FROM user_profile WHERE id=1').get().default_people_count || 1, existing.id);
     } else {
       db.prepare(`
         INSERT INTO meal_plans (day_of_week, meal_type, recipe_id, custom_title, people_count, week_type)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(day_of_week, meal_type, recipe_id || null, custom_title || null, people_count || 1, targetWeek);
+      `).run(day_of_week, meal_type, recipe_id || null, custom_title || null, people_count || db.prepare('SELECT default_people_count FROM user_profile WHERE id=1').get().default_people_count || 1, targetWeek);
     }
 
     backupDb();
@@ -541,225 +542,6 @@ app.post('/api/diet/clear-week', (req, res) => {
     res.json({
       success: true,
       message: `Se ha vaciado el menú de la ${targetWeek === 'next' ? 'próxima semana' : 'semana actual'}.`
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Update global people count for all meal plan items
-app.post('/api/diet/people-count', (req, res) => {
-  try {
-    const { people_count } = req.body;
-    const count = parseInt(people_count, 10) || 1;
-    db.prepare(`UPDATE meal_plans SET people_count = ?`).run(count);
-    db.prepare(`UPDATE user_profile SET default_people_count = ? WHERE id = 1`).run(count);
-    backupDb();
-    res.json({ success: true, count });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Generate Consolidated Shopping List for the week (current or next)
-app.get('/api/diet/shopping-list', (req, res) => {
-  try {
-    const targetWeek = req.query.week === 'next' ? 'next' : 'current';
-    const defaultProfile = db.prepare(`SELECT default_people_count FROM user_profile WHERE id = 1`).get();
-    const globalPeople = defaultProfile ? defaultProfile.default_people_count : 1;
-
-    const plans = db.prepare(`
-      SELECT mp.people_count, r.ingredients_json
-      FROM meal_plans mp
-      JOIN recipes r ON mp.recipe_id = r.id
-      WHERE mp.week_type = ?
-    `).all(targetWeek);
-
-    const map = {};
-
-    plans.forEach(p => {
-      const pCount = p.people_count || globalPeople;
-      const ingredients = JSON.parse(p.ingredients_json || '[]');
-
-      ingredients.forEach(ing => {
-        const nameKey = ing.name.trim().toLowerCase();
-        const amt = parseFloat(ing.amount);
-        const unit = ing.unit || '';
-
-        if (!map[nameKey]) {
-          map[nameKey] = {
-            name: ing.name.trim(),
-            amount: !isNaN(amt) ? amt * pCount : 0,
-            unit,
-            rawText: !isNaN(amt) ? '' : ing.amount
-          };
-        } else {
-          if (!isNaN(amt)) {
-            map[nameKey].amount += (amt * pCount);
-          }
-        }
-      });
-    });
-
-    const shoppingList = Object.values(map).map(item => {
-      if (item.amount > 0) {
-        return {
-          name: item.name,
-          displayAmount: `${item.amount % 1 === 0 ? item.amount : item.amount.toFixed(1)} ${item.unit}`.trim()
-        };
-      }
-      return {
-        name: item.name,
-        displayAmount: item.rawText || 'al gusto'
-      };
-    });
-
-    res.json(shoppingList);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Import custom recipes and weekly plan from AI JSON
-app.post('/api/diet/import-json', (req, res) => {
-  try {
-    let bodyData = req.body.body !== undefined ? req.body.body : req.body;
-    if (typeof bodyData === 'string') {
-      try {
-        bodyData = JSON.parse(bodyData);
-      } catch (e) {
-        return res.status(400).json({ error: 'El texto no es un JSON válido' });
-      }
-    }
-
-    let recipesList = [];
-    let planList = [];
-
-    if (Array.isArray(bodyData)) {
-      recipesList = bodyData;
-    } else if (bodyData && typeof bodyData === 'object') {
-      if (bodyData.recipes && Array.isArray(bodyData.recipes)) {
-        recipesList = bodyData.recipes;
-      }
-      if (bodyData.plan && Array.isArray(bodyData.plan)) {
-        planList = bodyData.plan;
-      }
-      if (bodyData.weekly_plan && Array.isArray(bodyData.weekly_plan)) {
-        planList = bodyData.weekly_plan;
-      }
-      // Single recipe check
-      if (!bodyData.recipes && !bodyData.plan && bodyData.title) {
-        recipesList = [bodyData];
-      }
-    }
-
-    let importedRecipesCount = 0;
-    let importedPlanCount = 0;
-
-    const titleToIdMap = {};
-
-    // 1. Process Recipes
-    recipesList.forEach(r => {
-      if (!r.title) return;
-
-      const existing = db.prepare(`SELECT id FROM recipes WHERE LOWER(title) = LOWER(?)`).get(r.title);
-      let recipeId = null;
-
-      const ingredientsJson = JSON.stringify(r.ingredients || []);
-      const instructionsArray = Array.isArray(r.instructions)
-        ? r.instructions
-        : (typeof r.instructions === 'string' ? [r.instructions] : []);
-      const instructionsJson = JSON.stringify(instructionsArray);
-
-      if (existing) {
-        recipeId = existing.id;
-        db.prepare(`
-          UPDATE recipes SET
-            category = COALESCE(?, category),
-            prep_time_min = COALESCE(?, prep_time_min),
-            kcal = COALESCE(?, kcal),
-            protein = COALESCE(?, protein),
-            carbs = COALESCE(?, carbs),
-            fat = COALESCE(?, fat),
-            ingredients_json = ?,
-            instructions_json = ?
-          WHERE id = ?
-        `).run(
-          r.category || 'almuerzo',
-          r.prep_time_min || 15,
-          r.kcal || 300,
-          r.protein || 0,
-          r.carbs || 0,
-          r.fat || 0,
-          ingredientsJson,
-          instructionsJson,
-          recipeId
-        );
-      } else {
-        const stmt = db.prepare(`
-          INSERT INTO recipes (title, description, category, prep_time_min, servings, kcal, protein, carbs, fat, fiber, ingredients_json, instructions_json, image_url, is_custom)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-        `);
-        const result = stmt.run(
-          r.title,
-          r.description || '',
-          r.category || 'almuerzo',
-          r.prep_time_min || 15,
-          r.servings || 1,
-          r.kcal || 300,
-          r.protein || 0,
-          r.carbs || 0,
-          r.fat || 0,
-          r.fiber || 0,
-          ingredientsJson,
-          instructionsJson,
-          r.image_url || ''
-        );
-        recipeId = result.lastInsertRowid;
-        importedRecipesCount++;
-      }
-
-      titleToIdMap[r.title.toLowerCase()] = recipeId;
-    });
-
-    // 2. Process Weekly Plan Items
-    const targetWeek = (req.body.week_type || bodyData.week_type || 'current') === 'next' ? 'next' : 'current';
-
-    planList.forEach(item => {
-      const day = (item.day_of_week || item.day || '').toLowerCase();
-      const mealType = (item.meal_type || item.meal || item.type || '').toLowerCase();
-      const recipeTitle = item.recipe_title || item.title || item.recipe || '';
-
-      if (!day || !mealType) return;
-
-      let recipeId = null;
-      if (recipeTitle && titleToIdMap[recipeTitle.toLowerCase()]) {
-        recipeId = titleToIdMap[recipeTitle.toLowerCase()];
-      } else if (recipeTitle) {
-        const found = db.prepare(`SELECT id FROM recipes WHERE LOWER(title) = LOWER(?)`).get(recipeTitle);
-        if (found) recipeId = found.id;
-      }
-
-      const existingPlan = db.prepare(`SELECT id FROM meal_plans WHERE day_of_week = ? AND meal_type = ? AND week_type = ?`).get(day, mealType, targetWeek);
-      if (existingPlan) {
-        db.prepare(`UPDATE meal_plans SET recipe_id = ?, custom_title = ? WHERE id = ?`)
-          .run(recipeId, recipeTitle || null, existingPlan.id);
-      } else {
-        db.prepare(`INSERT INTO meal_plans (day_of_week, meal_type, recipe_id, custom_title, people_count, week_type) VALUES (?, ?, ?, ?, 1, ?)`)
-          .run(day, mealType, recipeId, recipeTitle || null, targetWeek);
-      }
-
-      importedPlanCount++;
-    });
-
-    backupDb();
-
-    res.json({
-      success: true,
-      importedRecipesCount,
-      importedPlanCount,
-      targetWeek,
-      message: `Importación completada: ${importedRecipesCount} platos procesados y ${importedPlanCount} asignaciones añadidas a la ${targetWeek === 'next' ? 'próxima semana' : 'semana actual'}.`
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -876,79 +658,6 @@ app.get('/api/recipes/search-online', async (req, res) => {
 });
 
 // Save recipe to local collection and optionally assign directly to meal plan
-app.post('/api/recipes/save-and-assign', (req, res) => {
-  try {
-    const { recipe, assign } = req.body;
-    if (!recipe || !recipe.title) {
-      return res.status(400).json({ error: 'Datos de receta incompletos' });
-    }
-
-    // Check if recipe already exists locally by title
-    let existing = db.prepare('SELECT id FROM recipes WHERE LOWER(title) = LOWER(?)').get(recipe.title);
-    let recipeId = null;
-
-    const ingredientsJson = JSON.stringify(recipe.ingredients || []);
-    const instructionsJson = JSON.stringify(Array.isArray(recipe.instructions) ? recipe.instructions : [recipe.instructions || '']);
-
-    if (existing) {
-      recipeId = existing.id;
-    } else {
-      const stmt = db.prepare(`
-        INSERT INTO recipes (title, description, category, prep_time_min, servings, kcal, protein, carbs, fat, fiber, ingredients_json, instructions_json, image_url, is_custom)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-      `);
-      const result = stmt.run(
-        recipe.title,
-        recipe.description || `Importada de ${recipe.provider || 'Web'}`,
-        recipe.category || 'almuerzo',
-        recipe.prep_time_min || 20,
-        recipe.servings || 1,
-        parseInt(recipe.kcal || 0, 10),
-        parseInt(recipe.protein || 0, 10),
-        parseInt(recipe.carbs || 0, 10),
-        parseInt(recipe.fat || 0, 10),
-        parseInt(recipe.fiber || 0, 10),
-        ingredientsJson,
-        instructionsJson,
-        recipe.image_url || ''
-      );
-      recipeId = result.lastInsertRowid;
-    }
-
-    let assigned = false;
-    if (assign && assign.day_of_week && assign.meal_type) {
-      const targetWeek = assign.week_type === 'next' ? 'next' : 'current';
-      const existingSlot = db.prepare(`
-        SELECT id FROM meal_plans WHERE day_of_week = ? AND meal_type = ? AND week_type = ?
-      `).get(assign.day_of_week, assign.meal_type, targetWeek);
-
-      if (existingSlot) {
-        db.prepare(`
-          UPDATE meal_plans SET recipe_id = ?, custom_title = NULL, people_count = ? WHERE id = ?
-        `).run(recipeId, assign.people_count || 1, existingSlot.id);
-      } else {
-        db.prepare(`
-          INSERT INTO meal_plans (day_of_week, meal_type, recipe_id, people_count, week_type)
-          VALUES (?, ?, ?, ?, ?)
-        `).run(assign.day_of_week, assign.meal_type, recipeId, assign.people_count || 1, targetWeek);
-      }
-      assigned = true;
-    }
-
-    backupDb();
-    res.json({
-      success: true,
-      recipeId,
-      assigned,
-      message: assigned
-        ? `Receta "${recipe.title}" guardada y asignada al menú de la ${assign.week_type === 'next' ? 'próxima semana' : 'semana actual'}.`
-        : `Receta "${recipe.title}" guardada en Mis Platos.`
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 app.get('/api/recipes', async (req, res) => {
   try {
     const { query, category, maxKcal, minProtein, maxCarbs } = req.query;
@@ -958,82 +667,6 @@ app.get('/api/recipes', async (req, res) => {
       local: localResults,
       external: []
     });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/recipes', (req, res) => {
-  try {
-    const { title, description, category, prep_time_min, servings, kcal, protein, carbs, fat, fiber, ingredients, instructions, image_url } = req.body;
-
-    if (!title || !kcal) {
-      return res.status(400).json({ error: 'Título y Calorías son obligatorios' });
-    }
-
-    const stmt = db.prepare(`
-      INSERT INTO recipes (title, description, category, prep_time_min, servings, kcal, protein, carbs, fat, fiber, ingredients_json, instructions_json, image_url, is_custom)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-    `);
-
-    const result = stmt.run(
-      title, description || '', category || 'almuerzo', prep_time_min || 15, servings || 1,
-      parseInt(kcal, 10), parseInt(protein || 0, 10), parseInt(carbs || 0, 10), parseInt(fat || 0, 10), parseInt(fiber || 0, 10),
-      JSON.stringify(ingredients || []), JSON.stringify(instructions || []), image_url || ''
-    );
-
-    res.json({ id: result.lastInsertRowid, success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/recipes/import-external', (req, res) => {
-  try {
-    const { title, description, category, prep_time_min, servings, kcal, protein, carbs, fat, fiber, ingredients, instructions, image_url } = req.body;
-
-    const stmt = db.prepare(`
-      INSERT INTO recipes (title, description, category, prep_time_min, servings, kcal, protein, carbs, fat, fiber, ingredients_json, instructions_json, image_url, is_custom)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-    `);
-
-    const result = stmt.run(
-      title, description || 'Importada de base abierta', category || 'almuerzo', prep_time_min || 20, servings || 1,
-      parseInt(kcal, 10), parseInt(protein || 0, 10), parseInt(carbs || 0, 10), parseInt(fat || 0, 10), parseInt(fiber || 0, 10),
-      JSON.stringify(ingredients || []), JSON.stringify(instructions || []), image_url || ''
-    );
-
-    res.json({ id: result.lastInsertRowid, success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.put('/api/recipes/:id', (req, res) => {
-  try {
-    const { title, description, category, prep_time_min, servings, kcal, protein, carbs, fat, fiber, ingredients, instructions, image_url } = req.body;
-
-    db.prepare(`
-      UPDATE recipes 
-      SET title = ?, description = ?, category = ?, prep_time_min = ?, servings = ?, kcal = ?, protein = ?, carbs = ?, fat = ?, fiber = ?, ingredients_json = ?, instructions_json = ?, image_url = ?
-      WHERE id = ?
-    `).run(
-      title, description || '', category || 'almuerzo', prep_time_min || 15, servings || 1,
-      parseInt(kcal, 10), parseInt(protein || 0, 10), parseInt(carbs || 0, 10), parseInt(fat || 0, 10), parseInt(fiber || 0, 10),
-      JSON.stringify(ingredients || []), JSON.stringify(instructions || []), image_url || '',
-      req.params.id
-    );
-
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.delete('/api/recipes/:id', (req, res) => {
-  try {
-    db.prepare(`DELETE FROM recipes WHERE id = ?`).run(req.params.id);
-    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1487,11 +1120,14 @@ app.delete('/api/progress/:id', (req, res) => {
   }
 });
 
+// Missing API routes must not return HTML to callers.
+app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta API no encontrada.' }));
+
 // Fallback to SPA index.html
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`FitController running on port ${PORT}`);
+const server = app.listen(PORT, () => {
+  console.log(`FitController running on port ${server.address().port}`);
 });
