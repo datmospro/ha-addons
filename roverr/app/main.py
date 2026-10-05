@@ -154,15 +154,13 @@ async def backup_scheduler():
 
 
 async def ws_progress_broadcast_task():
-    logger.info("WebSocket progress broadcaster task started")
+    # This task also monitors qBittorrent completion events. It must keep
+    # running with no WebSocket clients, otherwise auto-copy only starts when
+    # somebody opens or refreshes the UI.
+    logger.info("Torrent progress monitor and WebSocket broadcaster task started")
     last_sent_progress = None
     while True:
         try:
-            if not manager.active_connections:
-                # When no web UI client is connected, check less frequently
-                await asyncio.sleep(3)
-                continue
-
             # Get active copy progress
             progress_data = get_copy_progress() # {hash: {percent, speed, status}}
             
@@ -218,7 +216,10 @@ async def ws_progress_broadcast_task():
                     except Exception as sync_err:
                         logger.error(f"Error during post-completion sync: {sync_err}")
             
-            if active_progress or last_sent_progress:
+            # Broadcasting is only useful when someone has the dashboard open,
+            # but monitoring and completion handling above must be independent
+            # of the browser connection.
+            if manager.active_connections and (active_progress or last_sent_progress):
                 await manager.broadcast({
                     "type": "progress",
                     "progress": active_progress
