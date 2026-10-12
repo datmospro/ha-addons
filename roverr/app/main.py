@@ -107,7 +107,7 @@ logger = logging.getLogger("Roverr")
 logger.info("=" * 80)
 logger.info("🚀 ROVERR - MEDIA MANAGER")
 logger.info("=" * 80)
-logger.info(f"📦 Version: 4.5.7")
+logger.info(f"📦 Version: 4.5.8")
 logger.info(f"🔧 Log Level: {logging.getLevelName(logger.getEffectiveLevel())}")
 logger.info("=" * 80)
 
@@ -213,6 +213,7 @@ async def ws_progress_broadcast_task():
             now = asyncio.get_running_loop().time()
             if now - last_reconcile >= 10:
                 last_reconcile = now
+                await asyncio.to_thread(logic.recover_copy_jobs)
                 await asyncio.to_thread(process_torrents, None)
             active_progress = {}
             # 1. Add downloading torrents
@@ -237,7 +238,8 @@ async def ws_progress_broadcast_task():
                     "state": prog.get('status', 'copying'),
                     "queue_position": prog.get('queue_position'),
                     "queue_total": prog.get('queue_total'),
-                    "active_copy": prog.get('active_copy', '')
+                    "active_copy": prog.get('active_copy', ''),
+                    "recovering": prog.get('recovering', False)
                 }
             
             # Detect completion
@@ -319,6 +321,9 @@ async def lifespan(app: FastAPI):
     update_task = asyncio.create_task(movies_update_broadcaster())
     # Startup
     init_db()
+    # Restore saved order and reattach the old active job before admitting new
+    # scheduler work. Registration is local; network recovery runs in workers.
+    await asyncio.to_thread(logic.recover_copy_jobs)
     asyncio.create_task(scheduler())
     
     # Import and start RSS scheduler

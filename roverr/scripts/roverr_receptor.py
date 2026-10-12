@@ -95,12 +95,13 @@ STOP_FLAGS = set()
 TASKS_LOCK = threading.Lock()
 
 class CopyTaskHandler(threading.Thread):
-    def __init__(self, task_id, source_path, dest_dir, folder_name, overwrite=False, fingerprint=None):
+    def __init__(self, task_id, source_path, dest_dir, folder_name, overwrite=False, fingerprint=None, stage_all=False):
         super().__init__()
         self.task_id = task_id
         self.source_path = source_path
         self.dest_dir = dest_dir
         self.folder_name = folder_name
+        self.staging = overwrite or stage_all
         self.overwrite = overwrite
         self.fingerprint = fingerprint
         self.replacements = []
@@ -125,7 +126,7 @@ class CopyTaskHandler(threading.Thread):
 
     def _copy_file(self, src_file, dst_file):
         """Copies a single file with progress and speed tracking"""
-        if self.overwrite:
+        if self.staging:
             final = dst_file
             dst_file = dst_file + '.roverr-' + self.task_id + '.part'
             if os.path.isfile(dst_file):
@@ -238,7 +239,7 @@ class CopyTaskHandler(threading.Thread):
 
             if self.task_id in STOP_FLAGS:
                 raise InterruptedError('Copy stopped by user')
-            if self.overwrite:
+            if self.staging:
                 current = inspect_files(self.source_path, self.dest_dir, self.folder_name)
                 if self.fingerprint and current['fingerprint'] != self.fingerprint:
                     raise ValueError('Files changed during copy; original destination preserved')
@@ -265,7 +266,7 @@ class CopyTaskHandler(threading.Thread):
             
         except Exception as e:
             logger.error(f"Task {self.task_id} failed: {e}", exc_info=True)
-            if self.overwrite:
+            if self.staging:
                 for path in self.created_files:
                     if os.path.isfile(path):
                         os.remove(path)
@@ -291,7 +292,7 @@ class ReceptorServer(BaseHTTPRequestHandler):
         # Healthcheck endpoint (Roverr logic ping)
         if parsed.path == '/' or parsed.path == '/ping':
             self._send_json(200, {
-                'version': '4.5.4',
+                'version': '4.5.8',
                 'service': 'Roverr Receptor', 
                 'status': 'ok', 
                 'message': 'Roverr Receptor is online.'
@@ -351,7 +352,8 @@ class ReceptorServer(BaseHTTPRequestHandler):
                 return
             overwrite = data.get('overwrite', False) is True
             fingerprint = data.get('fingerprint')
-            if (fingerprint and comparison['fingerprint'] != fingerprint) or (comparison['conflict'] and (not overwrite or not fingerprint)):
+            staged = data.get('stage_all', False) is True
+            if ((overwrite or staged) and not fingerprint) or (fingerprint and comparison['fingerprint'] != fingerprint) or (comparison['conflict'] and (not overwrite or not fingerprint)):
                 self._send_json(409, {'status': 'conflict', 'comparison': comparison})
                 return
 
@@ -367,7 +369,7 @@ class ReceptorServer(BaseHTTPRequestHandler):
                     STOP_FLAGS.remove(task_id)
 
             # Start background thread
-            thread = CopyTaskHandler(task_id, source_path, dest_dir, folder_name, overwrite, fingerprint)
+            thread = CopyTaskHandler(task_id, source_path, dest_dir, folder_name, overwrite, fingerprint, staged)
             thread.start()
             
             self._send_json(202, {'status': 'accepted', 'message': f'Copy task {task_id} started.'})

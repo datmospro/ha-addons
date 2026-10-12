@@ -1,3 +1,38 @@
+# 4.5.8
+
+- Persist copy jobs, their FIFO order, source/path snapshot and confirmed
+  overwrite decision in SQLite before acknowledging admission. The saved queue
+  is restored before automatic work starts and deduplicated by torrent hash.
+- Reattach to a receptor task that is still copying or completed while the addon
+  was offline. Query its status before dispatching; never start a duplicate task.
+  An unreachable receptor holds the transfer slot until its state is known.
+- Persist stop requests and cancellations across restarts. Link completion
+  history to its copy job so another torrent's history cannot complete a job.
+- Stage normal copies as well as overwrites. Local interrupted jobs safely
+  restart their owned temporary file from the beginning; changed originals or
+  destinations require a fresh manual decision. Existing destination files are
+  preserved until the temporary copy has completed.
+- Store no torrent passwords, API keys or notification tokens in copy jobs.
+
+Validated with 62 regression tests, including restoration from an independent
+Python process/SQLite connection, FIFO recovery, remote reattachment without a
+new copy request, offline recovery blocking the queue, persistent cancellation,
+temporary-file restart, history provenance and migration of existing history.
+Browser checks cover queue positions and completion updates without F5.
+
+## First upgrade to 4.5.8
+
+The older version's in-memory queue cannot be restored retroactively. Finish
+the active copy and stop the waiting queue before this first upgrade, replace
+and restart the PC's `roverr_receptor.py`, then update the addon. Re-select the
+old waiting movies manually once. From 4.5.8 onward, newly admitted jobs and
+their order survive addon updates and restarts.
+
+Updating this addon does not update or restart the standalone receptor on the
+PC. Remote recovery requires the receptor to be reachable eventually; if the PC
+receptor itself restarted and forgot its tasks, the addon compares the saved
+files again and preserves conflicting destinations for a manual decision.
+
 # 4.5.7
 
 - Fix the background scheduler's missing `sync_movies` import, which caused a

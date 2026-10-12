@@ -47,6 +47,7 @@ export function getCopyStatusTooltip(status, progress = {}) {
         const active = progress.active_copy ? `Ahora se está copiando: ${progress.active_copy}. ` : '';
         return `${position}${active}Solo se copia una película a la vez. La posición 1 es la siguiente en comenzar.`;
     }
+    if (status === 'copying' && progress.recovering) return 'Recuperando la copia anterior. La cola espera a confirmar el estado del receptor para evitar transferencias duplicadas.';
     if (status === 'copying') return 'La copia está en curso. Las demás películas esperan su turno en la cola.';
     return '';
 }

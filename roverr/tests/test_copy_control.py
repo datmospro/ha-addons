@@ -29,8 +29,8 @@ class CopyControlTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.base = Path(self.temp.name)
         self.db = SqliteDatabase(str(self.base / 'history.db'))
-        self.db.bind([database.Movie, database.MoveHistory])
-        self.db.create_tables([database.Movie, database.MoveHistory])
+        self.db.bind([database.Movie, database.MoveHistory, database.CopyJob])
+        self.db.create_tables([database.Movie, database.MoveHistory, database.CopyJob])
         self.settings = {
             'local_source_path': str(self.base / 'source'),
             'local_dest_path': str(self.base / 'library'),
@@ -477,7 +477,7 @@ class CopyControlTests(unittest.TestCase):
             with patch.object(remote, 'CopyTaskHandler') as task:
                 response = requests.post(url + '/copy', json=dict(payload, overwrite=True, fingerprint=comparison['fingerprint']), timeout=3)
                 self.assertEqual(response.status_code, 202)
-                task.assert_called_once_with('a', str(source), str(dst.parent), 'Film (2026)', True, comparison['fingerprint'])
+                task.assert_called_once_with('a', str(source), str(dst.parent), 'Film (2026)', True, comparison['fingerprint'], False)
                 task.return_value.start.assert_called_once()
             self.assertEqual(dst.read_bytes(), b'old')
         finally:
@@ -748,6 +748,199 @@ class CopyControlTests(unittest.TestCase):
             finally:
                 release.set()
             self.wait_for(lambda:not mover.COPY_PROGRESS)
+
+    def saved_job(self, hash='a', remote=False):
+        torrent=SimpleNamespace(**self.torrent(hash))
+        comparison=mover.inspect_torrent_copy(torrent,self.settings)
+        options=dict(self.settings, _stage_all=True,
+                     _copy_destinations=[row['destination']['path'] for row in comparison['files']],
+                     _copy_fingerprint=comparison['fingerprint'])
+        if remote:
+            options.update(receptor_enabled=True,receptor_host='127.0.0.1',receptor_port=8095)
+        return mover.save_copy_job(torrent,options)
+
+    def reset_queue_memory(self):
+        mover.COPY_PROGRESS.clear();mover.COPY_WAITING.clear();mover.COPY_ACTIVE.clear()
+        mover.COPY_NAMES.clear();mover.STOP_FLAGS.clear()
+        mover.COPY_OUTPUTS.clear();mover.COPY_REPLACEMENTS.clear();mover.COPY_DIRECTORIES.clear()
+
+    def test_persistent_queue_restores_saved_order_and_deduplicates(self):
+        for hash in ('a','b','c'):
+            self.movie(hash,status='pending',progress=1)
+            self.saved_job(hash)
+        self.db.close()
+        with patch.object(mover.threading,'Thread') as worker:
+            self.assertEqual(mover.recover_copy_jobs(),3)
+            self.assertEqual(mover.COPY_WAITING,['a','b','c'])
+            self.assertEqual(mover.get_copy_progress()['c']['queue_position'],3)
+            self.assertEqual(mover.recover_copy_jobs(),0)
+            self.assertEqual(worker.call_count,3)
+
+    def test_persistent_jobs_never_store_credentials(self):
+        self.settings.update(qb_pass='do-not-save',telegram_bot_token='do-not-save')
+        job=self.saved_job()
+        self.assertNotIn('do-not-save',job.options_json)
+        self.assertNotIn('qb_pass',job.options_json)
+
+    def test_cancelled_waiting_job_does_not_return_after_restart(self):
+        self.movie(status='pending',progress=1)
+        job=self.saved_job()
+        mover.register_copy_job(job)
+        mover.stop_copy('a')
+        self.assertEqual(database.CopyJob.get_by_id(job.id).state,'cancelled')
+        self.reset_queue_memory();self.db.close()
+        self.assertEqual(mover.recover_copy_jobs(),0)
+        self.assertFalse(mover.COPY_PROGRESS)
+
+    def test_active_remote_job_reattaches_without_starting_another_copy(self):
+        self.movie(status='pending',progress=1)
+        job=self.saved_job(remote=True)
+        database.CopyJob.update(state='running').where(database.CopyJob.id==job.id).execute()
+        job=database.CopyJob.get_by_id(job.id);mover.register_copy_job(job)
+        first=Mock(status_code=200);first.json.return_value={'status':'copying','percent':50}
+        done=Mock(status_code=200);done.json.return_value={'status':'done'}
+        with patch.object(mover.requests,'get',side_effect=[first,done]), \
+             patch.object(mover.requests,'post') as post, patch.object(mover,'process_single_torrent') as start, \
+             patch.object(mover.time,'sleep'):
+            mover.run_copy_job(job.id)
+            post.assert_not_called();start.assert_not_called()
+        self.assertEqual(database.CopyJob.get_by_id(job.id).state,'completed')
+
+    def test_remote_recovery_keeps_other_movies_waiting_while_unreachable(self):
+        import requests
+        self.movie(status='pending',progress=1);self.movie('b',status='pending',progress=1)
+        job=self.saved_job(remote=True);other=self.saved_job('b')
+        database.CopyJob.update(state='running').where(database.CopyJob.id==job.id).execute()
+        with patch.object(mover.threading,'Thread'):
+            mover.recover_copy_jobs()
+        copying=Mock(status_code=200);copying.json.return_value={'status':'copying'}
+        done=Mock(status_code=200);done.json.return_value={'status':'done'}
+        events=[requests.Timeout('offline'),copying,done]
+        def status(*args,**kwargs):
+            self.assertEqual(mover.COPY_ACTIVE,{'a'})
+            self.assertEqual(mover.COPY_WAITING,['b'])
+            event=events.pop(0)
+            if isinstance(event,Exception):raise event
+            return event
+        with patch.object(mover.requests,'get',side_effect=status), patch.object(mover.time,'sleep'), \
+             patch.object(mover,'process_single_torrent') as start:
+            mover.run_copy_job(job.id)
+            start.assert_not_called()
+        self.assertEqual(database.CopyJob.get_by_id(other.id).state,'queued')
+        self.assertEqual(mover.get_copy_progress()['b']['queue_position'],1)
+
+    def test_stop_request_for_active_remote_job_survives_restart(self):
+        self.movie(status='pending',progress=1)
+        job=self.saved_job(remote=True)
+        database.CopyJob.update(state='running',stop_requested=True).where(database.CopyJob.id==job.id).execute()
+        job=database.CopyJob.get_by_id(job.id);mover.register_copy_job(job)
+        copying=Mock(status_code=200);copying.json.return_value={'status':'copying'}
+        cancelled=Mock(status_code=200);cancelled.json.return_value={'status':'cancelled'}
+        response=Mock(status_code=200)
+        with patch.object(mover.requests,'get',side_effect=[copying,cancelled]), \
+             patch.object(mover.requests,'post',return_value=response) as stop, patch.object(mover.time,'sleep'):
+            mover.run_copy_job(job.id)
+            stop.assert_called_once()
+        self.assertEqual(database.CopyJob.get_by_id(job.id).state,'cancelled')
+
+    def test_interrupted_local_job_restarts_temporary_file_and_finishes(self):
+        self.movie(status='pending',progress=1)
+        source=Path(self.settings['local_source_path'])/'Film (2026).mkv'
+        source.write_bytes(b'complete-source')
+        job=self.saved_job()
+        database.CopyJob.update(state='running').where(database.CopyJob.id==job.id).execute()
+        destination=Path(self.settings['local_dest_path'])/'Film (2026)'/'Film (2026).mkv'
+        destination.parent.mkdir(parents=True)
+        temporary=Path(str(destination)+'.roverr-a.part');temporary.write_bytes(b'partial')
+        mover.register_copy_job(database.CopyJob.get_by_id(job.id))
+        with patch.object(mover,'get_qb_client',side_effect=AssertionError('Recovery must use saved source, not require qBittorrent')):
+            mover.run_copy_job(job.id)
+        self.assertEqual(destination.read_bytes(),source.read_bytes())
+        self.assertFalse(temporary.exists())
+        self.assertEqual(database.CopyJob.get_by_id(job.id).state,'completed')
+
+    def test_restored_job_preserves_destination_changed_while_stopped(self):
+        self.movie(status='pending',progress=1)
+        job=self.saved_job();destination=self.existing_destination(b'new external file')
+        mover.register_copy_job(job)
+        with patch.object(mover,'process_single_torrent') as start:
+            mover.run_copy_job(job.id)
+            start.assert_not_called()
+        self.assertEqual(destination.read_bytes(),b'new external file')
+        self.assertEqual(database.CopyJob.get_by_id(job.id).state,'error')
+        self.assertEqual(database.Movie.get(database.Movie.torrent_hash=='a').copy_pause_reason,'conflict')
+
+    def test_completed_history_recovers_crash_before_job_completion_commit(self):
+        self.movie(status='pending',progress=1)
+        job=self.saved_job(remote=True)
+        database.CopyJob.update(state='running').where(database.CopyJob.id==job.id).execute()
+        database.MoveHistory.create(torrent_name='Film (2026).mkv',source_path='',dest_path='',status='success',copy_job_id=job.id)
+        mover.register_copy_job(database.CopyJob.get_by_id(job.id))
+        with patch.object(mover.requests,'get') as status, patch.object(mover,'process_single_torrent') as start:
+            mover.run_copy_job(job.id)
+            status.assert_not_called();start.assert_not_called()
+        self.assertEqual(database.CopyJob.get_by_id(job.id).state,'completed')
+
+    def test_receptor_stages_normal_copy_until_final_commit(self):
+        remote=self.load_receptor()
+        source=Path(self.settings['local_source_path'])/'Film (2026).mkv'
+        destination=Path(self.settings['local_dest_path'])/'Film (2026)'/'Film (2026).mkv'
+        info=remote.inspect_files(str(source),str(destination.parent),'Film (2026)')
+        task=remote.CopyTaskHandler('a',str(source),str(destination.parent),'Film (2026)',False,info['fingerprint'],True)
+        original=task._copy_file
+        def staged(*args):
+            original(*args)
+            self.assertFalse(destination.exists())
+            self.assertTrue(list(destination.parent.glob('*.part')))
+        with patch.object(task,'_copy_file',side_effect=staged):task.run()
+        self.assertEqual(remote.TASKS['a']['status'],'done')
+        self.assertEqual(destination.read_bytes(),source.read_bytes())
+
+    def test_persistent_local_job_restores_from_an_independent_process(self):
+        import subprocess
+        self.movie(status='pending',progress=1)
+        job=self.saved_job()
+        database.CopyJob.update(state='running').where(database.CopyJob.id==job.id).execute()
+        self.db.close()
+        script='''import sys,time
+sys.path.insert(0,sys.argv[2])
+import database
+from peewee import SqliteDatabase
+db=SqliteDatabase(sys.argv[1])
+db.bind([database.Movie,database.MoveHistory,database.CopyJob])
+from modules import mover
+mover.load_settings=lambda:{'telegram_notify_on_move':False}
+mover.recover_copy_jobs()
+deadline=time.monotonic()+10
+while mover.COPY_PROGRESS and time.monotonic()<deadline:time.sleep(.05)
+assert not mover.COPY_PROGRESS
+assert database.CopyJob.select().get().state=='completed'
+db.close()
+print('RECOVERED')
+'''
+        child=subprocess.run([sys.executable,'-c',script,self.db.database,str(ROOT/'app')],capture_output=True,text=True,timeout=20)
+        self.assertEqual(child.returncode,0,child.stderr)
+        self.assertIn('RECOVERED',child.stdout)
+        destination=Path(self.settings['local_dest_path'])/'Film (2026)'/'Film (2026).mkv'
+        self.assertEqual(destination.read_bytes(),b'x')
+        self.assertEqual(database.CopyJob.get_by_id(job.id).state,'completed')
+
+    def test_migration_adds_job_history_link_without_losing_old_history(self):
+        database.MoveHistory.create(torrent_name='Old film',source_path='',dest_path='',status='success')
+        self.db.execute_sql('ALTER TABLE movehistory DROP COLUMN copy_job_id')
+        with patch.object(database,'db',self.db):database.migrate_db()
+        row=database.MoveHistory.select().get()
+        self.assertEqual(row.torrent_name,'Old film')
+        self.assertIsNone(row.copy_job_id)
+
+    def test_history_for_another_job_cannot_complete_restored_job(self):
+        self.movie(status='pending',progress=1)
+        job=self.saved_job()
+        database.MoveHistory.create(torrent_name='Film (2026).mkv',source_path='',dest_path='',status='success',copy_job_id=job.id+100)
+        mover.register_copy_job(job)
+        with patch.object(mover,'process_single_torrent') as start:
+            mover.run_copy_job(job.id)
+            start.assert_called_once()
 
 
 if __name__ == '__main__':

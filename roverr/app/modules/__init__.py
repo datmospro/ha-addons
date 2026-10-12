@@ -21,7 +21,7 @@ from .mover import (
     get_disk_free_space, get_dir_size, check_and_reserve_disk_space, release_disk_space_reservation,
     find_file_in_path, get_copy_progress, stop_copy, copy_with_progress,
     _poll_receptor_status, test_receptor_connection,
-    manual_move, mark_as_moved, process_single_torrent
+    recover_copy_jobs, manual_move, mark_as_moved, process_single_torrent
 )
 from .client import (
     _torrent_client_status, get_torrent_client_status, update_torrent_client_status,
@@ -65,7 +65,7 @@ __all__ = [
     'get_disk_free_space', 'get_dir_size', 'check_and_reserve_disk_space', 'release_disk_space_reservation',
     'find_file_in_path', 'get_copy_progress', 'stop_copy', 'copy_with_progress',
     '_poll_receptor_status', 'test_receptor_connection',
-    'manual_move', 'mark_as_moved', 'process_single_torrent',
+    'recover_copy_jobs', 'manual_move', 'mark_as_moved', 'process_single_torrent',
     '_torrent_client_status', 'get_torrent_client_status', 'update_torrent_client_status',
     'check_torrent_size_available', 'get_qb_client', 'process_torrents', 'get_active_torrents',
     'test_qbittorrent_connection',

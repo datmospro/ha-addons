@@ -16,12 +16,25 @@ class BaseModel(Model):
         database = db
 
 class MoveHistory(BaseModel):
+    copy_job_id = IntegerField(null=True)
     torrent_name = CharField()
     source_path = CharField()
     dest_path = CharField()
     status = CharField() # 'success', 'skipped', 'error'
     message = TextField(null=True)
     timestamp = DateTimeField(default=datetime.datetime.now)
+
+class CopyJob(BaseModel):
+    torrent_hash = CharField(unique=True)
+    queue_order = IntegerField(index=True)
+    state = CharField(default='queued', index=True)
+    torrent_json = TextField()
+    options_json = TextField()
+    stop_requested = BooleanField(default=False)
+    history_floor = IntegerField(default=0)
+    message = TextField(null=True)
+    created_at = DateTimeField(default=datetime.datetime.now)
+    updated_at = DateTimeField(default=datetime.datetime.now)
 
 class Movie(BaseModel):
     class Meta:
@@ -100,6 +113,9 @@ def migrate_db():
     ]
     
     try:
+        history_columns = {row[1] for row in db.execute_sql('PRAGMA table_info(movehistory)').fetchall()}
+        if history_columns and 'copy_job_id' not in history_columns:
+            db.execute_sql('ALTER TABLE movehistory ADD COLUMN copy_job_id INTEGER')
         cursor = db.execute_sql("PRAGMA table_info(movie)")
         existing_columns = {row[1] for row in cursor.fetchall()}
         
@@ -115,7 +131,7 @@ def migrate_db():
 def init_db():
     db.connect()
     db.execute_sql('PRAGMA busy_timeout = 5000')  # Wait up to 5 seconds if database is locked
-    db.create_tables([MoveHistory, Movie])
+    db.create_tables([MoveHistory, Movie, CopyJob])
     migrate_db()  # Run migration after creating tables
 
 def backup_database():

@@ -6,7 +6,12 @@ import threading
 import unicodedata
 import requests
 from copy_conflicts import inspect_files
-from database import MoveHistory, Movie
+from database import MoveHistory, Movie, CopyJob
+from peewee import fn
+import json
+import datetime
+from contextvars import Context
+from types import SimpleNamespace
 from .config import logger, load_settings, trigger_movies_update_callback
 from .notifications import send_telegram_notification
 
@@ -20,16 +25,22 @@ COPY_CONDITION = threading.Condition(COPY_LOCK)
 COPY_WAITING = []
 COPY_ACTIVE = set()
 COPY_NAMES = {}
+RECOVERY_LOCK = threading.RLock()
+COPY_JOB_CONTEXT = threading.local()
+
+def _record_history(**values):
+    return MoveHistory.create(copy_job_id=getattr(COPY_JOB_CONTEXT, 'job_id', None), **values)
 
 @contextmanager
-def copy_turn(torrent_hash):
+def copy_turn(torrent_hash, allow_stopped=False):
     """FIFO admission; cancelled waiting jobs leave the queue immediately."""
     admitted = False
     try:
         with COPY_CONDITION:
-            COPY_CONDITION.wait_for(lambda: torrent_hash in STOP_FLAGS or
+            COPY_CONDITION.wait_for(lambda: (torrent_hash in STOP_FLAGS and not allow_stopped) or
                                     (not COPY_ACTIVE and COPY_WAITING and COPY_WAITING[0] == torrent_hash))
-            check_copy_cancelled(torrent_hash)
+            if not allow_stopped:
+                check_copy_cancelled(torrent_hash)
             COPY_WAITING.remove(torrent_hash)
             COPY_ACTIVE.add(torrent_hash)
             COPY_PROGRESS[torrent_hash]['status'] = 'copying'
@@ -327,6 +338,11 @@ def stop_copy(torrent_hash):
         movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
         if movie:
             Movie.update(copy_paused=True, copy_pause_reason='manual').where(Movie.torrent_hash == torrent_hash).execute()
+        job = CopyJob.get_or_none(CopyJob.torrent_hash == torrent_hash)
+        if job and job.state in ('queued', 'running'):
+            state = 'running' if torrent_hash in COPY_ACTIVE or job.state == 'running' else 'cancelled'
+            CopyJob.update(state=state, stop_requested=True,
+                           updated_at=datetime.datetime.now()).where(CopyJob.id == job.id).execute()
         active = torrent_hash in COPY_PROGRESS
         if active:
             STOP_FLAGS.add(torrent_hash)
@@ -537,6 +553,180 @@ def commit_copy_outputs(torrent, settings):
             os.replace(temporary, final)
             COPY_OUTPUTS.get(torrent.hash, set()).discard(temporary)
 
+JOB_OPTION_KEYS = ('receptor_enabled', 'receptor_host', 'receptor_port',
+                   'receptor_path_mapping', 'local_source_path', 'local_dest_path',
+                   'copy_speed_limit', '_overwrite', '_stage_all', '_copy_fingerprint', '_copy_destinations')
+
+def save_copy_job(torrent, settings):
+    """Commit an admission before returning success; never store credentials."""
+    payload = {key: getattr(torrent, key) for key in ('hash', 'name', 'content_path', 'progress')}
+    options = {key: settings[key] for key in JOB_OPTION_KEYS if key in settings}
+    options['receptor_enabled'] = bool(settings.get('receptor_enabled', False))
+    with CopyJob._meta.database.atomic():
+        order = (CopyJob.select(fn.MAX(CopyJob.queue_order)).scalar() or 0) + 1
+        values = dict(queue_order=order, state='queued', stop_requested=False,
+                      history_floor=MoveHistory.select(fn.MAX(MoveHistory.id)).scalar() or 0,
+                      torrent_json=json.dumps(payload, ensure_ascii=False),
+                      options_json=json.dumps(options, ensure_ascii=False), message=None,
+                      updated_at=datetime.datetime.now())
+        existing = CopyJob.get_or_none(CopyJob.torrent_hash == torrent.hash)
+        if existing:
+            CopyJob.update(**values).where(CopyJob.id == existing.id).execute()
+            return CopyJob.get_by_id(existing.id)
+        return CopyJob.create(torrent_hash=torrent.hash, **values)
+
+def register_copy_job(job):
+    if job.torrent_hash in COPY_PROGRESS:
+        return False
+    payload = json.loads(job.torrent_json)
+    movie = Movie.get_or_none(Movie.torrent_hash == job.torrent_hash)
+    COPY_PROGRESS[job.torrent_hash] = {'percent': 0, 'speed': 0, 'status': 'queued'}
+    COPY_WAITING.append(job.torrent_hash)
+    COPY_NAMES[job.torrent_hash] = movie.title if movie else payload['name']
+    return True
+
+def recover_copy_jobs():
+    """Register the old active job first, then all waiting jobs in saved order."""
+    launch = []
+    with RECOVERY_LOCK, COPY_LOCK:
+        jobs = sorted(CopyJob.select().where(CopyJob.state.in_(('queued', 'running'))),
+                      key=lambda job: (job.state != 'running', job.queue_order))
+        for old_job in jobs:
+            job = CopyJob.get_by_id(old_job.id)
+            if job.state not in ('queued', 'running'):
+                continue
+            try:
+                if register_copy_job(job):
+                    launch.append(job.id)
+            except Exception as error:
+                CopyJob.update(state='error', message=str(error)).where(CopyJob.id == job.id).execute()
+                logger.error(f"Cannot restore copy job {job.id}: {error}")
+    for job_id in launch:
+        threading.Thread(target=Context().run, args=(run_copy_job, job_id), daemon=True).start()
+    CopyJob._meta.database.close()
+    return len(launch)
+
+def recover_remote_copy(torrent, settings):
+    """An unreachable receptor is uncertain, not proof that copying stopped."""
+    host, port = settings.get('receptor_host'), settings.get('receptor_port', 8095)
+    while True:
+        COPY_PROGRESS[torrent.hash].update(recovering=True)
+        try:
+            response = requests.get(f'http://{host}:{port}/status/{torrent.hash}', timeout=5)
+            if response.status_code == 404:
+                COPY_PROGRESS[torrent.hash]['recovering'] = False
+                return False
+            response.raise_for_status()
+            status = response.json().get('status')
+            if status == 'not_found':
+                COPY_PROGRESS[torrent.hash]['recovering'] = False
+                return False
+            if status in ('copying', 'done', 'error', 'cancelled'):
+                source, _, folder = copy_paths(torrent, settings)
+                local_destination = os.path.join(settings['local_dest_path'], folder)
+                COPY_PROGRESS[torrent.hash]['recovering'] = False
+                _poll_receptor_status(torrent, host, port, source, local_destination,
+                                      settings, folder, '')
+                return not settings.pop('_remote_lost', False)
+            raise ValueError('Receptor returned an unknown copy state')
+        except (requests.RequestException, ValueError) as error:
+            Movie.update(status_reason=f'Recuperando copia: no se puede confirmar el estado del receptor ({error})').where(Movie.torrent_hash == torrent.hash).execute()
+            time.sleep(2)
+
+def finish_copy_job(job, torrent):
+    history = MoveHistory.select().where((MoveHistory.torrent_name == torrent.name) &
+                                        (MoveHistory.id > job.history_floor) & (MoveHistory.copy_job_id == job.id)).order_by(MoveHistory.id.desc()).first()
+    stopped = torrent.hash in STOP_FLAGS or CopyJob.get_by_id(job.id).stop_requested
+    if history and history.status in ('success', 'manual'):
+        state, message = 'completed', None
+        Movie.update(status_reason=None).where(Movie.torrent_hash == torrent.hash).execute()
+    elif stopped or (history and history.status == 'cancelled'):
+        state, message = 'cancelled', 'Copy stopped by user'
+        Movie.update(copy_paused=True, copy_pause_reason='manual').where(Movie.torrent_hash == torrent.hash).execute()
+    else:
+        state = 'error'
+        message = history.message if history else 'La copia terminó sin confirmar el resultado; vuelve a iniciarla'
+        if not history:
+            _record_history(torrent_name=torrent.name, source_path='', dest_path='',
+                               status='error', message=message)
+    CopyJob.update(state=state, message=message, updated_at=datetime.datetime.now()).where(CopyJob.id == job.id).execute()
+
+def discard_local_job_temporaries(torrent_hash, settings):
+    """Remove only deterministic temporary files owned by this saved job."""
+    base = os.path.realpath(settings['local_dest_path'])
+    for destination in settings.get('_copy_destinations', []):
+        temporary = destination + '.roverr-' + torrent_hash + '.part'
+        resolved = os.path.realpath(temporary)
+        if os.path.commonpath([base, resolved]) != base or resolved == base:
+            raise ValueError('Saved temporary destination escapes library directory')
+        if os.path.isfile(temporary):
+            os.remove(temporary)
+            directory = os.path.dirname(temporary)
+            if os.path.realpath(directory) != base and not os.listdir(directory):
+                os.rmdir(directory)
+
+def run_copy_job(job_id):
+    job = CopyJob.get_by_id(job_id)
+    torrent_hash = job.torrent_hash
+    torrent = None
+    previous_job = getattr(COPY_JOB_CONTEXT, 'job_id', None)
+    COPY_JOB_CONTEXT.job_id = job_id
+    try:
+        torrent = SimpleNamespace(**json.loads(job.torrent_json))
+        settings = dict(load_settings(), **json.loads(job.options_json))
+        with copy_turn(torrent_hash, allow_stopped=job.state == 'running' and settings.get('receptor_enabled', False)):
+            CopyJob.update(state='running', updated_at=datetime.datetime.now()).where(CopyJob.id == job.id).execute()
+            if job.stop_requested:
+                STOP_FLAGS.add(torrent_hash)
+            while True:
+                # A recorded success also covers a crash between final file
+                # commit/history and marking the durable job complete.
+                recorded = MoveHistory.select().where((MoveHistory.torrent_name == torrent.name) &
+                           (MoveHistory.id > job.history_floor) & (MoveHistory.copy_job_id == job.id) & MoveHistory.status.in_(('success', 'manual'))).exists()
+                if recorded:
+                    break
+                if settings.get('receptor_enabled') and recover_remote_copy(torrent, settings):
+                    break
+                check_copy_cancelled(torrent_hash)
+                current = inspect_torrent_copy(torrent, settings)
+                if current['fingerprint'] != settings['_copy_fingerprint']:
+                    Movie.update(copy_paused=True, copy_pause_reason='conflict').where(Movie.torrent_hash == torrent_hash).execute()
+                    _record_history(torrent_name=torrent.name, status='error',
+                                       message='Los archivos cambiaron desde que se guardó la cola. Pulsa Copy para comparar.',
+                                       source_path=current['source_path'], dest_path=current['destination_path'])
+                    break
+                if not settings.get('receptor_enabled'):
+                    discard_local_job_temporaries(torrent_hash, settings)
+                process_single_torrent(None, torrent, settings)
+                history = MoveHistory.select().where((MoveHistory.torrent_name == torrent.name) &
+                                                    (MoveHistory.id > job.history_floor) & (MoveHistory.copy_job_id == job.id)).order_by(MoveHistory.id.desc()).first()
+                if settings.pop('_remote_lost', False) or (settings.get('receptor_enabled') and history and history.status == 'receptor_offline'):
+                    time.sleep(2)
+                    continue
+                break
+    except InterruptedError:
+        if torrent and not settings.get('receptor_enabled'):
+            discard_local_job_temporaries(torrent_hash, settings)
+    except Exception as error:
+        logger.error(f'Persistent copy job {job_id} failed: {error}')
+        if torrent:
+            _record_history(torrent_name=torrent.name, source_path='', dest_path='', status='error', message=str(error))
+        else:
+            CopyJob.update(state='error', message=str(error)).where(CopyJob.id == job_id).execute()
+    finally:
+        if torrent:
+            finish_copy_job(job, torrent)
+        COPY_JOB_CONTEXT.job_id = previous_job
+        Movie._meta.database.close()
+        with COPY_LOCK:
+            COPY_PROGRESS.pop(torrent_hash, None)
+            COPY_NAMES.pop(torrent_hash, None)
+            STOP_FLAGS.discard(torrent_hash)
+            COPY_OUTPUTS.pop(torrent_hash, None)
+            COPY_DIRECTORIES.pop(torrent_hash, None)
+            COPY_REPLACEMENTS.pop(torrent_hash, None)
+        trigger_movies_update_callback()
+
 def manual_move(torrent_hash, config_ignored=None, automatic=False, decision=None):
     """
     Manually triggers a move operation for a specific torrent
@@ -561,6 +751,9 @@ def manual_move(torrent_hash, config_ignored=None, automatic=False, decision=Non
         with COPY_LOCK:
             if torrent_hash in COPY_PROGRESS:
                 return {"success": True, "status": "started", "message": "Copy already queued or running"}
+            saved = CopyJob.get_or_none(CopyJob.torrent_hash == torrent_hash)
+            if saved and saved.state in ('queued', 'running'):
+                return {"success": True, "status": "started", "message": "Copy awaiting persistent queue recovery"}
         inspection = inspect_torrent_copy(torrent, settings)
         action = (decision or {}).get('action')
         if action not in (None, 'overwrite', 'keep'):
@@ -574,14 +767,17 @@ def manual_move(torrent_hash, config_ignored=None, automatic=False, decision=Non
         if action == 'keep':
             if not inspection['all_destinations_exist']:
                 return {"success": False, "message": "Faltan archivos de destino; no se puede marcar como copiada"}
-            MoveHistory.create(torrent_name=torrent.name, status='manual',
+            _record_history(torrent_name=torrent.name, status='manual',
                                message='Existing destination kept by user',
                                source_path=inspection['source_path'],
                                dest_path=os.path.join(settings['local_dest_path'], inspection['folder_name']))
             Movie.update(status='moved_manually', copy_paused=True, copy_pause_reason='manual').where(Movie.torrent_hash == torrent_hash).execute()
+            CopyJob.update(state='completed', message='Existing destination kept by user').where(CopyJob.torrent_hash == torrent_hash).execute()
             trigger_movies_update_callback()
             return {"success": True, "status": "marked", "message": "Archivo conservado y película marcada como copiada"}
-        settings = dict(settings, _overwrite=action == 'overwrite', _copy_fingerprint=inspection['fingerprint'])
+        settings = dict(settings, _overwrite=action == 'overwrite', _stage_all=True,
+                        _copy_fingerprint=inspection['fingerprint'],
+                        _copy_destinations=[row['destination']['path'] for row in inspection['files']])
         with COPY_LOCK:
             movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
             if automatic and movie and movie.copy_paused:
@@ -591,41 +787,14 @@ def manual_move(torrent_hash, config_ignored=None, automatic=False, decision=Non
             if not automatic and movie:
                 Movie.update(copy_paused=False, copy_pause_reason=None, status_reason=None).where(Movie.torrent_hash == torrent_hash).execute()
             STOP_FLAGS.discard(torrent_hash)
-            COPY_PROGRESS[torrent_hash] = {'percent': 0, 'speed': 0, 'status': 'queued'}
-            COPY_WAITING.append(torrent_hash)
-            COPY_NAMES[torrent_hash] = movie.title if movie else torrent.name
+            existing_job = CopyJob.get_or_none(CopyJob.torrent_hash == torrent_hash)
+            if existing_job and existing_job.state in ('queued', 'running'):
+                return {"success": True, "status": "started", "message": "Copy saved in persistent queue"}
+            job = save_copy_job(torrent, settings)
+            register_copy_job(job)
 
-        def _move_thread():
-            try:
-                with copy_turn(torrent_hash):
-                    check_copy_cancelled(torrent_hash)
-                    COPY_PROGRESS[torrent_hash]['status'] = 'copying'
-                    current = inspect_torrent_copy(torrent, settings)
-                    if current['fingerprint'] != settings['_copy_fingerprint']:
-                        Movie.update(copy_paused=True, copy_pause_reason='conflict').where(Movie.torrent_hash == torrent_hash).execute()
-                        MoveHistory.create(torrent_name=torrent.name, status='error',
-                                           message='Destino cambiado mientras esperaba. Vuelve a copiar para comparar.',
-                                           source_path=current['source_path'], dest_path=current['destination_path'])
-                        return
-                    COPY_PROGRESS[torrent_hash]['status'] = 'copying'
-                    process_single_torrent(qb, torrent, settings)
-            except InterruptedError:
-                pass
-            except Exception as e:
-                logger.error(f"Error in background move thread: {e}")
-            finally:
-                Movie._meta.database.close()
-                with COPY_LOCK:
-                    COPY_PROGRESS.pop(torrent_hash, None)
-                    COPY_NAMES.pop(torrent_hash, None)
-                    STOP_FLAGS.discard(torrent_hash)
-                    COPY_OUTPUTS.pop(torrent_hash, None)
-                    COPY_DIRECTORIES.pop(torrent_hash, None)
-                    COPY_REPLACEMENTS.pop(torrent_hash, None)
-                trigger_movies_update_callback()
+        threading.Thread(target=Context().run, args=(run_copy_job, job.id), daemon=True).start()
 
-        threading.Thread(target=_move_thread, daemon=True).start()
-        
         return {"success": True, "status": "started", "message": f"Started processing {torrent.name} in background"}
     except Exception as e:
         return {"success": False, "message": str(e)}
@@ -641,7 +810,7 @@ def mark_as_moved(torrent_hash, config_ignored=None):
              return {"success": False, "message": "Torrent not found"}
         
         torrent = torrents[0]
-        MoveHistory.create(torrent_name=torrent.name, status='manual', message="Manually marked as moved", source_path="", dest_path="")
+        _record_history(torrent_name=torrent.name, status='manual', message="Manually marked as moved", source_path="", dest_path="")
         return {"success": True, "message": "Marked as moved"}
     except Exception as e:
         return {"success": False, "message": str(e)}
@@ -670,14 +839,14 @@ def process_single_torrent(qb, torrent, settings):
             logger.info(f"Local file not found in {local_source}, but Receptor is enabled. Falling back to content_path: {content_path}")
         else:
             logger.warning(f"Could not find {item_name} in {local_source}")
-            MoveHistory.create(torrent_name=torrent.name, status='error', message=f"File not found in {local_source}", source_path="", dest_path="")
+            _record_history(torrent_name=torrent.name, status='error', message=f"File not found in {local_source}", source_path="", dest_path="")
             return
 
     # 3. Parse Name (Movie vs Series) - Allow space before year to be optional
     match = re.search(r"(.+?)\s*\((\d{4})\)", item_name)
     if not match:
         logger.info(f"Skipping {torrent.name}: Does not match 'Title (Year)' pattern.")
-        MoveHistory.create(torrent_name=torrent.name, status='skipped', message="Invalid name format", source_path=source_path, dest_path="")
+        _record_history(torrent_name=torrent.name, status='skipped', message="Invalid name format", source_path=source_path, dest_path="")
         return
 
     # 4. Sanitize title and year to prevent path traversal attacks
@@ -708,7 +877,7 @@ def process_single_torrent(qb, torrent, settings):
             logger.error(f"SECURITY: Path traversal attempt detected! Torrent: {torrent.name}")
             logger.error(f"  Expected base: {local_real}")
             logger.error(f"  Attempted path: {dest_real}")
-            MoveHistory.create(
+            _record_history(
                 torrent_name=torrent.name,
                 status='error',
                 message="Path traversal attempt blocked by security check",
@@ -744,7 +913,7 @@ def process_single_torrent(qb, torrent, settings):
             
             if not host:
                 logger.error("Receptor is enabled but no host is configured.")
-                MoveHistory.create(torrent_name=torrent.name, status='error', message="Receptor host missing", source_path=source_path, dest_path=dest_dir)
+                _record_history(torrent_name=torrent.name, status='error', message="Receptor host missing", source_path=source_path, dest_path=dest_dir)
                 return
                 
             logger.info(f"Receptor is ENABLED. Offloading copy to {host}:{port}")
@@ -776,6 +945,7 @@ def process_single_torrent(qb, torrent, settings):
                     "destination": receptor_dest,
                     "folder_name": folder_name,
                     "overwrite": settings.get('_overwrite', False),
+                    "stage_all": settings.get('_stage_all', False),
                     "fingerprint": settings.get('_copy_fingerprint')
                 }
                 
@@ -798,15 +968,15 @@ def process_single_torrent(qb, torrent, settings):
                     else:
                         error_msg = data.get("error_msg") or data.get("message") or data.get("error") or "Unknown Receptor Error"
                         logger.error(f"Receptor returned error: {error_msg}")
-                        MoveHistory.create(torrent_name=torrent.name, status='error', message=f"Receptor: {error_msg}", source_path=source_path, dest_path=dest_dir)
+                        _record_history(torrent_name=torrent.name, status='error', message=f"Receptor: {error_msg}", source_path=source_path, dest_path=dest_dir)
                         return
                 else:
                     logger.error(f"Receptor HTTP error: {resp.status_code}")
-                    MoveHistory.create(torrent_name=torrent.name, status='receptor_offline', message=f"Receptor HTTP {resp.status_code}", source_path=source_path, dest_path=dest_dir)
+                    _record_history(torrent_name=torrent.name, status='receptor_offline', message=f"Receptor HTTP {resp.status_code}", source_path=source_path, dest_path=dest_dir)
                     return
             except requests.exceptions.RequestException as e:
                 logger.warning(f"Receptor is unreachable ({e}). Marking as waiting for automatic retry.")
-                MoveHistory.create(torrent_name=torrent.name, status='receptor_offline', message="Receptor unreachable, waiting...", source_path=source_path, dest_path=dest_dir)
+                _record_history(torrent_name=torrent.name, status='receptor_offline', message="Receptor unreachable, waiting...", source_path=source_path, dest_path=dest_dir)
                 return
         
         # === LOCAL COPY LOGIC (Fallback / Default) ===
@@ -826,7 +996,7 @@ def process_single_torrent(qb, torrent, settings):
                 
                 if not success:
                     logger.error(f"Disk space check failed for {torrent.name}: {message}")
-                    MoveHistory.create(
+                    _record_history(
                         torrent_name=torrent.name,
                         status='error',
                         message=f"Disk space check failed: {message}",
@@ -839,10 +1009,10 @@ def process_single_torrent(qb, torrent, settings):
                 reserved_bytes = details['required_bytes']
                 try:
                     logger.info(f"Copying {source_path} to {dest_file}")
-                    copy_with_progress(source_path, dest_file, torrent.hash, limit, overwrite=settings.get('_overwrite', False))
+                    copy_with_progress(source_path, dest_file, torrent.hash, limit, overwrite=settings.get('_overwrite', False) or settings.get('_stage_all', False))
                     check_copy_cancelled(torrent.hash)
                     commit_copy_outputs(torrent, settings)
-                    MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_file, status='success')
+                    _record_history(torrent_name=torrent.name, source_path=source_path, dest_path=dest_file, status='success')
                     trigger_movies_update_callback()
                     
                     # Notify Telegram: Moved
@@ -866,7 +1036,7 @@ def process_single_torrent(qb, torrent, settings):
 
             else:
                 logger.info(f"File already exists: {dest_file}")
-                MoveHistory.create(torrent_name=torrent.name, status='skipped', message="Destination exists", source_path=source_path, dest_path=dest_file)
+                _record_history(torrent_name=torrent.name, status='skipped', message="Destination exists", source_path=source_path, dest_path=dest_file)
                 trigger_movies_update_callback()
                 
         # If it's a directory
@@ -881,7 +1051,7 @@ def process_single_torrent(qb, torrent, settings):
             
             if not success:
                 logger.error(f"Disk space check failed for {torrent.name}: {message}")
-                MoveHistory.create(
+                _record_history(
                     torrent_name=torrent.name,
                     status='error',
                     message=f"Disk space check failed: {message}",
@@ -906,7 +1076,7 @@ def process_single_torrent(qb, torrent, settings):
                             
                             if not os.path.exists(dest_file) or settings.get('_overwrite', False):
                                 logger.info(f"Copying {src_file} to {dest_file}")
-                                copy_with_progress(src_file, dest_file, torrent.hash, limit, overwrite=settings.get('_overwrite', False))
+                                copy_with_progress(src_file, dest_file, torrent.hash, limit, overwrite=settings.get('_overwrite', False) or settings.get('_stage_all', False))
                                 copied = True
                             else:
                                 logger.info(f"File already exists: {dest_file}")
@@ -917,7 +1087,7 @@ def process_single_torrent(qb, torrent, settings):
                 check_copy_cancelled(torrent.hash)
                 if copied:
                     commit_copy_outputs(torrent, settings)
-                    MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_dir, status='success')
+                    _record_history(torrent_name=torrent.name, source_path=source_path, dest_path=dest_dir, status='success')
                     trigger_movies_update_callback()
                     
                     # Notify Telegram: Moved
@@ -937,7 +1107,7 @@ def process_single_torrent(qb, torrent, settings):
 
                 else:
                     logger.warning(f"No video files found in {source_path}")
-                    MoveHistory.create(torrent_name=torrent.name, status='skipped', message="No video file found in folder", source_path=source_path, dest_path=dest_dir)
+                    _record_history(torrent_name=torrent.name, status='skipped', message="No video file found in folder", source_path=source_path, dest_path=dest_dir)
                     trigger_movies_update_callback()
                     
             finally:
@@ -945,7 +1115,7 @@ def process_single_torrent(qb, torrent, settings):
                 release_disk_space_reservation(dest_dir, reserved_bytes)
         else:
              logger.error(f"Source path is valid but neither file nor dir? {source_path}")
-             MoveHistory.create(torrent_name=torrent.name, status='error', message="Invalid source type", source_path=source_path, dest_path="")
+             _record_history(torrent_name=torrent.name, status='error', message="Invalid source type", source_path=source_path, dest_path="")
              trigger_movies_update_callback()
 
     except InterruptedError:
@@ -954,19 +1124,19 @@ def process_single_torrent(qb, torrent, settings):
             cleanup_copy_outputs(torrent.hash)
         except Exception as cleanup_error:
             logger.error(f"Cancelled copy cleanup failed: {cleanup_error}")
-            MoveHistory.create(torrent_name=torrent.name, status='error',
+            _record_history(torrent_name=torrent.name, status='error',
                                message=f"Cancelled copy cleanup failed: {cleanup_error}",
                                source_path=source_path, dest_path=dest_dir)
             trigger_movies_update_callback()
             return
-        MoveHistory.create(torrent_name=torrent.name, status='cancelled',
+        _record_history(torrent_name=torrent.name, status='cancelled',
                            message="Copy stopped by user", source_path=source_path, dest_path=dest_dir)
         trigger_movies_update_callback()
     except Exception as e:
-        if settings.get('_overwrite'):
+        if settings.get('_overwrite') or settings.get('_stage_all'):
             cleanup_copy_outputs(torrent.hash)
         logger.error(f"Error moving {torrent.name}: {e}")
-        MoveHistory.create(torrent_name=torrent.name, status='error', message=str(e), source_path="", dest_path="")
+        _record_history(torrent_name=torrent.name, status='error', message=str(e), source_path="", dest_path="")
         trigger_movies_update_callback()
 
 def _poll_receptor_status(torrent, host, port, source_path, dest_dir, settings, title, year):
@@ -1015,7 +1185,7 @@ def _poll_receptor_status(torrent, host, port, source_path, dest_dir, settings, 
                         'status': 'done',
                         'is_receptor': True
                     }
-                    MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_dir, status='success')
+                    _record_history(torrent_name=torrent.name, source_path=source_path, dest_path=dest_dir, status='success')
                     trigger_movies_update_callback()
                     
                     # Notify Telegram
@@ -1038,7 +1208,7 @@ def _poll_receptor_status(torrent, host, port, source_path, dest_dir, settings, 
                     break
                     
                 elif status == "cancelled":
-                    MoveHistory.create(torrent_name=torrent.name, source_path=source_path,
+                    _record_history(torrent_name=torrent.name, source_path=source_path,
                                        dest_path=dest_dir, status='cancelled', message="Copy stopped by user")
                     trigger_movies_update_callback()
                     break
@@ -1046,7 +1216,7 @@ def _poll_receptor_status(torrent, host, port, source_path, dest_dir, settings, 
                     # Receptor encountered an error
                     error_msg = data.get("error") or data.get("error_msg") or "Unknown receptor error"
                     logger.error(f"Receptor copy error for {torrent.hash}: {error_msg}")
-                    MoveHistory.create(torrent_name=torrent.name, status='error', message=f"Receptor Error: {error_msg}", source_path=source_path, dest_path=dest_dir)
+                    _record_history(torrent_name=torrent.name, status='error', message=f"Receptor Error: {error_msg}", source_path=source_path, dest_path=dest_dir)
                     trigger_movies_update_callback()
                     if torrent.hash in COPY_PROGRESS:
                         del COPY_PROGRESS[torrent.hash]
@@ -1059,11 +1229,16 @@ def _poll_receptor_status(torrent, host, port, source_path, dest_dir, settings, 
                          del COPY_PROGRESS[torrent.hash]
                      break
                 
+            elif resp.status_code == 404:
+                settings['_remote_lost'] = True
+                return
             else:
                  logger.warning(f"Receptor status returned {resp.status_code} for {torrent.hash}")
                  
         except Exception as e:
             logger.error(f"Error polling receptor for {torrent.hash}: {e}")
+            if torrent.hash in COPY_PROGRESS:
+                COPY_PROGRESS[torrent.hash]['recovering'] = True
             
         time.sleep(1) # Poll every 1 second
 
