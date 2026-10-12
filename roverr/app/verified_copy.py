@@ -88,4 +88,3 @@ def verify_copy(source, temporary, identity, check_cancelled):
         raise ValueError('La verificación SHA-256 falló; se conserva el destino original')
     check_cancelled()
     return hashes[0].hexdigest()
-
