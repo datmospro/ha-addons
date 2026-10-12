@@ -326,7 +326,7 @@ def stop_copy(torrent_hash):
     with SYNC_LOCK, COPY_LOCK:
         movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
         if movie:
-            Movie.update(copy_paused=True).where(Movie.torrent_hash == torrent_hash).execute()
+            Movie.update(copy_paused=True, copy_pause_reason='manual').where(Movie.torrent_hash == torrent_hash).execute()
         active = torrent_hash in COPY_PROGRESS
         if active:
             STOP_FLAGS.add(torrent_hash)
@@ -568,7 +568,7 @@ def manual_move(torrent_hash, config_ignored=None, automatic=False, decision=Non
         stale = decision is not None and decision.get('fingerprint') != inspection['fingerprint']
         if stale or (inspection['conflict'] and action is None):
             if automatic:
-                Movie.update(copy_paused=True).where(Movie.torrent_hash == torrent_hash).execute()
+                Movie.update(copy_paused=True, copy_pause_reason='conflict').where(Movie.torrent_hash == torrent_hash).execute()
             return {"success": False, "status": "conflict", "comparison": inspection,
                     "message": "Los archivos han cambiado; revisa la comparación" if stale else "El archivo de destino ya existe"}
         if action == 'keep':
@@ -578,7 +578,7 @@ def manual_move(torrent_hash, config_ignored=None, automatic=False, decision=Non
                                message='Existing destination kept by user',
                                source_path=inspection['source_path'],
                                dest_path=os.path.join(settings['local_dest_path'], inspection['folder_name']))
-            Movie.update(status='moved_manually', copy_paused=True).where(Movie.torrent_hash == torrent_hash).execute()
+            Movie.update(status='moved_manually', copy_paused=True, copy_pause_reason='manual').where(Movie.torrent_hash == torrent_hash).execute()
             trigger_movies_update_callback()
             return {"success": True, "status": "marked", "message": "Archivo conservado y película marcada como copiada"}
         settings = dict(settings, _overwrite=action == 'overwrite', _copy_fingerprint=inspection['fingerprint'])
@@ -589,7 +589,7 @@ def manual_move(torrent_hash, config_ignored=None, automatic=False, decision=Non
             if torrent_hash in COPY_PROGRESS:
                 return {"success": True, "status": "started", "message": "Copy already queued or running"}
             if not automatic and movie:
-                Movie.update(copy_paused=False).where(Movie.torrent_hash == torrent_hash).execute()
+                Movie.update(copy_paused=False, copy_pause_reason=None, status_reason=None).where(Movie.torrent_hash == torrent_hash).execute()
             STOP_FLAGS.discard(torrent_hash)
             COPY_PROGRESS[torrent_hash] = {'percent': 0, 'speed': 0, 'status': 'queued'}
             COPY_WAITING.append(torrent_hash)
@@ -602,7 +602,7 @@ def manual_move(torrent_hash, config_ignored=None, automatic=False, decision=Non
                     COPY_PROGRESS[torrent_hash]['status'] = 'copying'
                     current = inspect_torrent_copy(torrent, settings)
                     if current['fingerprint'] != settings['_copy_fingerprint']:
-                        Movie.update(copy_paused=True).where(Movie.torrent_hash == torrent_hash).execute()
+                        Movie.update(copy_paused=True, copy_pause_reason='conflict').where(Movie.torrent_hash == torrent_hash).execute()
                         MoveHistory.create(torrent_name=torrent.name, status='error',
                                            message='Destino cambiado mientras esperaba. Vuelve a copiar para comparar.',
                                            source_path=current['source_path'], dest_path=current['destination_path'])

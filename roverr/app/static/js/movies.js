@@ -222,7 +222,7 @@ function updateMovieCard(card, movie, posterSrc, statusClass, statusIcon, status
     overlay.className = `overlay-status ${statusClass}`;
     overlay.innerHTML = `${statusIcon} ${statusLabel}`;
     // Update tooltip for 'new' status with reason
-    const tooltip = getCopyStatusTooltip(movie.status, movie.copy_progress) || (movie.status === 'new' && movie.status_reason);
+    const tooltip = getCopyStatusTooltip(movie.status, movie.copy_progress) || (['new', 'pending', 'error'].includes(movie.status) && movie.status_reason);
     if (tooltip) {
         overlay.setAttribute('title', tooltip);
     } else {
@@ -269,7 +269,7 @@ function createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel)
         <input type="checkbox" class="movie-card-checkbox">
         <div class="poster-wrapper">
             <img src="${posterSrc}" alt="${escapeHtml(movie.title)}" loading="lazy" onerror="this.onerror=null; this.src='posters/placeholder_unidentified.png';">
-            <div class="overlay-status ${statusClass}" title="${escapeHtml(getCopyStatusTooltip(movie.status, movie.copy_progress) || (movie.status === 'new' ? movie.status_reason : '') || '')}">
+            <div class="overlay-status ${statusClass}" title="${escapeHtml(getCopyStatusTooltip(movie.status, movie.copy_progress) || (['new', 'pending', 'error'].includes(movie.status) ? movie.status_reason : '') || '')}">
                 ${statusIcon} ${statusLabel}
             </div>
         </div>
@@ -448,7 +448,7 @@ function renderMovieDetails(container, movie, hash) {
                 
                 
                 <div class="meta-row">
-                    <span class="badge status ${statusClass}" title="${escapeHtml(getCopyStatusTooltip(movie.status, movie.copy_progress) || (movie.status === 'new' ? movie.status_reason : '') || '')}">${statusIcon} ${statusLabel}</span>
+                    <span class="badge status ${statusClass}" title="${escapeHtml(getCopyStatusTooltip(movie.status, movie.copy_progress) || (['new', 'pending', 'error'].includes(movie.status) ? movie.status_reason : '') || '')}">${statusIcon} ${statusLabel}</span>
                     ${movie.source_tag ? `<span class="badge source-tag" style="background: rgba(255, 107, 107, 0.15); color: #ff6b6b; border: 1px solid rgba(255, 107, 107, 0.3); font-weight: 600;"><i class="fa-solid fa-film"></i> ${escapeHtml(movie.source_tag)}</span>` : ''}
                     <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
                     <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${movie.size > 0 ? formatBytes(movie.size) : 'N/A'}</span>

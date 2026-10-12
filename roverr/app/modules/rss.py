@@ -65,6 +65,7 @@ def is_movie_ignored(title, year, tmdb_id, ignored_movies):
         if tmdb_id and m.tmdb_id:
             if int(tmdb_id) == int(m.tmdb_id):
                 return True
+            continue
                 
         norm_db_title = normalize(m.title)
         norm_db_torrent = normalize(m.torrent_name)
@@ -131,6 +132,34 @@ def is_duplicate_movie(title, year, tmdb_id, existing_movies):
             return True
             
     return False
+
+def retry_rss_confirmation(movie, feed):
+    """Retry only uncertain additions, reusing a torrent if it already exists."""
+    reason = movie.status_reason or ''
+    if movie.state != 'rss' or movie.ignored or movie.copy_paused or not feed:
+        return False
+    if not feed.get('enabled', True) or not feed.get('auto_add'):
+        return False
+    if reason != 'Torrent client did not respond' and not reason.startswith('Pendiente de confirmación'):
+        return False
+    torrent_hash, torrent_name, error = auto_download_movie(
+        movie.title, movie.year, int(feed.get('preferred_size', 0)),
+        int(feed.get('max_size', 0)), label=feed.get('label', ''), tmdb_id=movie.tmdb_id)
+    if not torrent_hash:
+        Movie.update(status_reason=error).where(Movie.id == movie.id).execute()
+        return False
+    with Movie._meta.database.atomic():
+        real = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
+        changes = dict(rss_feed_name=feed.get('name'),
+                       auto_copy_requested=bool(feed.get('auto_copy')))
+        if real:
+            Movie.update(**changes).where(Movie.id == real.id).execute()
+            movie.delete_instance()
+        else:
+            changes.update(torrent_hash=torrent_hash, torrent_name=torrent_name,
+                           state='downloading', status='new', status_reason=None)
+            Movie.update(**changes).where(Movie.id == movie.id).execute()
+    return True
 
 def fetch_rss_movies(limit=30):
     """
@@ -263,6 +292,8 @@ def fetch_rss_movies(limit=30):
             
             # Check if exists by hash first (exact same RSS entry)
             if Movie.select().where(Movie.torrent_hash == pseudo_hash).exists():
+                retry_rss_confirmation(Movie.get(Movie.torrent_hash == pseudo_hash),
+                                       feed_map.get(entry['feed_name']))
                 logger.info(f"RSS movie '{title}' ({year}) already exists with exact hash {pseudo_hash[:8]}..., skipping")
                 continue
 
@@ -337,7 +368,9 @@ def fetch_rss_movies(limit=30):
                 
             # CRITICAL FIX: Check if movie already exists in dashboard by title+year (not ignored, not watchlist)
             # This prevents duplicate entries for the same movie in different qualities/formats
-            if is_duplicate_movie(title, year, entry.get('tmdb_id'), existing_movies):
+            current_movies = list(Movie.select().where((Movie.ignored == False) &
+                                  ((Movie.watchlist == False) | Movie.watchlist.is_null())))
+            if is_duplicate_movie(title, year, entry.get('tmdb_id'), current_movies):
                 logger.info(f"Movie '{title}' ({year}) already exists in dashboard. Skipping duplicate RSS entry.")
                 continue
             
@@ -365,6 +398,12 @@ def fetch_rss_movies(limit=30):
                             break
                     
                     if torrent_exists:
+                        if feed_label:
+                            qb.torrents_add_tags(torrent_hashes=t['hash'], tags=feed_label)
+                        real = Movie.get_or_none(Movie.torrent_hash == t['hash'])
+                        if real:
+                            Movie.update(rss_feed_name=entry['feed_name'],
+                                         auto_copy_requested=bool(feed_config.get('auto_copy'))).where(Movie.id == real.id).execute()
                         # Skip this entry entirely - no auto-download, no RSS entry
                         continue
                     
@@ -405,7 +444,9 @@ def fetch_rss_movies(limit=30):
                         # Create DB Entry with REAL torrent hash
                         try:
                             Movie.create(
-                                torrent_hash=torrent_hash,
+                                rss_feed_name=entry['feed_name'],
+                            auto_copy_requested=bool(feed_config.get('auto_copy')),
+                            torrent_hash=torrent_hash,
                                 title=metadata.get('title', title) if metadata else title,
                                 year=metadata.get('year', year) if metadata else year,
                                 poster_path=poster_local,
@@ -424,7 +465,7 @@ def fetch_rss_movies(limit=30):
                                 imdb_id=metadata.get('imdb_id') if metadata else None,
                                 imdb_rating=metadata.get('imdb_rating') if metadata else None,
                                 imdb_votes=metadata.get('imdb_votes') if metadata else None,
-                                tmdb_id=int(entry_tmdb_id) if entry_tmdb_id else None,  # Save TMDB ID for intelligent search
+                                tmdb_id=int(entry_tmdb_id) if entry_tmdb_id else (metadata.get('tmdb_id') if metadata else None),  # Save TMDB ID for intelligent search
                                 country_code=metadata.get('country_code') if metadata else None,  # Save country code for flag display
                                 metadata_updated_at=datetime.now(),
                                 torrent_name=torrent_name
@@ -504,6 +545,8 @@ def fetch_rss_movies(limit=30):
                             poster_local = 'posters/placeholder_unidentified.png'
                         
                         Movie.create(
+                            rss_feed_name=entry['feed_name'],
+                            auto_copy_requested=bool(feed_config.get('auto_copy')),
                             torrent_hash=pseudo_hash,
                             title=metadata.get('title', title) if metadata else title,
                             year=metadata.get('year', year) if metadata else year,
@@ -524,7 +567,7 @@ def fetch_rss_movies(limit=30):
                             imdb_id=metadata.get('imdb_id') if metadata else None,
                             imdb_rating=metadata.get('imdb_rating') if metadata else None,
                             imdb_votes=metadata.get('imdb_votes') if metadata else None,
-                            tmdb_id=int(entry_tmdb_id) if entry_tmdb_id else None,
+                            tmdb_id=int(entry_tmdb_id) if entry_tmdb_id else (metadata.get('tmdb_id') if metadata else None),
                             metadata_updated_at=datetime.now(),
                             torrent_name=entry['title']
                         )
@@ -571,6 +614,8 @@ def fetch_rss_movies(limit=30):
             
             # Create DB Entry (for feeds without auto_add)
             Movie.create(
+                rss_feed_name=entry['feed_name'],
+                auto_copy_requested=bool(feed_config.get('auto_copy')) if feed_config else False,
                 torrent_hash=pseudo_hash,
                 title=metadata.get('title', title) if metadata else title,
                 year=metadata.get('year', year) if metadata else year,

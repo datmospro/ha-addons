@@ -205,10 +205,16 @@ def process_torrents(config_ignored=None):
     # Call sync_movies - this handles status updates + auto-copy detection
     try:
         api_key = settings.get('tmdb_api_key')
+        # Import lazily: tmdb imports client functions through mover. Without
+        # this import the scheduler silently logged NameError and only browser
+        # requests could synchronize completed downloads.
+        from .tmdb import sync_movies
         sync_movies(torrent_list, api_key)
         logger.info("Sync_movies completed successfully")
     except Exception as e:
         logger.error(f"Error calling sync_movies: {e}", exc_info=True)
+    finally:
+        Movie._meta.database.close()
 
 def get_active_torrents(config_ignored=None):
     settings = load_settings()

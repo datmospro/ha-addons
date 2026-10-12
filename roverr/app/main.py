@@ -107,7 +107,7 @@ logger = logging.getLogger("Roverr")
 logger.info("=" * 80)
 logger.info("🚀 ROVERR - MEDIA MANAGER")
 logger.info("=" * 80)
-logger.info(f"📦 Version: 4.5.6")
+logger.info(f"📦 Version: 4.5.7")
 logger.info(f"🔧 Log Level: {logging.getLevelName(logger.getEffectiveLevel())}")
 logger.info("=" * 80)
 
@@ -186,6 +186,7 @@ async def ws_progress_broadcast_task():
     # somebody opens or refreshes the UI.
     logger.info("Torrent progress monitor and WebSocket broadcaster task started")
     last_sent_progress = None
+    last_reconcile = 0.0
     while True:
         try:
             # Get active copy progress
@@ -207,6 +208,12 @@ async def ws_progress_broadcast_task():
                 await asyncio.sleep(5)
                 continue
             
+            # Periodic reconciliation also covers instant downloads and movies
+            # already complete when this process started, with no browser open.
+            now = asyncio.get_running_loop().time()
+            if now - last_reconcile >= 10:
+                last_reconcile = now
+                await asyncio.to_thread(process_torrents, None)
             active_progress = {}
             # 1. Add downloading torrents
             for t in torrents:

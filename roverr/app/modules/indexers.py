@@ -892,60 +892,63 @@ def auto_download_movie(title, year, preferred_size_gb, max_size_gb, label=None,
         qb = get_qb_client(settings)
         qb.auth_log_in()
         
-        # Get torrents list BEFORE adding to compare
-        torrents_before = {t['hash'] for t in qb.torrents_info()}
-        
-        # Add torrent with label/tag if provided
-        if label:
-            logger.info(f"Adding torrent with label: {label}")
-            qb.torrents_add(urls=best_torrent['download_url'], tags=label)
-        else:
-            qb.torrents_add(urls=best_torrent['download_url'])
-            
-        # Give torrent client time to add the torrent (retry loop for reliability)
-        import time
-        max_retries = 6
-        new_torrents = []
-        
-        for attempt in range(max_retries):
-            time.sleep(1)  # Sleep 1 second between retries
-            
-            # Get the torrent hash by finding the NEW torrent that was just added
-            torrents_after = qb.torrents_info()
-            
-            # Find torrents that weren't there before
-            new_torrents = [t for t in torrents_after if t['hash'] not in torrents_before]
-            
-            if new_torrents:
-                logger.info(f"New torrent detected after {attempt + 1} attempts")
-                break
-        
-        if new_torrents:
-            # If we have multiple new torrents, try to find the one matching our title/year
-            matching_torrent = None
-            for t in new_torrents:
-                t_title, t_year = clean_torrent_name(t['name'])
-                # Check if title matches (case insensitive) and year matches (if provided)
-                title_matches = t_title.lower() == title.lower() or title.lower() in t_title.lower()
-                year_matches = (not year) or (str(t_year) == str(year))
-                
-                if title_matches and year_matches:
-                    matching_torrent = t
-                    break
-            
-            # Use matching torrent if found, otherwise use the first new torrent
-            selected = matching_torrent or new_torrents[0]
-            logger.info(f"Added torrent to download client: {selected['name']} (hash: {selected['hash'][:8]}...)")
-            return selected['hash'], selected['name'], None  # Success - no reason needed
-        
-        
-        # ÔØî REMOVED UNSAFE FALLBACK: Do not use "most recent" torrent as it may be wrong
-        # If we can't detect the new torrent, it's better to fail than to assign wrong hash
-        logger.error(f"ÔØî Could not detect new torrent after {max_retries} retries for: {best_torrent['title']}")
-        logger.error(f"ÔÜá´©Å This movie will NOT be added to the database to prevent data corruption")
-        logger.error(f"­ƒÆí Possible causes: Torrent client slow to respond, network issues, or torrent already exists")
-        return None, None, "Torrent client did not respond"
-        
+        from urllib.parse import urlparse, parse_qs
+        import base64
+        from .automation import normalize_title
+        expected_hash = None
+        url = best_torrent['download_url']
+        if url.startswith('magnet:'):
+            for exact in parse_qs(urlparse(url).query).get('xt', []):
+                if exact.lower().startswith('urn:btih:'):
+                    value = exact.rsplit(':', 1)[-1]
+                    try:
+                        expected_hash = base64.b32decode(value.upper()).hex() if len(value) == 32 else value.lower()
+                    except (ValueError, base64.binascii.Error):
+                        expected_hash = None
+
+        def release_key(name):
+            return normalize_title(re.sub(r'\.(mkv|mp4|avi|torrent)$', '', name, flags=re.I))
+
+        def find_requested(torrents, allow_title=False):
+            if expected_hash:
+                exact = [torrent for torrent in torrents if torrent['hash'].lower() == expected_hash]
+                if len(exact) == 1:
+                    return exact[0]
+            exact = [torrent for torrent in torrents if release_key(torrent['name']) == release_key(best_torrent['title'])]
+            if len(exact) == 1:
+                return exact[0]
+            if allow_title:
+                release_title, release_year = clean_torrent_name(best_torrent['title'])
+                matches = []
+                for torrent in torrents:
+                    candidate_title, candidate_year = clean_torrent_name(torrent['name'])
+                    if release_year and candidate_year == release_year and normalize_title(candidate_title) == normalize_title(release_title):
+                        matches.append(torrent)
+                if len(matches) == 1:
+                    return matches[0]
+            return None
+
+        before = qb.torrents_info()
+        existing = find_requested(before)
+        if existing:
+            if label:
+                qb.torrents_add_tags(torrent_hashes=existing['hash'], tags=label)
+            logger.info(f"Using requested torrent already in qBittorrent: {existing['name']}")
+            return existing['hash'], existing['name'], None
+        before_hashes = {torrent['hash'] for torrent in before}
+        qb.torrents_add(urls=url, **({'tags': label} if label else {}))
+        # Late confirmation is reconciled against the RSS placeholder by sync.
+        # Never attach an unrelated newly added torrent as a fallback.
+        for attempt in range(15):
+            time.sleep(1)
+            after = qb.torrents_info()
+            requested = find_requested(after)
+            if requested is None:
+                requested = find_requested([torrent for torrent in after if torrent['hash'] not in before_hashes], allow_title=True)
+            if requested:
+                return requested['hash'], requested['name'], None
+        return None, None, "Pendiente de confirmación de qBittorrent; se enlazará al detectar el torrent"
+
     except Exception as e:
         logger.error(f"Error adding torrent to download client: {e}")
         return None, None, f"Download client error: {str(e)}"

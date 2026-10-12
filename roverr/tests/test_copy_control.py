@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'app'))
 import database
 from peewee import SqliteDatabase
-from modules import mover, tmdb, config
+from modules import mover, tmdb, config, automation, indexers, rss, client as torrent_client
 import main
 from copy_conflicts import inspect_files
 
@@ -106,24 +106,29 @@ class CopyControlTests(unittest.TestCase):
              patch.object(main.asyncio, 'sleep', side_effect=sleep):
             with self.assertRaises(asyncio.CancelledError):
                 asyncio.run(main.ws_progress_broadcast_task())
-            process.assert_called_once_with(None)
+            self.assertEqual(process.call_count, 2)
+            self.assertEqual(process.call_args.args, (None,))
 
     def test_auto_copy_survives_consumed_status_transition(self):
         self.movie(status='pending', progress=1)
-        with patch.object(tmdb, 'manual_move') as move:
+        with patch.object(automation, 'manual_move') as move:
             tmdb.sync_movies([self.torrent()], 'test-key')
             move.assert_called_once_with('a', automatic=True)
 
-    def test_upgrade_holds_backlog_but_not_future_completions(self):
+    def test_existing_and_new_completions_enter_automatic_queue(self):
         self.settings.pop('copy_recovery_453_done')
         self.movie(status='downloading', progress=.5)
         self.movie('b', status='downloading', progress=.5)
-        with patch.object(tmdb, 'manual_move') as move:
+        with patch.object(automation, 'manual_move', return_value={'success': True}) as move:
             tmdb.sync_movies([self.torrent(), self.torrent('b', .5, 'downloading')], 'key')
-            move.assert_not_called()
-            self.assertTrue(database.Movie.get_by_id(1).copy_paused)
-            self.assertFalse(database.Movie.get_by_id(2).copy_paused)
-            tmdb.sync_movies([self.torrent(), self.torrent('b')], 'key')
+            move.assert_called_once_with('a', automatic=True)
+            self.assertFalse(database.Movie.get_by_id(1).copy_paused)
+            database.MoveHistory.create(torrent_name='Film (2026).mkv',source_path='',dest_path='',status='manual')
+            # b uses a distinct torrent name for this test.
+            movie_b=database.Movie.get(database.Movie.torrent_hash=='b'); movie_b.torrent_name='Second (2026).mkv'; movie_b.save()
+            move.reset_mock()
+            second=self.torrent('b'); second['name']='Second (2026).mkv'
+            tmdb.sync_movies([self.torrent(), second], 'key')
             move.assert_called_once_with('b', automatic=True)
 
     def test_empty_snapshot_does_not_consume_upgrade_recovery(self):
@@ -143,7 +148,7 @@ class CopyControlTests(unittest.TestCase):
         self.movie(status='pending', progress=1)
         self.assertTrue(mover.stop_copy('a'))
         self.db.close()
-        with patch.object(tmdb, 'manual_move') as move:
+        with patch.object(automation, 'manual_move') as move:
             tmdb.sync_movies([self.torrent()], 'key')
             move.assert_not_called()
         self.assertTrue(database.Movie.get(database.Movie.torrent_hash == 'a').copy_paused)
@@ -564,6 +569,185 @@ class CopyControlTests(unittest.TestCase):
                 self.assertEqual(list(progress.call_args.args[0]['progress']), ['a'])
         finally:
             main.manager.active_connections.clear()
+
+    def test_rss_placeholder_merges_with_real_torrent(self):
+        real = self.movie(status='pending', year='2026', tmdb_id=10)
+        placeholder = self.movie('rss', state='rss', status='new', year='2026', tmdb_id=10,
+                                 rss_feed_name='Test feed', auto_copy_requested=True,
+                                 status_reason='Torrent client did not respond')
+        automation.reconcile_rss_movies([self.torrent()])
+        self.assertIsNone(database.Movie.get_or_none(database.Movie.id == placeholder.id))
+        saved = database.Movie.get_by_id(real.id)
+        self.assertEqual(saved.rss_feed_name, 'Test feed')
+        self.assertTrue(saved.auto_copy_requested)
+
+    def test_reconciliation_preserves_ignored_rows_and_distinct_tmdb_ids(self):
+        self.movie(status='pending', year='2026', tmdb_id=10)
+        self.movie('ignored-rss', state='rss', year='2026', tmdb_id=10, ignored=True)
+        self.movie('different-rss', state='rss', year='2026', tmdb_id=20)
+        automation.reconcile_rss_movies([self.torrent()])
+        self.assertEqual(database.Movie.select().count(), 3)
+
+    def test_reconciliation_preserves_manual_hold_and_watchlist(self):
+        self.movie(status='pending', year='2026', tmdb_id=10)
+        self.movie('rss', state='rss', year='2026', tmdb_id=10, copy_paused=True,
+                   copy_pause_reason='manual', watchlist=True)
+        automation.reconcile_rss_movies([self.torrent()])
+        real = database.Movie.get(database.Movie.torrent_hash == 'a')
+        self.assertTrue(real.copy_paused)
+        self.assertEqual(real.copy_pause_reason, 'manual')
+        self.assertTrue(real.watchlist)
+
+    def test_legacy_recovery_hold_is_released_for_eligible_pending_copy(self):
+        self.movie(status='pending', progress=1, copy_paused=True)
+        with patch.object(automation, 'manual_move', return_value={'success': True}) as move:
+            automation.queue_completed_movies([self.torrent()], self.settings)
+            move.assert_called_once_with('a', automatic=True)
+        self.assertFalse(database.Movie.get(database.Movie.torrent_hash == 'a').copy_paused)
+
+    def test_cancelled_history_never_auto_releases_legacy_hold(self):
+        self.movie(status='pending', progress=1, copy_paused=True)
+        database.MoveHistory.create(torrent_name='Film (2026).mkv',source_path='',dest_path='',status='cancelled')
+        with patch.object(automation, 'manual_move') as move:
+            automation.queue_completed_movies([self.torrent()], self.settings)
+            move.assert_not_called()
+        self.assertIn('manualmente', database.Movie.get(database.Movie.torrent_hash == 'a').status_reason)
+
+    def test_feed_origin_queues_completed_movie_even_without_tags(self):
+        self.movie(status='pending', progress=1, rss_feed_name='Feed')
+        self.settings['rss_feeds']=[{'name':'Feed','auto_copy':True,'enabled':True}]
+        torrent=self.torrent();torrent['tags']=''
+        with patch.object(automation, 'manual_move', return_value={'success':True}) as move:
+            automation.queue_completed_movies([torrent], self.settings)
+            move.assert_called_once_with('a', automatic=True)
+
+    def test_feed_disabled_does_not_queue_and_shows_reason(self):
+        self.movie(status='pending', progress=1, rss_feed_name='Feed')
+        self.settings['rss_feeds']=[{'name':'Feed','auto_copy':False}]
+        with patch.object(automation, 'manual_move') as move:
+            automation.queue_completed_movies([self.torrent()], self.settings)
+            move.assert_not_called()
+        self.assertIn('no está habilitada', database.Movie.get(database.Movie.torrent_hash == 'a').status_reason)
+
+    def test_manual_admission_failure_is_visible_and_retryable(self):
+        self.movie(status='pending', progress=1)
+        with patch.object(automation, 'manual_move', return_value={'success':False,'message':'Receptor offline'}):
+            automation.queue_completed_movies([self.torrent()], self.settings)
+        saved=database.Movie.get(database.Movie.torrent_hash == 'a')
+        self.assertEqual(saved.status_reason,'Receptor offline')
+        self.assertFalse(saved.copy_paused)
+
+    def test_first_seen_complete_torrent_is_queued_in_same_sync(self):
+        self.settings['telegram_notify_on_new_movie']=False
+        with patch.object(tmdb,'fetch_complete_movie_metadata',return_value={'title':'Film','year':'2026'}), \
+             patch.object(automation,'manual_move',return_value={'success':True}) as move:
+            tmdb.sync_movies([self.torrent()], 'key')
+            move.assert_called_once_with('a', automatic=True)
+
+    def test_completed_download_queues_without_tmdb_connection(self):
+        with patch.object(automation,'manual_move',return_value={'success':True}) as move:
+            tmdb.sync_movies([self.torrent()], None)
+            move.assert_called_once_with('a', automatic=True)
+
+    def test_reuses_existing_exact_torrent_instead_of_adding_again(self):
+        existing={'hash':'a'*40,'name':'Film (2026).mkv'}
+        qb=Mock();qb.torrents_info.return_value=[existing]
+        release={'title':'Film (2026)','download_url':'magnet:?xt=urn:btih:'+'a'*40,'size_mb':1}
+        with patch.object(indexers,'load_settings',return_value=self.settings), \
+             patch.object(indexers,'search_indexers',return_value=[release]), \
+             patch.object(indexers,'select_best_torrent',return_value=release), \
+             patch.object(indexers,'get_qb_client',return_value=qb):
+            result=indexers.auto_download_movie('Film','2026',1,2,label='films')
+        self.assertEqual(result[0],'a'*40)
+        qb.torrents_add.assert_not_called()
+        qb.torrents_add_tags.assert_called_once()
+
+    def test_never_assigns_unrelated_new_torrent_to_requested_movie(self):
+        qb=Mock();qb.torrents_info.side_effect=[[]]+[[{'hash':'b'*40,'name':'Other (2025).mkv'}]]*15
+        release={'title':'Film (2026)','download_url':'https://example.invalid/torrent','size_mb':1}
+        with patch.object(indexers,'load_settings',return_value=self.settings), \
+             patch.object(indexers,'search_indexers',return_value=[release]), \
+             patch.object(indexers,'select_best_torrent',return_value=release), \
+             patch.object(indexers,'get_qb_client',return_value=qb), patch.object(indexers.time,'sleep'):
+            result=indexers.auto_download_movie('Film','2026',1,2)
+        self.assertIsNone(result[0])
+        self.assertIn('confirmación',result[2])
+
+    def test_confirmation_detects_late_matching_torrent(self):
+        qb=Mock();qb.torrents_info.side_effect=[[],[],[],[{'hash':'a'*40,'name':'Film (2026).mkv'}]]
+        release={'title':'Film (2026)','download_url':'https://example.invalid/torrent','size_mb':1}
+        with patch.object(indexers,'load_settings',return_value=self.settings), \
+             patch.object(indexers,'search_indexers',return_value=[release]), \
+             patch.object(indexers,'select_best_torrent',return_value=release), \
+             patch.object(indexers,'get_qb_client',return_value=qb), patch.object(indexers.time,'sleep'):
+            result=indexers.auto_download_movie('Film','2026',1,2)
+        self.assertEqual(result[0],'a'*40)
+
+    def test_rss_uncertain_addition_retries_and_updates_same_record(self):
+        placeholder=self.movie('rss',state='rss',status='new',year='2026',status_reason='Torrent client did not respond')
+        with patch.object(rss,'auto_download_movie',return_value=('a','Film (2026).mkv',None)):
+            result=rss.retry_rss_confirmation(placeholder,{'name':'Feed','auto_add':True,'auto_copy':True})
+        self.assertTrue(result)
+        self.assertEqual(database.Movie.select().count(),1)
+        saved=database.Movie.get_by_id(placeholder.id)
+        self.assertEqual(saved.torrent_hash,'a')
+        self.assertEqual(saved.state,'downloading')
+        self.assertEqual(saved.rss_feed_name,'Feed')
+        self.assertIsNone(saved.status_reason)
+
+    def test_rss_confirmation_retries_merge_existing_real_record(self):
+        real=self.movie(status='pending')
+        placeholder=self.movie('rss',state='rss',status='new',year='2026',status_reason='Torrent client did not respond')
+        with patch.object(rss,'auto_download_movie',return_value=('a','Film (2026).mkv',None)):
+            rss.retry_rss_confirmation(placeholder,{'name':'Feed','auto_add':True,'auto_copy':True})
+        self.assertEqual(database.Movie.select().count(),1)
+        self.assertEqual(database.Movie.select().get().id,real.id)
+
+    def test_migration_adds_feed_and_hold_reason_columns_without_losing_rows(self):
+        self.movie(status='pending')
+        for field in ('rss_feed_name','auto_copy_requested','copy_pause_reason'):
+            self.db.execute_sql('ALTER TABLE movie DROP COLUMN '+field)
+        with patch.object(database,'db',self.db):
+            database.migrate_db()
+            database.migrate_db()
+        saved=database.Movie.get(database.Movie.torrent_hash=='a')
+        self.assertFalse(saved.auto_copy_requested)
+        self.assertIsNone(saved.copy_pause_reason)
+
+    def test_complete_downloads_queue_in_order_without_any_browser(self):
+        self.settings['tmdb_api_key']='key'
+        for hash in ('a','b','c'):
+            self.movie(hash,status='pending',progress=1)
+        qb=Mock()
+        def torrents(torrent_hashes=None):
+            hashes=[torrent_hashes] if torrent_hashes else ['a','b','c']
+            return [SimpleNamespace(**self.torrent(hash)) for hash in hashes]
+        qb.torrents_info.side_effect=torrents
+        entered=threading.Event();release=threading.Event()
+        def process(qb,torrent,settings):
+            if torrent.hash=='a':
+                entered.set();release.wait(5)
+        async def end_iteration(_):
+            raise asyncio.CancelledError
+        main.manager.active_connections.clear()
+        with patch.object(main,'get_qb_client',return_value=qb), \
+             patch.object(main,'load_settings',return_value=self.settings), \
+             patch.object(torrent_client,'load_settings',return_value=self.settings), \
+             patch.object(torrent_client,'get_qb_client',return_value=qb), \
+             patch.object(mover,'get_qb_client',return_value=qb), \
+             patch.object(mover,'process_single_torrent',side_effect=process), \
+             patch.object(main.asyncio,'sleep',side_effect=end_iteration):
+            try:
+                with self.assertRaises(asyncio.CancelledError):
+                    asyncio.run(main.ws_progress_broadcast_task())
+                self.assertTrue(entered.wait(2))
+                snapshot=mover.get_copy_progress()
+                self.assertEqual(snapshot['a']['status'],'copying')
+                self.assertEqual(snapshot['b']['queue_position'],1)
+                self.assertEqual(snapshot['c']['queue_position'],2)
+            finally:
+                release.set()
+            self.wait_for(lambda:not mover.COPY_PROGRESS)
 
 
 if __name__ == '__main__':

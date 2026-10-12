@@ -1,3 +1,34 @@
+# 4.5.7
+
+- Fix the background scheduler's missing `sync_movies` import, which caused a
+  NameError outside browser-driven synchronization and prevented headless copy
+  admission. Validate the real scheduler/client/sync/queue path end to end.
+- Reconcile a synthetic RSS entry with its real torrent using TMDB identity or
+  matching title/year; retain user holds and watchlist choices, preserve ignored
+  entries, and leave ambiguous matches untouched. Existing RSS duplicates are
+  repaired during normal torrent synchronization.
+- Reuse an exact torrent already in qBittorrent instead of treating it as a
+  failed addition. Allow up to 15 seconds for confirmation, never assign an
+  unrelated newly added torrent, and retry uncertain RSS confirmations later.
+- Record RSS feed origin so automatic copy does not depend only on torrent tags.
+  Reconcile completed downloads every 10 seconds independently of WebSocket
+  clients, including downloads already complete on first discovery.
+- Automatically admit eligible completed movies to the existing FIFO copy queue:
+  one copies while the rest show their queue positions. TMDB availability does
+  not gate background processing of completed downloads.
+- Distinguish explicit manual holds from destination conflicts and show why a
+  pending movie cannot start. Recover legacy unclassified recovery holds only
+  for eligible pending movies without cancellation/error history; preserve
+  explicit holds and registered cancellations. Existing destinations still
+  require a manual overwrite/keep decision.
+
+No receptor script change is required for 4.5.7.
+
+Validated with 49 regression tests, including the real background scheduler
+admitting three complete downloads with zero WebSocket clients, FIFO positions,
+RSS reconciliation/retries, existing-torrent confirmation and preservation of
+manual holds. Browser checks cover live completion refresh and queue details.
+
 # 4.5.6
 
 - Refresh completed copies immediately without F5. Notify the server event loop

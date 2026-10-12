@@ -577,15 +577,10 @@ def sync_movies(torrents, api_key):
     logger.info("=" * 80)
     
     logger.info(f"­ƒÆ¥ [DB] Processing {len(torrents)} torrent(s)")
-    if not api_key:
-        return
-
     # 1. Update existing movies based on current torrents
     torrent_map = {t['hash']: t for t in torrents}
     
     # Update active torrents
-    recovery_settings = load_settings()
-    recovery = not recovery_settings.get('copy_recovery_453_done', False)
     for t in torrents:
         movie = Movie.get_or_none(Movie.torrent_hash == t['hash'])
         
@@ -596,8 +591,6 @@ def sync_movies(torrents, api_key):
 
             # CAPTURE OLD STATUS BEFORE ANY MODIFICATIONS (Critical for download completion detection)
             old_status = movie.status
-            if recovery and t['progress'] >= 1 and movie.status not in ('moved', 'moved_manually'):
-                movie.copy_paused = True
 
             # Update dynamic fields
             movie.progress = t['progress']
@@ -686,66 +679,11 @@ def sync_movies(torrents, api_key):
             if 'Roverr' in t.get('tags', ''):
                 logger.info(f"RSS DEBUG [{movie.title}]: old={old_status}, new={movie.status}, completed={download_completed}")
             
-            # Retry eligible completed copies even if another sync already consumed
-            # the downloading -> pending transition. Queue admission deduplicates.
-            if t['progress'] >= 1 and movie.status == 'pending' and not movie.copy_paused:
-                logger.info(f"Movie '{movie.title}' download completed, checking auto-copy...")
-                
-                # Notify Telegram: Download Complete
+            if download_completed:
                 settings = load_settings()
-                if download_completed and settings.get('telegram_notify_on_download_complete', True):
-                    send_telegram_notification(f"Ô£à <b>Download Complete</b>\n\n­ƒÄ¼ {movie.title} ({movie.year})\n­ƒÆ¥ Ready to move.")
+                if settings.get('telegram_notify_on_download_complete', True):
+                    send_telegram_notification(f"Download complete: {movie.title} ({movie.year})")
 
-                #  Check if this movie came from RSS with auto_copy enabled
-                settings = load_settings()
-                rss_feeds = settings.get('rss_feeds', [])
-                auto_copy_manual = settings.get('auto_copy_manual_search', False)
-                
-                # Match by label/tag
-                torrent_tags = t.get('tags', '')
-                torrent_category = t.get('category', '')
-                
-                # DEBUG: Verify tags are now available
-                logger.info(f"DEBUG: Torrent tags for '{movie.title}': '{torrent_tags}'")
-                logger.info(f"DEBUG: Torrent category for '{movie.title}': '{torrent_category}'")
-                logger.info(f"DEBUG: Number of RSS feeds configured: {len(rss_feeds)}")
-                logger.info(f"DEBUG: Auto-copy manual search enabled: {auto_copy_manual}")
-                
-                # First, check RSS feeds
-                rss_matched = False
-                for feed in rss_feeds:
-                    feed_label = feed.get('label', '')
-                    feed_auto_copy = feed.get('auto_copy', False)
-                    logger.info(f"DEBUG: Checking RSS feed '{feed.get('name')}' - label: '{feed_label}', auto_copy: {feed_auto_copy}")
-                    
-                    if feed_label and feed_label in torrent_tags:
-                        logger.info(f"DEBUG: Label '{feed_label}' found in torrent tags!")
-                        if feed.get('auto_copy', False):
-                            logger.info(f"Auto-copying '{movie.title}' from RSS feed '{feed.get('name')}'")
-                            try:
-                                manual_move(t['hash'], automatic=True)
-                                rss_matched = True
-                            except Exception as e:
-                                logger.error(f"Auto-copy failed for '{movie.title}': {e}")
-                        else:
-                            logger.info(f"DEBUG: auto_copy is disabled for this feed")
-                        break
-                    else:
-                        logger.info(f"DEBUG: Label '{feed_label}' NOT found in tags '{torrent_tags}'")
-                
-                # If not matched by RSS, check manual search tag
-                if not rss_matched:
-                    if auto_copy_manual and MANUAL_SEARCH_TAG in torrent_tags:
-                        logger.info(f"Auto-copying '{movie.title}' from manual search")
-                        try:
-                            manual_move(t['hash'], automatic=True)
-                        except Exception as e:
-                            logger.error(f"Auto-copy failed for '{movie.title}': {e}")
-                    else:
-                        logger.info(f"DEBUG: No auto-copy match found (RSS or manual search)")
-                
-                logger.info(f"DEBUG: Auto-copy check completed for '{movie.title}'")
-                
             # AUTO-RETRY RECEPTOR: Check if a movie was stuck because the receptor was offline
             if not movie.copy_paused and movie.status == 'receptor_offline' and t['progress'] >= 1:
                 # The torrent is still in the correct state, we should check if the receptor is back online
@@ -782,7 +720,7 @@ def sync_movies(torrents, api_key):
             try:
                 # Fetch complete TMDB metadata
                 title, year = clean_torrent_name(t['name'])
-                metadata = fetch_complete_movie_metadata(title, year, api_key)
+                metadata = (fetch_complete_movie_metadata(title, year, api_key) if api_key else None) or {'title': title, 'year': year}
                 
                 poster_local = None
                 backdrop_local = None
@@ -836,7 +774,6 @@ def sync_movies(torrents, api_key):
                             country_code=metadata.get('country_code'),  # Save country code for flag display
                             watch_providers=metadata.get('watch_providers'),
                             metadata_updated_at=datetime.now(),
-                            copy_paused=recovery and t['progress'] >= 1,
                             torrent_name=t['name']
                         )
                         
@@ -848,10 +785,9 @@ def sync_movies(torrents, api_key):
             except Exception as e:
                 logger.error(f"Error adding movie {t['name']}: {e}")
 
-    if recovery and torrents:
-        recovery_settings = load_settings()
-        recovery_settings['copy_recovery_453_done'] = True
-        save_settings(recovery_settings)
+    from .automation import reconcile_rss_movies, queue_completed_movies
+    reconcile_rss_movies(torrents)
+    queue_completed_movies(torrents, load_settings())
 
     # 2. Cleanup Ignored Movies - DISABLED
     # DO NOT delete ignored movies when torrent disappears from torrent client
@@ -1090,6 +1026,8 @@ def get_movie_data(torrents, api_key):
             ).start()
         
         movies.append({
+            "copy_paused": m.copy_paused,
+            "copy_pause_reason": m.copy_pause_reason,
             "title": m.title,
             "year": m.year,
             "poster_url": poster_display,
@@ -1612,7 +1550,7 @@ def get_movie_details(torrent_hash, api_key):
                 logger.info(f"No cache found for {name}, extracting title from torrent name")
                 title, year = clean_torrent_name(name)
             
-            metadata = fetch_complete_movie_metadata(title, year, api_key)
+            metadata = (fetch_complete_movie_metadata(title, year, api_key) if api_key else None) or {'title': title, 'year': year}
             
             if metadata:
                 # Download images
@@ -1804,6 +1742,8 @@ def get_movie_details(torrent_hash, api_key):
             display_source_path = content_path
 
         movie_details.update({
+            "status_reason": movie.status_reason if movie else None,
+            "copy_paused": movie.copy_paused if movie else False,
             "torrent_name": t.name,
             "torrent_hash": t.hash,
             "size": t.size,

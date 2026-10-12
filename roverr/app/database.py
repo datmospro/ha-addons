@@ -54,6 +54,9 @@ class Movie(BaseModel):
     tmdb_id = IntegerField(null=True) # TMDB movie ID for unique identification
     metadata_updated_at = DateTimeField(null=True) # Last metadata update
     country_code = CharField(null=True, max_length=2) # ISO 3166-1 country code (e.g., 'US', 'ES')
+    rss_feed_name = CharField(null=True)
+    auto_copy_requested = BooleanField(default=False)
+    copy_pause_reason = CharField(null=True)
     copy_paused = BooleanField(default=False) # Only manual copy clears this persistent hold
     ignored = BooleanField(default=False) # If True, sync will skip this movie
     torrent_name = CharField(null=True) # Original torrent name for history linking
@@ -73,6 +76,9 @@ def migrate_db():
     
     # List of new columns to add to Movie table
     new_columns = [
+        ('rss_feed_name', 'TEXT'),
+        ('auto_copy_requested', 'BOOLEAN NOT NULL DEFAULT 0'),
+        ('copy_pause_reason', 'TEXT'),
         ('copy_paused', 'BOOLEAN NOT NULL DEFAULT 0'),
         ('cast', 'TEXT'),
         ('crew', 'TEXT'),
