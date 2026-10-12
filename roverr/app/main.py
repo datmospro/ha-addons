@@ -557,6 +557,25 @@ def delete_movie_endpoint(torrent_hash: str):
         return {"success": True, "message": "Película eliminada"}
     return {"success": False, "message": "Película no encontrada"}
 
+@app.get('/api/version')
+def addon_version_endpoint():
+    from modules.diagnostics import addon_version
+    return JSONResponse({'version': addon_version()}, headers={'Cache-Control': 'no-store'})
+
+@app.post('/api/diagnostics/run')
+def run_diagnostics_endpoint():
+    from modules.diagnostics import run_diagnostics
+    return JSONResponse(run_diagnostics(), headers={'Cache-Control': 'no-store'})
+
+@app.get('/api/diagnostics/report')
+def download_diagnostics_endpoint():
+    from modules.diagnostics import latest_diagnostics
+    report = latest_diagnostics()
+    if report is None:
+        return JSONResponse({'success': False, 'message': 'Ejecuta primero un diagnóstico.'}, status_code=404)
+    return JSONResponse(report, headers={'Cache-Control': 'no-store',
+        'Content-Disposition': 'attachment; filename="roverr-diagnostico.json"'})
+
 @app.get('/api/copy-queue')
 def copy_queue_endpoint():
     from modules.mover import get_copy_queue_snapshot

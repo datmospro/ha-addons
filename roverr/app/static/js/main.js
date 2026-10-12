@@ -4,6 +4,7 @@
  * Reemplaza app.js - líneas 23-44 (DOMContentLoaded)
  */
 
+import { initDiagnostics } from './diagnostics.js';
 import { initCopyQueue } from './copy-queue.js';
 import { initUI } from './ui.js';
 import { initNavigation } from './navigation.js';
@@ -42,6 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('✓ Search initialized');
 
         initSettings();
+        initDiagnostics();
         console.log('✓ Settings initialized');
 
         initMovies();

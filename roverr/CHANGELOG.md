@@ -1,3 +1,29 @@
+# 4.5.14
+
+- Add Settings → Diagnostics with on-demand qBittorrent authentication and
+  receptor health checks, mapped source/destination paths, read/write/delete
+  permissions, disk space, SQLite/queue health and automatic copy policy.
+- Run filesystem checks where copies actually execute: on Home Assistant for
+  local transfers or on the Windows receiver when remote copying is enabled.
+- Show clear Spanish results, skipped checks and corrective actions. Use a tiny
+  uniquely named destination probe; remove only that probe. Never create a
+  missing library root or modify media files during diagnostics.
+- Download the completed diagnostic as JSON without rerunning checks. Export
+  only allowlisted fields; redact credentials, tokens and URL user information.
+  Do not export settings, copy options, torrent history messages or raw logs.
+- Allow receptor status/control requests while a diagnostic probe is running.
+  Reserve copy hashes atomically to prevent duplicate starts under concurrent
+  HTTP requests.
+
+Validated with 114 backend regressions including permission failures, full
+disks, missing mappings, unavailable/older receivers, credential redaction,
+probe cleanup, cached exports and concurrent copy admission. Browser tests
+cover clear actions, escaped paths, JSON download and mobile layout.
+
+Update/restart the PC receptor when current copies finish to enable remote
+filesystem diagnostics. Receptor 4.5.13 continues copying normally; the addon
+shows a diagnostic compatibility warning until it is updated.
+
 # 4.5.13
 
 - Add an activity panel showing the active transfer, progress, speed, approximate

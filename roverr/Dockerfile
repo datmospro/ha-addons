@@ -13,6 +13,7 @@ RUN \
 # Copy data for add-on
 COPY run.sh /
 COPY app /app
+COPY config.yaml /app/addon_config.yaml
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir --break-system-packages \

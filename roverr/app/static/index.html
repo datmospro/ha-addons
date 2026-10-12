@@ -7,6 +7,7 @@
     <title>Roverr - Gestor de películas</title> <!-- Modular CSS Architecture -->
     <link rel="stylesheet" href="styles/base.css?v=8">
     <link rel="stylesheet" href="styles/copy-queue.css?v=4.5.13">
+    <link rel="stylesheet" href="styles/diagnostics.css?v=4.5.14">
     <link rel="stylesheet" href="styles/layout.css?v=8">
     <link rel="stylesheet" href="styles/components.css?v=8">
     <link rel="stylesheet" href="styles/movies.css?v=8">
@@ -50,7 +51,7 @@
                     <span class="qb-status-dot"></span>
                     <span class="qb-status-text">qBittorrent OK</span>
                 </div>
-                <span id="version-info">v4.4.96</span>
+                <span id="version-info">v4.5.14</span>
             </div>
         </aside>
 
@@ -212,6 +213,9 @@
                         <button class="settings-tab" data-tab="notifications">
                             <i class="fa-brands fa-telegram"></i> Notificaciones
                         </button>
+                        <button class="settings-tab" data-tab="diagnostics">
+                            <i class="fa-solid fa-stethoscope"></i> Diagnóstico
+                        </button>
                         <button class="settings-tab" data-tab="advanced">
                             <i class="fa-solid fa-microchip"></i> Avanzado
                         </button>
@@ -220,6 +224,18 @@
                     <!-- Settings Content (Panels) -->
                     <div class="settings-content">
 
+                        <div id="tab-diagnostics" class="settings-panel">
+                            <section class="settings-section" id="diagnostics-panel">
+                                <h3><i class="fa-solid fa-stethoscope"></i> Diagnóstico de Roverr</h3>
+                                <p class="section-desc">Comprueba los ajustes guardados. Guarda los cambios de configuración antes de ejecutar el diagnóstico. La prueba de escritura crea y elimina un pequeño archivo temporal propio en el destino.</p>
+                                <div class="diagnostics-actions">
+                                    <button class="btn primary" id="run-diagnostics-btn">Ejecutar diagnóstico</button>
+                                    <button class="btn secondary" id="download-diagnostics-btn" disabled>Descargar informe sin credenciales</button>
+                                </div>
+                                <p id="diagnostics-summary" role="status" aria-live="polite">Ejecuta las comprobaciones para ver las conexiones, rutas, permisos y espacio disponible.</p>
+                                <div id="diagnostics-checks"></div>
+                            </section>
+                        </div>
                         <!-- Panel: General -->
                         <div id="tab-general" class="settings-panel active">
                             <div class="settings-section">
