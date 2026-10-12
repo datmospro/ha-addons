@@ -239,7 +239,9 @@ async def ws_progress_broadcast_task():
                     "queue_position": prog.get('queue_position'),
                     "queue_total": prog.get('queue_total'),
                     "active_copy": prog.get('active_copy', ''),
-                    "recovering": prog.get('recovering', False)
+                    "recovering": prog.get('recovering', False),
+                    "phase": prog.get("phase"),
+                    "resumed_bytes": prog.get("resumed_bytes", 0)
                 }
             
             # Detect completion

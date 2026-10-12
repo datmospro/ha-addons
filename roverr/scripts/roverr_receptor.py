@@ -69,6 +69,98 @@ def inspect_files(source, destination, folder_name):
             'fingerprint': fingerprint}
 
 
+"""Verified staged transfers shared with the standalone Windows receptor."""
+import hashlib
+import json
+import os
+
+BLOCK_SIZE = 1024 * 1024
+
+
+def source_identity(path):
+    if os.path.islink(path) or not os.path.isfile(path):
+        raise ValueError('El origen debe ser un archivo normal')
+    stat = os.stat(path)
+    return {'path': os.path.normcase(os.path.realpath(path)), 'size': stat.st_size,
+            'mtime_ns': stat.st_mtime_ns, 'ctime_ns': stat.st_ctime_ns}
+
+
+def remove_resume_metadata(temporary):
+    for path in (temporary + '.json', temporary + '.json.tmp'):
+        if os.path.lexists(path):
+            if os.path.islink(path):
+                raise ValueError('Los metadatos temporales no pueden ser un enlace')
+            os.remove(path)
+
+
+def prepare_resume(source, temporary, final, task_id, check_cancelled):
+    """Reuse only an owned temporary whose entire prefix matches the source."""
+    check_cancelled()
+    expected = {'version': 1, 'source': source_identity(source),
+                'destination': os.path.normcase(os.path.realpath(final)), 'task_id': task_id}
+    metadata = temporary + '.json'
+    for path in (temporary, metadata, metadata + '.tmp'):
+        if os.path.islink(path):
+            raise ValueError('El archivo temporal no puede ser un enlace')
+    offset = 0
+    if os.path.exists(temporary):
+        valid = False
+        try:
+            with open(metadata, encoding='utf-8') as stream:
+                valid = json.load(stream) == expected
+            offset = os.path.getsize(temporary)
+            valid = valid and offset <= expected['source']['size']
+            if valid:
+                with open(source, 'rb') as original, open(temporary, 'rb') as partial:
+                    remaining = offset
+                    while remaining:
+                        check_cancelled()
+                        length = min(BLOCK_SIZE, remaining)
+                        if original.read(length) != partial.read(length):
+                            valid = False
+                            break
+                        remaining -= length
+                valid = valid and source_identity(source) == expected['source']
+        except InterruptedError:
+            raise
+        except (OSError, ValueError, TypeError):
+            valid = False
+        if not valid:
+            check_cancelled()
+            os.remove(temporary)
+            offset = 0
+    check_cancelled()
+    with open(metadata + '.tmp', 'w', encoding='utf-8') as stream:
+        json.dump(expected, stream, sort_keys=True)
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(metadata + '.tmp', metadata)
+    return offset, expected['source']
+
+
+def verify_copy(source, temporary, identity, check_cancelled):
+    """Read both complete files and compare SHA-256 before publication."""
+    check_cancelled()
+    if source_identity(source) != identity or os.path.getsize(temporary) != identity['size']:
+        raise ValueError('El origen cambió o la copia está incompleta; no se publicará el archivo')
+    output_before = os.stat(temporary)
+    hashes = [hashlib.sha256(), hashlib.sha256()]
+    with open(source, 'rb') as original, open(temporary, 'rb') as output:
+        while True:
+            check_cancelled()
+            first, second = original.read(BLOCK_SIZE), output.read(BLOCK_SIZE)
+            hashes[0].update(first)
+            hashes[1].update(second)
+            if not first and not second:
+                break
+    output_after = os.stat(temporary)
+    if (hashes[0].digest() != hashes[1].digest() or source_identity(source) != identity
+            or (output_before.st_size, output_before.st_mtime_ns) != (output_after.st_size, output_after.st_mtime_ns)):
+        raise ValueError('La verificación SHA-256 falló; se conserva el destino original')
+    check_cancelled()
+    return hashes[0].hexdigest()
+
+
 # Configuration
 BIND_HOST = '0.0.0.0'
 BIND_PORT = 8095
@@ -78,14 +170,15 @@ MAX_SPEED_MBPS = 0  # 0 for unlimited, adjust to throttle copy
 # This script will receive the correct Windows paths directly.
 
 # Logging setup
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("roverr_receptor.log", mode="a", encoding="utf-8")
-    ]
-)
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler("roverr_receptor.log", mode="a", encoding="utf-8")
+        ]
+    )
 logger = logging.getLogger("RoverrReceptor")
 
 # State tracking for active copies
@@ -95,7 +188,7 @@ STOP_FLAGS = set()
 TASKS_LOCK = threading.Lock()
 
 class CopyTaskHandler(threading.Thread):
-    def __init__(self, task_id, source_path, dest_dir, folder_name, overwrite=False, fingerprint=None, stage_all=False):
+    def __init__(self, task_id, source_path, dest_dir, folder_name, overwrite=False, fingerprint=None, stage_all=False, attempt_id=None):
         super().__init__()
         self.task_id = task_id
         self.source_path = source_path
@@ -113,7 +206,7 @@ class CopyTaskHandler(threading.Thread):
                 'status': 'copying',
                 'percent': 0.0,
                 'speed': 0.0,
-                'error_msg': ''
+                'error_msg': '', 'attempt_id': attempt_id
             }
 
     def update_state(self, status, percent=None, speed=None, error_msg=''):
@@ -126,15 +219,27 @@ class CopyTaskHandler(threading.Thread):
 
     def _copy_file(self, src_file, dst_file):
         """Copies a single file with progress and speed tracking"""
+        def cancelled():
+            if self.task_id in STOP_FLAGS:
+                raise InterruptedError('Copy stopped by user')
+        cancelled()
+        os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+        identity = source_identity(src_file)
+        copied = 0
+        mode = 'xb'
+        with TASKS_LOCK:
+            TASKS[self.task_id].update(phase='validating_resume')
         if self.staging:
             final = dst_file
             dst_file = dst_file + '.roverr-' + self.task_id + '.part'
-            if os.path.isfile(dst_file):
-                os.remove(dst_file)
+            self.created_files.update((dst_file, dst_file + '.json', dst_file + '.json.tmp'))
+            copied, identity = prepare_resume(src_file, dst_file, final, self.task_id, cancelled)
+            mode = 'r+b' if os.path.exists(dst_file) else 'xb'
             self.replacements.append((dst_file, final))
-        file_size = os.path.getsize(src_file)
-
-        copied = 0
+        file_size = identity['size']
+        initial_offset = copied
+        with TASKS_LOCK:
+            TASKS[self.task_id].update(phase='copying', resumed_bytes=initial_offset)
         start_time = time.time()
         last_update = start_time
         
@@ -142,7 +247,9 @@ class CopyTaskHandler(threading.Thread):
 
         if self.task_id in STOP_FLAGS:
             raise InterruptedError('Copy stopped by user')
-        with open(src_file, 'rb') as fsrc, open(dst_file, 'xb') as fdst:
+        with open(src_file, 'rb') as fsrc, open(dst_file, mode) as fdst:
+            fsrc.seek(initial_offset)
+            fdst.seek(initial_offset)
             self.created_files.add(dst_file)
             while True:
                 # Check for cancellation
@@ -162,16 +269,26 @@ class CopyTaskHandler(threading.Thread):
                 
                 if current_time - last_update > 0.5 or copied == file_size:
                     percent = round((copied / file_size) * 100, 1) if file_size > 0 else 100.0
-                    speed = round((copied / 1024 / 1024) / elapsed, 2) if elapsed > 0 else 0.0
+                    speed = round(((copied - initial_offset) / 1024 / 1024) / elapsed, 2) if elapsed > 0 else 0.0
                     
                     self.update_state(status=None, percent=percent, speed=speed)
                     last_update = current_time
                     
                 # Basic throttling if needed
                 if MAX_SPEED_MBPS > 0:
-                    expected_time = (copied / 1024 / 1024) / MAX_SPEED_MBPS
+                    expected_time = ((copied - initial_offset) / 1024 / 1024) / MAX_SPEED_MBPS
                     if expected_time > elapsed:
-                        time.sleep(expected_time - elapsed)
+                        deadline = time.monotonic() + expected_time - elapsed
+                        while time.monotonic() < deadline:
+                            cancelled()
+                            time.sleep(min(.1, max(0, deadline - time.monotonic())))
+            fdst.flush()
+            os.fsync(fdst.fileno())
+        with TASKS_LOCK:
+            TASKS[self.task_id].update(phase='verifying', speed=0)
+        digest = verify_copy(src_file, dst_file, identity, cancelled)
+        with TASKS_LOCK:
+            TASKS[self.task_id].setdefault('sha256', {})[os.path.basename(dst_file)] = digest
         return True
 
     def run(self):
@@ -248,9 +365,12 @@ class CopyTaskHandler(threading.Thread):
                         raise InterruptedError('Copy stopped by user')
                     for temporary, final in self.replacements:
                         os.replace(temporary, final)
+                        remove_resume_metadata(temporary)
                         self.created_files.discard(temporary)
             # Success
             logger.info(f"Task {self.task_id} completed successfully.")
+            with TASKS_LOCK:
+                TASKS[self.task_id].update(verified=True, phase='done')
             self.update_state('done', percent=100.0, speed=0.0)
 
         except InterruptedError as e:
@@ -266,7 +386,8 @@ class CopyTaskHandler(threading.Thread):
             
         except Exception as e:
             logger.error(f"Task {self.task_id} failed: {e}", exc_info=True)
-            if self.staging:
+            # Invalid data or changed paths must not be reused. I/O errors may be retried.
+            if isinstance(e, ValueError):
                 for path in self.created_files:
                     if os.path.isfile(path):
                         os.remove(path)
@@ -292,7 +413,7 @@ class ReceptorServer(BaseHTTPRequestHandler):
         # Healthcheck endpoint (Roverr logic ping)
         if parsed.path == '/' or parsed.path == '/ping':
             self._send_json(200, {
-                'version': '4.5.8',
+                'version': '4.5.12',
                 'service': 'Roverr Receptor', 
                 'status': 'ok', 
                 'message': 'Roverr Receptor is online.'
@@ -348,6 +469,7 @@ class ReceptorServer(BaseHTTPRequestHandler):
                 self._send_json(400, {'error': str(error)})
                 return
             if parsed.path == '/inspect':
+                comparison['verified_resume'] = True
                 self._send_json(200, comparison)
                 return
             overwrite = data.get('overwrite', False) is True
@@ -369,10 +491,48 @@ class ReceptorServer(BaseHTTPRequestHandler):
                     STOP_FLAGS.remove(task_id)
 
             # Start background thread
-            thread = CopyTaskHandler(task_id, source_path, dest_dir, folder_name, overwrite, fingerprint, staged)
+            thread = CopyTaskHandler(task_id, source_path, dest_dir, folder_name, overwrite, fingerprint, staged, data.get("attempt_id"))
             thread.start()
             
             self._send_json(202, {'status': 'accepted', 'message': f'Copy task {task_id} started.'})
+            return
+
+        if parsed.path == '/cleanup':
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                data = json.loads(self.rfile.read(length).decode('utf-8'))
+                task_id = data.get('task_id')
+                destination = data.get('destination')
+                files = data.get('files')
+                if not isinstance(task_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', task_id):
+                    raise ValueError('Identificador de tarea no válido')
+                if not isinstance(destination, str) or not destination or not isinstance(files, list):
+                    raise ValueError('Faltan las rutas de limpieza')
+                base = os.path.realpath(destination)
+                owned = []
+                for final in files:
+                    if not isinstance(final, str):
+                        raise ValueError('Ruta de destino no válida')
+                    temporary = final + '.roverr-' + task_id + '.part'
+                    for path in (temporary, temporary + '.json', temporary + '.json.tmp'):
+                        resolved = os.path.realpath(path)
+                        if os.path.commonpath([base, resolved]) != base or resolved == base or os.path.islink(path):
+                            raise ValueError('La limpieza sale de la carpeta de destino')
+                        owned.append(path)
+                with TASKS_LOCK:
+                    if TASKS.get(task_id, {}).get('status') == 'copying':
+                        self._send_json(409, {'error': 'La copia sigue activa; primero hay que detenerla'})
+                        return
+                    removed = False
+                    for path in owned:
+                        if os.path.isfile(path):
+                            os.remove(path)
+                            removed = True
+                    if removed and os.path.isdir(destination) and not os.listdir(destination):
+                        os.rmdir(destination)
+                self._send_json(200, {'status': 'cancelled'})
+            except (ValueError, OSError, TypeError) as error:
+                self._send_json(400, {'error': str(error)})
             return
 
         # Stop endpoint: /stop/<task_id>

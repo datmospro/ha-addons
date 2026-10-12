@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-const source=fs.readFileSync(new URL('../app/static/js/templates.js',import.meta.url),'utf8').replace(/^import .* from '.\/ui.js';$/m,'').replace("'./messages.js'", JSON.stringify(new URL('../app/static/js/messages.js',import.meta.url).href));
-const {getMovieStatus}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+import {getMovieStatus} from '../app/static/js/templates.js';
 assert.equal(getMovieStatus({status:'pending',copy_paused:true,copy_pause_reason:'manual'}).label,'Detenida');
 assert.equal(getMovieStatus({status:'pending',copy_paused:true,copy_pause_reason:'manual'}).action,'Reanudar copia');
 assert.equal(getMovieStatus({status:'error',copy_paused:true,copy_pause_reason:'conflict'}).action,'Revisar destino');
@@ -26,3 +25,7 @@ assert.equal(getMovieStatus({status:'pending',progress:0.5,copy_paused:true,copy
 assert.equal(getMovieStatus({status:'pending',progress:1,copy_paused:true,copy_pause_reason:null}).status,'pending');
 assert.equal(getMovieStatus({status:'pending',download_stats:{progress:100},copy_paused:true,copy_pause_reason:'manual'}).status,'stopped');
 console.log('Undownloaded RSS and size rejection: regression checks passed');
+
+assert.equal(getMovieStatus({status:'copying',copy_progress:{phase:'verifying'}}).label,'Verificando copia');
+assert.equal(getMovieStatus({status:'copying',copy_progress:{phase:'validating_resume'}}).label,'Comprobando copia parcial');
+assert.match(getMovieStatus({status:'copying',copy_progress:{resumed_bytes:1024}}).reason,/reanudada/);

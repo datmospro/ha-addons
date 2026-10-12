@@ -477,7 +477,7 @@ class CopyControlTests(unittest.TestCase):
             with patch.object(remote, 'CopyTaskHandler') as task:
                 response = requests.post(url + '/copy', json=dict(payload, overwrite=True, fingerprint=comparison['fingerprint']), timeout=3)
                 self.assertEqual(response.status_code, 202)
-                task.assert_called_once_with('a', str(source), str(dst.parent), 'Film (2026)', True, comparison['fingerprint'], False)
+                task.assert_called_once_with('a', str(source), str(dst.parent), 'Film (2026)', True, comparison['fingerprint'], False, None)
                 task.return_value.start.assert_called_once()
             self.assertEqual(dst.read_bytes(), b'old')
         finally:
@@ -843,6 +843,112 @@ class CopyControlTests(unittest.TestCase):
             stop.assert_called_once()
         self.assertEqual(database.CopyJob.get_by_id(job.id).state,'cancelled')
 
+    def test_resume_space_reservation_credits_existing_owned_partial(self):
+        source=Path(self.settings['local_source_path'])/'Film (2026).mkv'
+        source.write_bytes(b'x'*100)
+        with patch.object(mover,'get_disk_free_space',return_value=60):
+            ok,_,details=mover.check_and_reserve_disk_space(str(source),self.settings['local_dest_path'],safety_buffer_percent=0,min_buffer_mb=0,existing_bytes=50)
+        self.assertTrue(ok)
+        self.assertEqual(details['required_bytes'],50)
+        mover.release_disk_space_reservation(self.settings['local_dest_path'],50)
+
+    def test_failed_cleanup_remains_persisted_until_retry_succeeds(self):
+        self.movie(status='pending',progress=1)
+        job=self.saved_job()
+        database.CopyJob.update(state='running',stop_requested=True).where(database.CopyJob.id==job.id).execute()
+        job=database.CopyJob.get_by_id(job.id)
+        mover.register_copy_job(job)
+        with patch.object(mover,'discard_local_job_temporaries',side_effect=PermissionError('file busy')):
+            mover.run_copy_job(job.id)
+        self.assertEqual(database.CopyJob.get_by_id(job.id).state,'running')
+        job=database.CopyJob.get_by_id(job.id)
+        mover.register_copy_job(job)
+        with patch.object(mover,'discard_local_job_temporaries') as cleanup:
+            mover.run_copy_job(job.id)
+            cleanup.assert_called_once()
+        self.assertEqual(database.CopyJob.get_by_id(job.id).state,'cancelled')
+
+    def test_stopping_failed_resumable_local_job_cleans_saved_partial(self):
+        from verified_copy import prepare_resume
+        self.movie(status='error',progress=1)
+        job=self.saved_job()
+        import json
+        options=json.loads(job.options_json)
+        options['_verification_required']=True
+        database.CopyJob.update(state='error',options_json=json.dumps(options)).where(database.CopyJob.id==job.id).execute()
+        source=Path(self.settings['local_source_path'])/'Film (2026).mkv'
+        destination=Path(self.settings['local_dest_path'])/'Film (2026)'/'Film (2026).mkv'
+        destination.parent.mkdir(parents=True)
+        partial=str(destination)+'.roverr-a.part'
+        prepare_resume(str(source),partial,str(destination),'a',lambda:None)
+        Path(partial).write_bytes(b'')
+        mover.stop_copy('a')
+        self.wait_for(lambda:not mover.COPY_PROGRESS)
+        self.assertFalse(Path(partial).exists())
+        self.assertFalse(Path(partial+'.json').exists())
+        self.assertEqual(database.CopyJob.get_by_id(job.id).state,'cancelled')
+
+    def test_saved_remote_stop_cleans_partial_even_when_receptor_restarted(self):
+        import json
+        self.movie(status='error',progress=1)
+        job=self.saved_job(remote=True)
+        options=json.loads(job.options_json)
+        options['_verification_required']=True
+        database.CopyJob.update(state='running',stop_requested=True,options_json=json.dumps(options)).where(database.CopyJob.id==job.id).execute()
+        job=database.CopyJob.get_by_id(job.id)
+        mover.register_copy_job(job)
+        not_found=Mock(status_code=404)
+        cleaned=Mock(status_code=200)
+        with patch.object(mover.requests,'get',return_value=not_found),patch.object(mover.requests,'post',return_value=cleaned) as cleanup:
+            mover.run_copy_job(job.id)
+        self.assertTrue(cleanup.call_args.args[0].endswith('/cleanup'))
+        self.assertEqual(cleanup.call_args.kwargs['json']['files'],options['_copy_destinations'])
+        self.assertEqual(database.CopyJob.get_by_id(job.id).state,'cancelled')
+
+    def test_new_remote_attempt_ignores_old_terminal_response(self):
+        self.movie(status='pending',progress=1)
+        job=self.saved_job(remote=True)
+        torrent=SimpleNamespace(**self.torrent('a'))
+        settings=dict(self.settings,receptor_enabled=True,receptor_host='127.0.0.1',_copy_attempt_id='new')
+        mover.COPY_PROGRESS['a']={'status':'copying'}
+        for state in ('done','error','cancelled'):
+            response=Mock(status_code=200)
+            response.json.return_value={'status':state,'attempt_id':'old'}
+            with patch.object(mover.requests,'get',return_value=response), patch.object(mover,'_poll_receptor_status') as polling:
+                self.assertFalse(mover.recover_remote_copy(torrent,settings))
+                polling.assert_not_called()
+
+    def test_unverified_remote_completion_is_not_recorded_as_success(self):
+        self.movie(status='pending',progress=1)
+        torrent=SimpleNamespace(**self.torrent('a'))
+        response=Mock(status_code=200)
+        response.json.return_value={'status':'done','attempt_id':'new','verified':False}
+        with patch.object(mover.requests,'get',return_value=response):
+            mover._poll_receptor_status(torrent,'localhost',8095,'src','dst',dict(self.settings,_verification_required=True,_copy_attempt_id='new'),'Film','2026')
+        self.assertEqual(database.MoveHistory.select().get().status,'error')
+
+    def test_restored_local_job_resumes_valid_partial(self):
+        from verified_copy import prepare_resume
+        self.movie(status='pending',progress=1)
+        source=Path(self.settings['local_source_path'])/'Film (2026).mkv'
+        source.write_bytes(b'complete-source'*1000)
+        job=self.saved_job()
+        destination=Path(self.settings['local_dest_path'])/'Film (2026)'/'Film (2026).mkv'
+        destination.parent.mkdir(parents=True)
+        temporary=str(destination)+'.roverr-a.part'
+        prepare_resume(str(source),temporary,str(destination),'a',lambda:None)
+        Path(temporary).write_bytes(source.read_bytes()[:4000])
+        mover.register_copy_job(job)
+        original=mover.verify_copy
+        observed=[]
+        def verified(*args):
+            observed.append(mover.COPY_PROGRESS['a']['resumed_bytes'])
+            return original(*args)
+        with patch.object(mover,'verify_copy',side_effect=verified):mover.run_copy_job(job.id)
+        self.assertEqual(observed,[4000])
+        self.assertEqual(destination.read_bytes(),source.read_bytes())
+        self.assertEqual(database.CopyJob.get_by_id(job.id).state,'completed')
+
     def test_interrupted_local_job_restarts_temporary_file_and_finishes(self):
         self.movie(status='pending',progress=1)
         source=Path(self.settings['local_source_path'])/'Film (2026).mkv'
@@ -894,6 +1000,47 @@ class CopyControlTests(unittest.TestCase):
             self.assertTrue(list(destination.parent.glob('*.part')))
         with patch.object(task,'_copy_file',side_effect=staged):task.run()
         self.assertEqual(remote.TASKS['a']['status'],'done')
+        self.assertEqual(destination.read_bytes(),source.read_bytes())
+
+    def test_valid_partial_resumes_after_independent_process_restore(self):
+        import subprocess
+        from verified_copy import prepare_resume
+        self.movie(status='pending',progress=1)
+        source=Path(self.settings['local_source_path'])/'Film (2026).mkv'
+        source.write_bytes(b'resume-after-restart'*5000)
+        job=self.saved_job()
+        database.CopyJob.update(state='running').where(database.CopyJob.id==job.id).execute()
+        destination=Path(self.settings['local_dest_path'])/'Film (2026)'/'Film (2026).mkv'
+        destination.parent.mkdir(parents=True)
+        temporary=str(destination)+'.roverr-a.part'
+        prepare_resume(str(source),temporary,str(destination),'a',lambda:None)
+        Path(temporary).write_bytes(source.read_bytes()[:32768])
+        self.db.close()
+        script="""import sys,time
+sys.path.insert(0,sys.argv[2])
+import database
+from peewee import SqliteDatabase
+db=SqliteDatabase(sys.argv[1]);db.bind([database.Movie,database.MoveHistory,database.CopyJob])
+from modules import mover
+mover.load_settings=lambda:{'telegram_notify_on_move':False}
+original=mover.verify_copy
+observed=[]
+def verify(*args):
+    observed.append(mover.COPY_PROGRESS['a']['resumed_bytes'])
+    return original(*args)
+mover.verify_copy=verify
+mover.recover_copy_jobs()
+deadline=time.monotonic()+10
+while mover.COPY_PROGRESS and time.monotonic()<deadline:time.sleep(.05)
+assert not mover.COPY_PROGRESS
+assert observed==[32768],observed
+assert database.CopyJob.select().get().state=='completed'
+db.close()
+print('RESUMED_AND_VERIFIED')
+"""
+        child=subprocess.run([sys.executable,'-c',script,self.db.database,str(ROOT/'app')],capture_output=True,text=True,timeout=20)
+        self.assertEqual(child.returncode,0,child.stderr)
+        self.assertIn('RESUMED_AND_VERIFIED',child.stdout)
         self.assertEqual(destination.read_bytes(),source.read_bytes())
 
     def test_persistent_local_job_restores_from_an_independent_process(self):

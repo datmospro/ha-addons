@@ -1,3 +1,31 @@
+# 4.5.12
+
+- Resume an interrupted staged transfer only after matching its saved source
+  identity and checking the entire written prefix against the current source.
+  Unknown, corrupted or outdated partials restart safely.
+- Flush copied data and verify the full source and staged output with SHA-256
+  before replacing the final destination or recording success.
+- Show Checking partial copy and Verifying copy in the dashboard and details.
+  The next queued copy waits for verification to finish.
+- Keep owned partials after I/O errors for a validated retry; explicit Stop
+  removes partials and metadata, preserving existing final files. Persist
+  cleanup requests and recover them after addon or receptor restarts.
+- Identify remote attempts separately so an old completed/failed task cannot
+  satisfy a new copy request. Require verification confirmation for new jobs.
+
+Validated with 83 backend regressions, including valid/corrupted partials,
+source changes, same-size corruption, independent-process resume, remote retry
+provenance, cleanup after
+restart and disk space accounting. Browser checks cover verification phases,
+queue positions and completion refresh.
+
+Update the PC receptor script and restart it when current transfers have
+finished, then update the addon. The new addon requests receptor 4.5.12 before
+admitting new remote copies. Legacy partials without metadata restart from zero.
+Full verification rereads both files and therefore adds disk I/O and time after
+the transfer reaches 100%. An interrupted transfer can resume; an explicit Stop
+cleans its partial and the next manual start begins from zero.
+
 # 4.5.11
 
 - Group torrents with the same movie identity into one dashboard card, keeping

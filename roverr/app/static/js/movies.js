@@ -480,7 +480,7 @@ function renderMovieDetails(container, movie, hash) {
                 ${['copying', 'queued'].includes(movie.status) && movie.copy_progress ? `
                 <div class="details-progress-container">
                     <div class="progress-info">
-                        <span>${movie.status === 'queued' ? getQueueLabel(movie.copy_progress) : `Copiando... ${(movie.copy_progress.percent ?? (movie.copy_progress.progress ?? 0) * 100)}%`}</span>
+                        <span>${movie.status === 'queued' ? getQueueLabel(movie.copy_progress) : `${getMovieStatus(movie).label}... ${(movie.copy_progress.percent ?? (movie.copy_progress.progress ?? 0) * 100)}%`}</span>
                         <span>${movie.status === 'queued' ? 'Esperando turno' : `${movie.copy_progress.speed} MB/s`}</span>
                     </div>
                     <div class="progress-bar large">
@@ -752,7 +752,7 @@ export function updateProgressUI(progress, type) {
         if (barEl) barEl.style.width = '0%';
         return;
     }
-    const label = type === 'copying' ? 'Copiando...' : 'Descargando...';
+    const label = type === 'copying' ? `${getMovieStatus({status:type,copy_progress:progress}).label}...` : 'Descargando...';
     const percent = type === 'copying' ? progress.percent : progress.progress.toFixed(1);
 
     if (percentEl) percentEl.textContent = `${label} ${percent}%`;
