@@ -14,3 +14,15 @@ assert.equal(getMovieStatus({status:'error',status_reason:'Permiso denegado'}).r
 assert.equal(getMovieStatus({status:'downloading',copy_paused:true}).label,'Descargando');
 assert.match(getMovieStatus({status:'receptor_offline'}).reason,/puerto/);
 console.log('Status presentation: 11 checks passed');
+
+const sizeReason = 'No torrent within size limits (max: 12000 MB)';
+for (const pauseReason of [null, 'manual', 'conflict']) {
+    const rss = getMovieStatus({status:'new',state:'rss',progress:0,copy_paused:true,copy_pause_reason:pauseReason,status_reason:sizeReason});
+    assert.equal(rss.label,'Por descargar');
+    assert.equal(rss.reason,sizeReason);
+    assert.notEqual(rss.action,'Reanudar copia');
+}
+assert.equal(getMovieStatus({status:'pending',progress:0.5,copy_paused:true,copy_pause_reason:'manual'}).status,'pending');
+assert.equal(getMovieStatus({status:'pending',progress:1,copy_paused:true,copy_pause_reason:null}).status,'pending');
+assert.equal(getMovieStatus({status:'pending',download_stats:{progress:100},copy_paused:true,copy_pause_reason:'manual'}).status,'stopped');
+console.log('Undownloaded RSS and size rejection: regression checks passed');

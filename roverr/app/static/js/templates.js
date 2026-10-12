@@ -103,17 +103,19 @@ export function getMovieStatus(movie) {
     let reason = getCopyStatusTooltip(status, progress) || movie.status_reason || '';
     let action = 'Copiar';
     if (['moved', 'moved_manually'].includes(status)) reason = '';
+    const isDownloadComplete = movie.state !== 'rss' && !['new', 'downloading', 'orphaned'].includes(status)
+        && (movie.download_stats ? movie.download_stats.progress >= 100 : (movie.progress == null || movie.progress >= 1));
     if (status === 'copying' && progress.recovering) status = 'recovering';
     else if (!['moved', 'moved_manually', 'copying', 'queued', 'downloading'].includes(status)) {
-        if (movie.copy_pause_reason === 'conflict') {
+        if (isDownloadComplete && movie.copy_pause_reason === 'conflict') {
             status = 'conflict';
             reason = movie.status_reason || 'El destino existe o ha cambiado. Compara los archivos antes de decidir si quieres sobrescribir o conservar el destino.';
             action = 'Revisar destino';
-        } else if (movie.copy_paused && movie.copy_pause_reason !== 'conflict') {
+        } else if (isDownloadComplete && movie.copy_paused && movie.copy_pause_reason === 'manual') {
             status = 'stopped';
             reason = 'La copia está detenida. No se iniciará automáticamente; pulsa Reanudar copia para volver a ponerla en cola.';
             action = 'Reanudar copia';
-        } else if (['error', 'skipped'].includes(status)) {
+        } else if (isDownloadComplete && ['error', 'skipped'].includes(status)) {
             status = 'blocked';
             reason = movie.status_reason || 'La copia no pudo completarse. Revisa las rutas y el registro del addon y pulsa Reintentar copia.';
             action = 'Reintentar copia';

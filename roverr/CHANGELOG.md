@@ -1,3 +1,12 @@
+# 4.5.10
+
+- Preserve the original download rejection reason, including RSS size limits,
+  for undownloaded movies even when they carry a copy hold.
+- Show Stopped / Resume copy only for completed downloads with an explicit
+  manual copy pause. A legacy hold alone no longer implies cancellation.
+- Do not classify undownloaded RSS movies as destination conflicts or failed
+  copies.
+
 # 4.5.9
 
 - Unify dashboard and details status labels in Spanish. Distinguish stopped
