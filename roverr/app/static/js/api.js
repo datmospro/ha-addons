@@ -7,6 +7,20 @@
 import { API_BASE } from './config.js';
 import { showToast } from './ui.js';
 
+export async function batchStopCopies(torrentHashes) {
+    try {
+        const res = await fetch(`${API_BASE}/movies/batch-stop`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ torrent_hashes: torrentHashes })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+    } catch (error) {
+        return { success: false, message: 'No se pudieron detener las copias' };
+    }
+}
+
 // === GET REQUESTS ===
 
 /**

@@ -84,7 +84,7 @@ logger = logging.getLogger("Roverr")
 logger.info("=" * 80)
 logger.info("🚀 ROVERR - MEDIA MANAGER")
 logger.info("=" * 80)
-logger.info(f"📦 Version: 4.5.1")
+logger.info(f"📦 Version: 4.5.3")
 logger.info(f"🔧 Log Level: {logging.getLevelName(logger.getEffectiveLevel())}")
 logger.info("=" * 80)
 
@@ -153,6 +153,10 @@ async def backup_scheduler():
         await asyncio.sleep(3600)
 
 
+def completed_progress_hashes(previous, current):
+    """Completion detection must not depend on WebSocket subscribers."""
+    return set(previous or {}) - set(current)
+
 async def ws_progress_broadcast_task():
     # This task also monitors qBittorrent completion events. It must keep
     # running with no WebSocket clients, otherwise auto-copy only starts when
@@ -183,7 +187,7 @@ async def ws_progress_broadcast_task():
             active_progress = {}
             # 1. Add downloading torrents
             for t in torrents:
-                if t.state in ['downloading', 'metaDL', 'allocating', 'queuedDL', 'checkingDL']:
+                if t.progress < 1 and t.state in ['downloading', 'forceDL', 'stalledDL', 'pausedDL', 'stoppedDL', 'metaDL', 'allocating', 'queuedDL', 'checkingDL']:
                     active_progress[t.hash] = {
                         "type": "downloading",
                         "progress": t.progress,
@@ -193,7 +197,7 @@ async def ws_progress_broadcast_task():
                     }
             
             # 2. Add copying progress
-            for t_hash, prog in progress_data.items():
+            for t_hash, prog in list(progress_data.items()):
                 active_progress[t_hash] = {
                     "type": "copying",
                     "progress": prog.get('percent', 0) / 100.0, # Normalise to 0-1
@@ -203,10 +207,7 @@ async def ws_progress_broadcast_task():
             
             # Detect completion
             if last_sent_progress:
-                completed_hashes = []
-                for h in last_sent_progress.keys():
-                    if h not in active_progress:
-                        completed_hashes.append(h)
+                completed_hashes = completed_progress_hashes(last_sent_progress, active_progress)
                 
                 if completed_hashes:
                     logger.info(f"Detected copy/download completion for hashes: {completed_hashes}. Syncing DB.")
@@ -224,7 +225,7 @@ async def ws_progress_broadcast_task():
                     "type": "progress",
                     "progress": active_progress
                 })
-                last_sent_progress = active_progress if active_progress else None
+            last_sent_progress = active_progress if active_progress else None
 
             # Adaptive interval: 1s if there is active downloading/copying progress; 3s if idle
             if active_progress:
@@ -343,6 +344,11 @@ def update_settings(settings: dict):
     dest_path = settings.get('local_dest_path', '').strip()
     if not source_path or not dest_path:
         raise HTTPException(status_code=400, detail="Source Path and Destination Path are required and cannot be empty")
+    # This internal migration flag must survive settings saved by an older
+    # browser tab, otherwise future completed downloads become recovery holds.
+    current_settings = load_settings()
+    if current_settings.get('copy_recovery_453_done'):
+        settings['copy_recovery_453_done'] = True
     save_settings(settings)
     return {"success": True, "message": "Settings saved"}
 
@@ -495,6 +501,26 @@ def stop_copy_endpoint(torrent_hash: str):
     if success:
         return {"success": True, "message": "Stop signal sent"}
     return {"success": False, "message": "Could not stop copy (maybe not running?)"}
+
+@app.post("/api/movies/batch-stop")
+def batch_stop_copies(payload: dict):
+    from database import Movie
+    hashes = payload.get('torrent_hashes', [])
+    if not isinstance(hashes, list) or any(not isinstance(h, str) for h in hashes):
+        return {"success": False, "message": "Invalid torrent hashes"}
+    stopped = 0
+    skipped = 0
+    for torrent_hash in set(hashes):
+        movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
+        if movie is None or movie.status in ('moved', 'moved_manually', 'orphaned'):
+            skipped += 1
+            continue
+        if stop_copy(torrent_hash):
+            stopped += 1
+        else:
+            skipped += 1
+    return {"success": True, "stopped": stopped, "skipped": skipped,
+            "message": "Copies held; active transfers are stopping and cleaning up"}
 
 @app.post("/api/movies/batch-delete")
 def batch_delete_movies(payload: dict):

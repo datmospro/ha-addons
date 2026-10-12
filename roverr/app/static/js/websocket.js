@@ -93,7 +93,7 @@ async function updateRealtimeProgress(progressData) {
             
             const overlay = card.querySelector('.overlay-status');
             if (overlay) {
-                const status = p.type === 'copying' ? 'copying' : (p.state === 'downloading' ? 'downloading' : 'new');
+                const status = p.type === 'copying' ? (p.state === 'queued' ? 'queued' : 'copying') : (p.state === 'downloading' ? 'downloading' : 'new');
                 const statusClass = getStatusClass(status);
                 const { icon: statusIcon, label: statusLabel } = getStatusIconAndLabel(status);
                 overlay.className = `overlay-status ${statusClass}`;

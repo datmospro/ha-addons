@@ -8,7 +8,7 @@ import hashlib
 import shutil
 from datetime import datetime
 from database import Movie, MoveHistory
-from .config import logger, load_settings, get_language, trigger_movies_update_callback, MANUAL_SEARCH_TAG
+from .config import save_settings, logger, load_settings, get_language, trigger_movies_update_callback, MANUAL_SEARCH_TAG
 from .notifications import send_telegram_notification
 from .mover import clean_torrent_name, sanitize_path_component, manual_move, get_copy_progress, COPY_PROGRESS
 
@@ -554,6 +554,17 @@ def get_movie_videos(tmdb_id, api_key):
         logger.error(f"Error fetching movie videos: {e}")
         return {"success": False, "message": str(e)}
 
+from functools import wraps
+SYNC_LOCK = threading.RLock()
+
+def serialized_sync(function):
+    @wraps(function)
+    def run(*args, **kwargs):
+        with SYNC_LOCK:
+            return function(*args, **kwargs)
+    return run
+
+@serialized_sync
 def sync_movies(torrents, api_key):
     """
     Syncs movies between qBittorrent torrents and the database.
@@ -573,6 +584,8 @@ def sync_movies(torrents, api_key):
     torrent_map = {t['hash']: t for t in torrents}
     
     # Update active torrents
+    recovery_settings = load_settings()
+    recovery = not recovery_settings.get('copy_recovery_453_done', False)
     for t in torrents:
         movie = Movie.get_or_none(Movie.torrent_hash == t['hash'])
         
@@ -583,6 +596,8 @@ def sync_movies(torrents, api_key):
 
             # CAPTURE OLD STATUS BEFORE ANY MODIFICATIONS (Critical for download completion detection)
             old_status = movie.status
+            if recovery and t['progress'] >= 1 and movie.status not in ('moved', 'moved_manually'):
+                movie.copy_paused = True
 
             # Update dynamic fields
             movie.progress = t['progress']
@@ -595,7 +610,7 @@ def sync_movies(torrents, api_key):
             
             # Check if copying
             if t['hash'] in COPY_PROGRESS:
-                movie.status = 'copying'
+                movie.status = COPY_PROGRESS[t['hash']].get('status', 'copying')
             else:
                 # 1. Check current state (Prioritize active downloading)
                 state = t['state']
@@ -642,7 +657,9 @@ def sync_movies(torrents, api_key):
                              else:
                                  movie.status = 'moved' if history.status == 'success' else 'moved_manually'
                                  
-                         elif history.status in ['error', 'receptor_offline']: movie.status = 'error'
+                         elif history.status == 'cancelled': movie.status = 'pending'
+                         elif history.status == 'receptor_offline': movie.status = 'receptor_offline'
+                         elif history.status == 'error': movie.status = 'error'
                          elif history.status == 'skipped': movie.status = 'skipped'
                     else:
                         # 3. No history and not downloading -> Pending or Error
@@ -669,12 +686,14 @@ def sync_movies(torrents, api_key):
             if 'Roverr' in t.get('tags', ''):
                 logger.info(f"RSS DEBUG [{movie.title}]: old={old_status}, new={movie.status}, completed={download_completed}")
             
-            if download_completed:
+            # Retry eligible completed copies even if another sync already consumed
+            # the downloading -> pending transition. Queue admission deduplicates.
+            if t['progress'] >= 1 and movie.status == 'pending' and not movie.copy_paused:
                 logger.info(f"Movie '{movie.title}' download completed, checking auto-copy...")
                 
                 # Notify Telegram: Download Complete
                 settings = load_settings()
-                if settings.get('telegram_notify_on_download_complete', True):
+                if download_completed and settings.get('telegram_notify_on_download_complete', True):
                     send_telegram_notification(f"Ô£à <b>Download Complete</b>\n\n­ƒÄ¼ {movie.title} ({movie.year})\n­ƒÆ¥ Ready to move.")
 
                 #  Check if this movie came from RSS with auto_copy enabled
@@ -704,7 +723,7 @@ def sync_movies(torrents, api_key):
                         if feed.get('auto_copy', False):
                             logger.info(f"Auto-copying '{movie.title}' from RSS feed '{feed.get('name')}'")
                             try:
-                                manual_move(t['hash'])
+                                manual_move(t['hash'], automatic=True)
                                 rss_matched = True
                             except Exception as e:
                                 logger.error(f"Auto-copy failed for '{movie.title}': {e}")
@@ -719,7 +738,7 @@ def sync_movies(torrents, api_key):
                     if auto_copy_manual and MANUAL_SEARCH_TAG in torrent_tags:
                         logger.info(f"Auto-copying '{movie.title}' from manual search")
                         try:
-                            manual_move(t['hash'])
+                            manual_move(t['hash'], automatic=True)
                         except Exception as e:
                             logger.error(f"Auto-copy failed for '{movie.title}': {e}")
                     else:
@@ -728,7 +747,7 @@ def sync_movies(torrents, api_key):
                 logger.info(f"DEBUG: Auto-copy check completed for '{movie.title}'")
                 
             # AUTO-RETRY RECEPTOR: Check if a movie was stuck because the receptor was offline
-            if old_status == 'receptor_offline' and movie.status in ['pending', 'uploading', 'completed', 'queuedUP', 'stalledUP']:
+            if not movie.copy_paused and movie.status == 'receptor_offline' and t['progress'] >= 1:
                 # The torrent is still in the correct state, we should check if the receptor is back online
                 logger.info(f"Movie '{movie.title}' is stuck waiting for Receptor. Checking Receptor status...")
                 settings = load_settings()
@@ -744,7 +763,7 @@ def sync_movies(torrents, api_key):
                                 # Send silent notification or let the next move log it
                                 try:
                                     # Trigger copy process
-                                    manual_move(t['hash'])
+                                    manual_move(t['hash'], automatic=True)
                                 except Exception as e:
                                     logger.error(f"Failed to retry Receptor copy for '{movie.title}': {e}")
                             else:
@@ -817,6 +836,7 @@ def sync_movies(torrents, api_key):
                             country_code=metadata.get('country_code'),  # Save country code for flag display
                             watch_providers=metadata.get('watch_providers'),
                             metadata_updated_at=datetime.now(),
+                            copy_paused=recovery and t['progress'] >= 1,
                             torrent_name=t['name']
                         )
                         
@@ -827,6 +847,11 @@ def sync_movies(torrents, api_key):
 
             except Exception as e:
                 logger.error(f"Error adding movie {t['name']}: {e}")
+
+    if recovery and torrents:
+        recovery_settings = load_settings()
+        recovery_settings['copy_recovery_453_done'] = True
+        save_settings(recovery_settings)
 
     # 2. Cleanup Ignored Movies - DISABLED
     # DO NOT delete ignored movies when torrent disappears from torrent client

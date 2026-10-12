@@ -27,6 +27,7 @@ function getStatusIconAndLabel(status) {
         'moved': { icon: '<i class="fa-solid fa-check"></i>', label: 'Moved' },
         'moved_manually': { icon: '<i class="fa-solid fa-check"></i>', label: 'Moved' },
         'copying': { icon: '<i class="fa-solid fa-spinner fa-spin"></i>', label: 'Copying' },
+        'queued': { icon: '<i class="fa-regular fa-clock"></i>', label: 'En cola' },
         'pending': { icon: '<i class="fa-regular fa-clock"></i>', label: 'Pending' },
         'missing': { icon: '<i class="fa-solid fa-circle-exclamation"></i>', label: 'Missing' },
         'new': { icon: '<i class="fa-solid fa-sparkles"></i>', label: 'New' },

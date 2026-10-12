@@ -727,7 +727,7 @@ async def rss_scheduler():
                         
                         try:
                             # Call fetch_rss_movies (same as clicking "Fetch RSS" button)
-                            result = fetch_rss_movies(limit=30)
+                            result = await asyncio.to_thread(fetch_rss_movies, limit=30)
                             
                             if result.get('success'):
                                 logger.info(f"RSS auto-refresh successful: {result.get('message')}")

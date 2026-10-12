@@ -13,6 +13,10 @@ from .notifications import send_telegram_notification
 COPY_PROGRESS = {} # {hash: {percent: float, speed: float, status: str}}
 STOP_FLAGS = set() # Set of hashes to stop
 RESERVED_SPACE = {} # {dest_path: reserved_bytes} - Track space reserved by active copies
+COPY_LOCK = threading.RLock()
+COPY_SLOT = threading.Semaphore(1)
+COPY_OUTPUTS = {} # Only files created by the active task may be removed.
+COPY_DIRECTORIES = {}
 SPACE_LOCK = threading.Lock() # Thread-safe access to RESERVED_SPACE
 
 def clean_torrent_name(name):
@@ -281,18 +285,34 @@ def get_copy_progress():
     return COPY_PROGRESS
 
 def stop_copy(torrent_hash):
-    """
-    Signals a copy operation to stop.
-    """
-    if torrent_hash in COPY_PROGRESS and COPY_PROGRESS[torrent_hash]['status'] == 'copying':
-        STOP_FLAGS.add(torrent_hash)
-        logger.info(f"Signal to stop copy for {torrent_hash} received.")
-        return True
-    return False
+    """Persist a manual hold before signalling an active or queued transfer."""
+    from .tmdb import SYNC_LOCK
+    with SYNC_LOCK, COPY_LOCK:
+        movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
+        if movie:
+            Movie.update(copy_paused=True).where(Movie.torrent_hash == torrent_hash).execute()
+        active = torrent_hash in COPY_PROGRESS
+        if active:
+            STOP_FLAGS.add(torrent_hash)
+        return bool(movie or active)
+
+def check_copy_cancelled(torrent_hash):
+    if torrent_hash in STOP_FLAGS:
+        raise InterruptedError("Copy stopped by user")
+
+def cleanup_copy_outputs(torrent_hash):
+    """Delete task-owned files, then its directory only if empty."""
+    for path in COPY_OUTPUTS.get(torrent_hash, set()):
+        if os.path.isfile(path):
+            os.remove(path)
+    directory = COPY_DIRECTORIES.get(torrent_hash)
+    if directory and os.path.isdir(directory) and not os.listdir(directory):
+        os.rmdir(directory)
 
 def copy_with_progress(src, dst, torrent_hash, speed_limit_mbps=0):
     global COPY_PROGRESS, STOP_FLAGS
     
+    check_copy_cancelled(torrent_hash)
     file_size = os.path.getsize(src)
     copied = 0
     chunk_size = 1024 * 1024 # 1MB chunks
@@ -306,7 +326,8 @@ def copy_with_progress(src, dst, torrent_hash, speed_limit_mbps=0):
     }
     
     try:
-        with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst:
+        with open(src, 'rb') as fsrc, open(dst, 'xb') as fdst:
+            COPY_OUTPUTS.setdefault(torrent_hash, set()).add(dst)
             while True:
                 # Check for stop signal
                 if torrent_hash in STOP_FLAGS:
@@ -321,7 +342,7 @@ def copy_with_progress(src, dst, torrent_hash, speed_limit_mbps=0):
                 copied += len(chunk)
                 
                 # Calculate Progress
-                percent = (copied / file_size) * 100
+                percent = (copied / file_size) * 100 if file_size else 100
                 
                 # Calculate Speed & Limit
                 current_time = time.time()
@@ -352,36 +373,21 @@ def copy_with_progress(src, dst, torrent_hash, speed_limit_mbps=0):
                     expected_time = (copied / 1024 / 1024) / effective_limit
                     if expected_time > elapsed:
                         sleep_time = expected_time - elapsed
-                        time.sleep(sleep_time)
+                        deadline = time.monotonic() + sleep_time
+                        while time.monotonic() < deadline:
+                            check_copy_cancelled(torrent_hash)
+                            time.sleep(min(0.1, max(0, deadline - time.monotonic())))
                         
-        # Final Update
+        check_copy_cancelled(torrent_hash)
         COPY_PROGRESS[torrent_hash] = {
-            'percent': 100,
-            'speed': 0,
-            'status': 'done'
+            'percent': 100, 'speed': 0, 'status': 'copying'
         }
-        # Clean up
-        time.sleep(2)
-        if torrent_hash in COPY_PROGRESS:
-            del COPY_PROGRESS[torrent_hash]
             
     except InterruptedError:
-        # Cleanup partial file
-        logger.info(f"Cleaning up partial file: {dst}")
-        try:
-            os.remove(dst)
-            # Try to remove folder if empty
-            parent_dir = os.path.dirname(dst)
-            if not os.listdir(parent_dir):
-                os.rmdir(parent_dir)
-        except Exception as cleanup_err:
-            logger.error(f"Error cleaning up: {cleanup_err}")
-            
-        if torrent_hash in COPY_PROGRESS:
-            del COPY_PROGRESS[torrent_hash]
-        if torrent_hash in STOP_FLAGS:
-            STOP_FLAGS.remove(torrent_hash)
-            
+        # The operation owns cleanup; propagate cancellation so no success
+        # history, notification or later file copy is emitted.
+        raise
+
     except Exception as e:
         logger.error(f"Error copying file: {e}")
         COPY_PROGRESS[torrent_hash] = {
@@ -415,7 +421,7 @@ def find_file_in_path(base_path, filename):
 
 from .client import get_qb_client
 
-def manual_move(torrent_hash, config_ignored=None):
+def manual_move(torrent_hash, config_ignored=None, automatic=False):
     """
     Manually triggers a move operation for a specific torrent
     """
@@ -434,14 +440,39 @@ def manual_move(torrent_hash, config_ignored=None):
             
         torrent = torrents[0]
         
-        # Run in background thread to avoid blocking API (Cloudflare 524 Fix)
+        if torrent.progress < 1:
+            return {"success": False, "message": "Download is not complete"}
+        with COPY_LOCK:
+            movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
+            if automatic and movie and movie.copy_paused:
+                return {"success": False, "message": "Copy held for manual start"}
+            if torrent_hash in COPY_PROGRESS:
+                return {"success": True, "message": "Copy already queued or running"}
+            if not automatic and movie:
+                Movie.update(copy_paused=False).where(Movie.torrent_hash == torrent_hash).execute()
+            STOP_FLAGS.discard(torrent_hash)
+            COPY_PROGRESS[torrent_hash] = {'percent': 0, 'speed': 0, 'status': 'queued'}
+
         def _move_thread():
             try:
-                process_single_torrent(qb, torrent, settings)
+                with COPY_SLOT:
+                    check_copy_cancelled(torrent_hash)
+                    COPY_PROGRESS[torrent_hash]['status'] = 'copying'
+                    process_single_torrent(qb, torrent, settings)
+            except InterruptedError:
+                pass
             except Exception as e:
                 logger.error(f"Error in background move thread: {e}")
+            finally:
+                Movie._meta.database.close()
+                with COPY_LOCK:
+                    COPY_PROGRESS.pop(torrent_hash, None)
+                    STOP_FLAGS.discard(torrent_hash)
+                    COPY_OUTPUTS.pop(torrent_hash, None)
+                    COPY_DIRECTORIES.pop(torrent_hash, None)
+                trigger_movies_update_callback()
 
-        threading.Thread(target=_move_thread).start()
+        threading.Thread(target=_move_thread, daemon=True).start()
         
         return {"success": True, "message": f"Started processing {torrent.name} in background"}
     except Exception as e:
@@ -608,7 +639,7 @@ def process_single_torrent(qb, torrent, settings):
                             'is_receptor': True
                         }
                         # Start background thread to poll Receptor status
-                        threading.Thread(target=_poll_receptor_status, args=(torrent, host, port, source_path, dest_dir, settings, title, year)).start()
+                        _poll_receptor_status(torrent, host, port, source_path, dest_dir, settings, title, year)
                         return
                     else:
                         error_msg = data.get("error_msg") or data.get("message") or data.get("error") or "Unknown Receptor Error"
@@ -625,6 +656,8 @@ def process_single_torrent(qb, torrent, settings):
                 return
         
         # === LOCAL COPY LOGIC (Fallback / Default) ===
+        check_copy_cancelled(torrent.hash)
+        COPY_DIRECTORIES[torrent.hash] = dest_dir
         os.makedirs(dest_dir, exist_ok=True)
         # If it's a file
         if os.path.isfile(source_path):
@@ -653,6 +686,7 @@ def process_single_torrent(qb, torrent, settings):
                 try:
                     logger.info(f"Copying {source_path} to {dest_file}")
                     copy_with_progress(source_path, dest_file, torrent.hash, limit)
+                    check_copy_cancelled(torrent.hash)
                     MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_file, status='success')
                     trigger_movies_update_callback()
                     
@@ -725,6 +759,7 @@ def process_single_torrent(qb, torrent, settings):
                                 # But we might have multiple files.
                                 pass
                             
+                check_copy_cancelled(torrent.hash)
                 if copied:
                     MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_dir, status='success')
                     trigger_movies_update_callback()
@@ -759,7 +794,18 @@ def process_single_torrent(qb, torrent, settings):
 
     except InterruptedError:
         logger.info(f"Copy cancelled for {torrent.name}")
-        # History entry? Maybe not needed if cancelled.
+        try:
+            cleanup_copy_outputs(torrent.hash)
+        except Exception as cleanup_error:
+            logger.error(f"Cancelled copy cleanup failed: {cleanup_error}")
+            MoveHistory.create(torrent_name=torrent.name, status='error',
+                               message=f"Cancelled copy cleanup failed: {cleanup_error}",
+                               source_path=source_path, dest_path=dest_dir)
+            trigger_movies_update_callback()
+            return
+        MoveHistory.create(torrent_name=torrent.name, status='cancelled',
+                           message="Copy stopped by user", source_path=source_path, dest_path=dest_dir)
+        trigger_movies_update_callback()
     except Exception as e:
         logger.error(f"Error moving {torrent.name}: {e}")
         MoveHistory.create(torrent_name=torrent.name, status='error', message=str(e), source_path="", dest_path="")
@@ -776,16 +822,18 @@ def _poll_receptor_status(torrent, host, port, source_path, dest_dir, settings, 
     
     logger.info(f"Started polling Receptor for {torrent.hash}")
     
+    stop_sent = False
     while True:
         try:
             # Check for stop signal from Roverr UI
-            if torrent.hash in STOP_FLAGS:
+            if torrent.hash in STOP_FLAGS and not stop_sent:
                 logger.info(f"Sending stop signal to Receptor for {torrent.hash}")
-                requests.post(stop_url, timeout=5)
-                STOP_FLAGS.remove(torrent.hash)
-                if torrent.hash in COPY_PROGRESS:
-                    del COPY_PROGRESS[torrent.hash]
-                break
+                response = requests.post(stop_url, timeout=5)
+                if response.status_code != 404:
+                    response.raise_for_status()
+                stop_sent = True
+                # Keep polling until the remote writer has closed its files
+                # and finished cleanup before releasing the transfer slot.
                 
             resp = requests.get(url, timeout=3)
             
@@ -831,6 +879,11 @@ def _poll_receptor_status(torrent, host, port, source_path, dest_dir, settings, 
                         del COPY_PROGRESS[torrent.hash]
                     break
                     
+                elif status == "cancelled":
+                    MoveHistory.create(torrent_name=torrent.name, source_path=source_path,
+                                       dest_path=dest_dir, status='cancelled', message="Copy stopped by user")
+                    trigger_movies_update_callback()
+                    break
                 elif status == "error":
                     # Receptor encountered an error
                     error_msg = data.get("error") or data.get("error_msg") or "Unknown receptor error"
