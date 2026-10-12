@@ -86,10 +86,10 @@ export function statusBadgeTemplate(status) {
 }
 
 /**
- * NOTA: Los templates completos (torrentRowTemplate, movieCardTemplate, etc.) 
+ * NOTA: Los templates completos (torrentRowTemplate, movieCardTemplate, etc.)
  * serán añadidos en la siguiente fase cuando se implementen los módulos
  * dashboard.js, search.js, y movies.js que los utilizan.
- * 
+ *
  * Por ahora, mantenemos solo las funciones helper para evitar dependencias circulares.
  */
 
@@ -102,7 +102,7 @@ export function getMovieStatus(movie) {
     let status = movie.status;
     let reason = getCopyStatusTooltip(status, progress) || movie.status_reason || '';
     let action = 'Copiar';
-    if (['moved', 'moved_manually'].includes(status)) reason = ''; 
+    if (['moved', 'moved_manually'].includes(status)) reason = '';
     if (status === 'copying' && progress.recovering) status = 'recovering';
     else if (!['moved', 'moved_manually', 'copying', 'queued', 'downloading'].includes(status)) {
         if (movie.copy_pause_reason === 'conflict') {
