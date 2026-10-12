@@ -39,6 +39,7 @@ class CopyTaskHandler(threading.Thread):
         self.source_path = source_path
         self.dest_dir = dest_dir
         self.folder_name = folder_name
+        self.created_files = set()
         self.chunk_size = 1024 * 1024  # 1MB chunks
         
         with TASKS_LOCK:
@@ -60,10 +61,6 @@ class CopyTaskHandler(threading.Thread):
     def _copy_file(self, src_file, dst_file):
         """Copies a single file with progress and speed tracking"""
         file_size = os.path.getsize(src_file)
-        if file_size == 0:
-            with open(dst_file, 'wb') as f:
-                pass
-            return True
 
         copied = 0
         start_time = time.time()
@@ -71,7 +68,10 @@ class CopyTaskHandler(threading.Thread):
         
         os.makedirs(os.path.dirname(dst_file), exist_ok=True)
 
-        with open(src_file, 'rb') as fsrc, open(dst_file, 'wb') as fdst:
+        if self.task_id in STOP_FLAGS:
+            raise InterruptedError('Copy stopped by user')
+        with open(src_file, 'rb') as fsrc, open(dst_file, 'xb') as fdst:
+            self.created_files.add(dst_file)
             while True:
                 # Check for cancellation
                 if self.task_id in STOP_FLAGS:
@@ -160,13 +160,22 @@ class CopyTaskHandler(threading.Thread):
             else:
                 raise ValueError("Source path is neither a file nor a directory.")
 
+            if self.task_id in STOP_FLAGS:
+                raise InterruptedError('Copy stopped by user')
             # Success
             logger.info(f"Task {self.task_id} completed successfully.")
             self.update_state('done', percent=100.0, speed=0.0)
 
         except InterruptedError as e:
-            # Cleanup happen on abort
-            self.update_state('error', error_msg=str(e))
+            try:
+                for path in self.created_files:
+                    if os.path.isfile(path):
+                        os.remove(path)
+                if os.path.isdir(self.dest_dir) and not os.listdir(self.dest_dir):
+                    os.rmdir(self.dest_dir)
+                self.update_state('cancelled', speed=0.0)
+            except Exception as cleanup_error:
+                self.update_state('error', error_msg=f"Cleanup failed: {cleanup_error}")
             
         except Exception as e:
             logger.error(f"Task {self.task_id} failed: {e}", exc_info=True)

@@ -7,7 +7,7 @@
 import { state } from './state.js';
 import {
     getMovies, getMovieDetails, identifyMovie as apiIdentifyMovie,
-    batchCopyMovies, batchDeleteMovies, stopCopy as apiStopCopy,
+    batchStopCopies, batchCopyMovies, batchDeleteMovies, stopCopy as apiStopCopy,
     searchIndexers, addTorrent
 } from './api.js';
 import { showToast, formatBytes, getProgressClass, escapeHtml, openModal, closeModal, updateTorrentClientAlert } from './ui.js';
@@ -58,6 +58,7 @@ let selectionCounter;
 let selectAllBtn;
 let deselectAllBtn;
 let copySelectedBtn;
+let stopSelectedBtn;
 let deleteSelectedBtn;
 let deleteModal;
 
@@ -70,6 +71,7 @@ export function initMovies() {
     selectAllBtn = document.getElementById('select-all-btn');
     deselectAllBtn = document.getElementById('deselect-all-btn');
     copySelectedBtn = document.getElementById('copy-selected-btn');
+    stopSelectedBtn = document.getElementById('stop-selected-btn');
     deleteSelectedBtn = document.getElementById('delete-selected-btn');
     deleteModal = document.getElementById('delete-modal');
 
@@ -877,12 +879,12 @@ async function deleteMovie(hash) {
 }
 
 async function stopCopy(hash) {
-    if (!confirm("Are you sure you want to stop the copy process?")) return;
+    if (!confirm("¿Detener la copia y eliminar los archivos incompletos creados en el destino? Quedará pendiente de inicio manual.")) return;
 
     const data = await apiStopCopy(hash);
 
     if (data.success) {
-        showToast('Copy process stopped', 'success');
+        showToast('Copia bloqueada; deteniendo y limpiando el destino incompleto', 'success');
         showMovieDetails(hash);
     } else {
         showToast(data.message, 'error');
@@ -1172,6 +1174,7 @@ function setupMultiSelect() {
     if (selectAllBtn) selectAllBtn.addEventListener('click', selectAllMovies);
     if (deselectAllBtn) deselectAllBtn.addEventListener('click', deselectAllMovies);
     if (copySelectedBtn) copySelectedBtn.addEventListener('click', copySelectedMovies);
+    if (stopSelectedBtn) stopSelectedBtn.addEventListener('click', stopSelectedCopies);
     if (deleteSelectedBtn) deleteSelectedBtn.addEventListener('click', () => {
         if (deleteModal) deleteModal.classList.add('active');
     });
@@ -1256,6 +1259,7 @@ function updateSelectionUI() {
     selectAllBtn.style.display = hasSelection ? 'none' : 'inline-flex';
     deselectAllBtn.style.display = hasSelection ? 'inline-flex' : 'none';
     deleteSelectedBtn.style.display = hasSelection ? 'inline-flex' : 'none';
+    if (stopSelectedBtn) stopSelectedBtn.style.display = hasSelection ? 'inline-flex' : 'none';
 
     const hasNonErrorMovies = Array.from(selectedMovies.values()).some(
         m => m.status !== 'error' && m.status !== 'orphaned'
@@ -1275,6 +1279,24 @@ function updateSelectionUI() {
             if (checkbox) checkbox.checked = false;
         }
     });
+}
+
+async function stopSelectedCopies() {
+    const hashes = Array.from(state.getSelectedMovies().keys());
+    if (!hashes.length) return;
+    if (!confirm('¿Detener las copias seleccionadas? Se eliminarán los archivos creados por las copias incompletas y quedarán pendientes de inicio manual.')) return;
+    stopSelectedBtn.disabled = true;
+    try {
+        const data = await batchStopCopies(hashes);
+        showToast(data.success ? `${data.stopped} copias detenidas o bloqueadas; limpiando destinos incompletos` : data.message,
+                  data.success ? 'success' : 'error');
+        if (data.success) {
+            deselectAllMovies();
+            await fetchMovies();
+        }
+    } finally {
+        stopSelectedBtn.disabled = false;
+    }
 }
 
 async function copySelectedMovies() {

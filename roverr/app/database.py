@@ -24,6 +24,11 @@ class MoveHistory(BaseModel):
     timestamp = DateTimeField(default=datetime.datetime.now)
 
 class Movie(BaseModel):
+    class Meta:
+        # Background metadata writers may hold an older Movie instance. They
+        # must not overwrite a cancellation hold saved by another thread.
+        only_save_dirty = True
+
     torrent_hash = CharField(unique=True)
     title = CharField()
     year = CharField(null=True)
@@ -49,6 +54,7 @@ class Movie(BaseModel):
     tmdb_id = IntegerField(null=True) # TMDB movie ID for unique identification
     metadata_updated_at = DateTimeField(null=True) # Last metadata update
     country_code = CharField(null=True, max_length=2) # ISO 3166-1 country code (e.g., 'US', 'ES')
+    copy_paused = BooleanField(default=False) # Only manual copy clears this persistent hold
     ignored = BooleanField(default=False) # If True, sync will skip this movie
     torrent_name = CharField(null=True) # Original torrent name for history linking
     watchlist = BooleanField(default=False) # If True, movie is in watchlist monitoring
@@ -67,6 +73,7 @@ def migrate_db():
     
     # List of new columns to add to Movie table
     new_columns = [
+        ('copy_paused', 'BOOLEAN NOT NULL DEFAULT 0'),
         ('cast', 'TEXT'),
         ('crew', 'TEXT'),
         ('vote_average', 'REAL'),
