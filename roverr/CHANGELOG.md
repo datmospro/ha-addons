@@ -1,3 +1,23 @@
+# 4.5.15
+
+- Panel con búsqueda por título, año y nombre del torrent; filtros por estado,
+  año y origen RSS; ordenación por fecha de incorporación, título, año, tamaño
+  y posición en la cola. Preferencias guardadas en el navegador.
+- Contadores por película única, accesos directos por estado, resultados sin
+  coincidencias y carteles compactos opcionales. Estados y filtros se actualizan
+  en directo sin perder las preferencias al abrir una ficha.
+- Seleccionar visibles respeta los filtros. El contador informa de las películas
+  seleccionadas fuera de la vista y mantiene juntas sus distintas versiones.
+- Actividad más compacta: copia activa y siguiente pendiente, controles de prioridad
+  con ayuda, cola completa desplegable, ayuda y resultados recientes plegados.
+  Conserva progreso, velocidad, tiempo estimado, pausa, reanudación y detención.
+- Cabecera del panel adaptable a su contenido, navegación reducida en móvil y
+  metadatos de carteles legibles. Consulta y cuenta atrás RSS en español.
+
+Validado con pruebas de navegador de búsqueda, filtros, selección, preferencias,
+ordenación, actualizaciones en directo, agrupación de versiones, controles de
+cola y diseño móvil. No requiere cambios ni reinicio del receptor.
+
 # 4.5.14
 
 - Add Settings → Diagnostics with on-demand qBittorrent authentication and

@@ -1,3 +1,4 @@
+import { initDashboardFilters, updateDashboardFilters } from './dashboard-filters.js';
 /**
  * Módulo de Películas para Roverr
  * Gestiona la vista de detalles de películas y multi-selección
@@ -77,6 +78,7 @@ export function initMovies() {
     deleteModal = document.getElementById('delete-modal');
 
     setupMultiSelect();
+    initDashboardFilters(() => renderMovieCards(state.getMovies()));
 
     // Setup manual search modal close button
     const manualSearchModal = document.getElementById('manual-search-modal');
@@ -134,16 +136,6 @@ export async function fetchMovies(isPolling = false) {
     // Update Series Notification
     updateSeriesNotification(ignored);
 
-    if (movies.length === 0) {
-        moviesGrid.innerHTML = '<div style="text-align: center; grid-column: 1/-1;">No se encontraron películas.</div>';
-        return;
-    }
-
-    // Check if grid has non-card children
-    if (moviesGrid.querySelector(':not(.movie-card)')) {
-        moviesGrid.innerHTML = '';
-    }
-
     renderMovieCards(movies);
 }
 
@@ -171,8 +163,11 @@ export function updateSeriesNotification(ignored) {
  */
 export function renderMovieCards(movies) {
     movies = groupMovies(movies);
+    [...moviesGrid.children].filter(node=>!node.classList.contains('movie-card')).forEach(node=>node.remove());
     // Keep selection attached to the logical movie when its active version changes.
     const selected = state.getSelectedMovies();
+    const availableHashes=new Set(movies.flatMap(movie=>movie.versions.map(version=>version.torrent_hash)));
+    for(const hash of selected.keys()) if(!availableHashes.has(hash)) selected.delete(hash);
     for (const movie of movies) {
         const previous = movie.versions.find(version => selected.has(version.torrent_hash));
         if (previous) {
@@ -180,6 +175,7 @@ export function renderMovieCards(movies) {
             selected.set(movie.torrent_hash, {torrent_hash:movie.torrent_hash, title:movie.title, status:movie.status, version_hashes:movie.versions.map(version => version.torrent_hash)});
         }
     }
+    movies = updateDashboardFilters(movies);
     // Map existing cards
     const existingCards = new Map();
     moviesGrid.querySelectorAll('.movie-card').forEach(card => {
@@ -204,12 +200,19 @@ export function renderMovieCards(movies) {
         } else {
             // Create new card
             card = createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel);
-            moviesGrid.appendChild(card);
         }
+        // Appending existing nodes applies the current ordering without recreating cards.
+        moviesGrid.appendChild(card);
     });
 
     // Remove stale cards
     existingCards.forEach(card => card.remove());
+    if (!movies.length) {
+        const empty=document.createElement('div');
+        empty.className='dashboard-empty';
+        empty.textContent=state.getMovies().length ? 'No hay películas con estos filtros. Puedes limpiarlos para ver todas.' : 'No hay películas en el panel.';
+        moviesGrid.appendChild(empty);
+    }
 
     // Update selection UI
     updateSelectionUI();
@@ -1289,7 +1292,9 @@ function updateSelectionUI() {
     const count = selectedMovies.size;
 
     if (count > 0) {
-        selectionCounter.textContent = `(${count})`;
+        const visibleSelected=[...moviesGrid.querySelectorAll('.movie-card')].filter(card=>selectedMovies.has(card.dataset.hash)).length;
+        const hidden=count-visibleSelected;
+        selectionCounter.textContent = `(${count}${hidden ? ` · ${hidden} fuera del filtro` : ''})`;
         selectionCounter.classList.add('active');
     } else {
         selectionCounter.textContent = '';
@@ -1297,7 +1302,8 @@ function updateSelectionUI() {
     }
 
     const hasSelection = count > 0;
-    selectAllBtn.style.display = hasSelection ? 'none' : 'inline-flex';
+    selectAllBtn.style.display = 'inline-flex';
+    selectAllBtn.disabled = !moviesGrid.querySelector('.movie-card');
     deselectAllBtn.style.display = hasSelection ? 'inline-flex' : 'none';
     deleteSelectedBtn.style.display = hasSelection ? 'inline-flex' : 'none';
     if (stopSelectedBtn) stopSelectedBtn.style.display = hasSelection ? 'inline-flex' : 'none';

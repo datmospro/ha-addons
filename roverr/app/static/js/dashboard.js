@@ -15,7 +15,7 @@ import {
     moveManually as apiMoveManually, stopCopy as apiStopCopy,
     markAsMoved as apiMarkAsMoved, getRSSStatus
 } from './api.js';
-import { showToast, formatBytes, formatDate, setButtonLoading } from './ui.js';
+import { showToast, formatBytes, formatDate, setButtonLoading, escapeHtml } from './ui.js';
 import { getStatusClass } from './templates.js';
 import { connectWebSocket } from './websocket.js';
 
@@ -87,10 +87,10 @@ export async function fetchTorrents() {
 async function handleTriggerCheck() {
     const data = await apiTriggerCheck();
     if (data.success !== false) {
-        showToast('Auto-check triggered', 'success');
+        showToast('Comprobación automática solicitada', 'success');
         await fetchTorrents();
     } else {
-        showToast('Error triggering check', 'error');
+        showToast('No se pudo iniciar la comprobación', 'error');
     }
 }
 
@@ -101,7 +101,7 @@ async function handleTriggerCheck() {
 async function handleFetchRSS() {
     if (!fetchRssBtn) return;
 
-    setButtonLoading(fetchRssBtn, true, 'Fetching...');
+    setButtonLoading(fetchRssBtn, true, 'Consultando…');
 
     const data = await fetchRSS();
 
@@ -192,7 +192,7 @@ async function updateRSSCountdown() {
         const seconds = data.countdown_seconds % 60;
         const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
-        rssCountdownEl.innerHTML = `<i class="fa-solid fa-clock"></i> Next RSS: <strong>${data.next_feed_name}</strong> in ${timeStr}`;
+        rssCountdownEl.innerHTML = `<i class="fa-solid fa-clock"></i> Próxima consulta RSS: <strong>${escapeHtml(data.next_feed_name)}</strong> en ${timeStr}`;
         rssCountdownEl.style.display = 'block';
     } else {
         rssCountdownEl.style.display = 'none';

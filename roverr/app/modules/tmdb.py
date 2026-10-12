@@ -1028,6 +1028,8 @@ def get_movie_data(torrents, api_key):
             ).start()
         
         movies.append({
+            "added_at": m.added_at.isoformat() if m.added_at else None,
+            "rss_feed_name": m.rss_feed_name,
             "tmdb_id": m.tmdb_id,
             "torrent_name": m.torrent_name,
             "copy_paused": m.copy_paused,

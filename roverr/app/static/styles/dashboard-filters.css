@@ -1,0 +1,37 @@
+.dashboard-filters { display:flex; flex-wrap:wrap; align-items:end; gap:.6rem; padding:.75rem 0; }
+.dashboard-filters label { display:flex; flex-direction:column; gap:.25rem; font-size:.8rem; color:var(--text-muted); min-width:0; }
+.dashboard-filters input[type=search], .dashboard-filters select { width:100%; min-height:38px; padding:.45rem .6rem; border:1px solid var(--border); border-radius:8px; color:var(--text-primary); background:var(--bg-secondary); }
+.dashboard-filters .dashboard-query { flex:1 1 220px; }
+.dashboard-filters .dashboard-density { flex-direction:row; align-items:center; min-height:38px; }
+.dashboard-counts { display:flex; flex-wrap:wrap; gap:.4rem; }
+.dashboard-counts button { border:1px solid var(--border); border-radius:20px; color:var(--text-muted); background:var(--bg-secondary); padding:.35rem .65rem; cursor:pointer; }
+.dashboard-counts button[aria-pressed=true] { color:var(--text-primary); border-color:var(--accent,#3b82f6); background:rgba(59,130,246,.16); }
+.dashboard-results { color:var(--text-muted); font-size:.85rem; margin:.5rem 0 0; }
+.movies-grid.compact-posters { grid-template-columns:repeat(auto-fill,minmax(125px,1fr)); gap:.8rem; padding:.8rem 0; }
+.compact-posters .overlay-status { font-size:.7rem; padding:.35rem; }
+.compact-posters .movie-info { opacity:1; transform:none; }
+.compact-posters .movie-title { font-size:.85rem; }
+.movie-meta { display:flex; flex-wrap:wrap; gap:.3rem; justify-content:center; font-size:.75rem; color:var(--text-muted); }
+#view-dashboard .movie-sticky-header { position:sticky; left:auto; width:100%; top:0; }
+#view-dashboard .dashboard-content { padding-top:1rem !important; }
+#view-dashboard .header-top { padding:.75rem 1.5rem; }
+#view-dashboard .movie-action-bar { padding:.6rem 1.5rem; gap:.5rem; }
+#view-dashboard .dashboard-actions { display:flex; flex-wrap:wrap; gap:.5rem; margin-left:auto; }
+.main-content { min-width:0; }
+@media(max-width:700px) {
+    :root { --sidebar-width:64px; }
+    .sidebar { padding:.75rem .3rem; }
+    .sidebar .logo { padding-bottom:.75rem; margin-bottom:.75rem; }
+    .sidebar .logo-icon { width:36px; height:36px; }
+    .sidebar .logo h1, .sidebar .qb-status-text { display:none; }
+    .sidebar .nav-item { font-size:0; justify-content:center; padding:.75rem .3rem; gap:0; }
+    .sidebar .nav-item i { font-size:1.1rem; }
+    .sidebar-footer { font-size:.65rem; }
+    #view-dashboard .header-top { padding:.6rem .75rem; gap:.5rem; flex-wrap:wrap; }
+    #view-dashboard .movie-action-bar { padding:.5rem .75rem; }
+    #view-dashboard .movie-action-bar .btn { font-size:.75rem; padding:.45rem .6rem; }
+    #view-dashboard .dashboard-content { padding:.75rem; }
+    #movies-section { padding:.75rem; }
+}
+.dashboard-empty { grid-column:1/-1; text-align:center; color:var(--text-muted); padding:2rem 1rem; }
+@media(max-width:600px) { .dashboard-filters label:not(.dashboard-query):not(.dashboard-density) { flex:1 1 40%; } .dashboard-filters .dashboard-query { flex-basis:100%; } .movies-grid.compact-posters { grid-template-columns:repeat(auto-fill,minmax(105px,1fr)); } }

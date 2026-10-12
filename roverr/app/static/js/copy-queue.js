@@ -8,6 +8,8 @@ let current = null;
 let panel;
 let refreshTimer;
 let readGeneration = 0;
+let expanded = false;
+try { expanded=localStorage.getItem('roverr.queue.expanded')==='true'; } catch {}
 
 function duration(seconds) {
     if (seconds == null) return 'Calculando tiempo restante';
@@ -24,6 +26,17 @@ export function renderCopyQueue(data) {
     toggle.textContent = data.paused ? 'Reanudar cola' : 'Pausar cola';
     toggle.disabled = busy;
     const active = data.entries.find(entry => entry.active);
+    const waiting=data.entries.filter(entry=>!entry.active).length;
+    const count=panel.querySelector('#copy-queue-count');
+    if(count) count.textContent=`· ${active ? '1 activa · ' : ''}${waiting} en cola`;
+    const expand=panel.querySelector('#copy-queue-expand');
+    if(expand) {
+        expand.hidden=waiting<=1;
+        expand.textContent=expanded ? 'Mostrar menos' : `Ver toda la cola (${waiting})`;
+        expand.setAttribute('aria-expanded',String(expanded));
+    }
+    panel.classList.toggle('queue-expanded',expanded);
+    let waitingIndex=0;
     panel.querySelector('#copy-queue-state').textContent = data.paused
         ? (active && active.phase !== 'paused' ? 'Cola pausada; esperando a que la copia activa confirme la pausa.' : 'Cola pausada. Los archivos parciales se conservan.')
         : (data.entries.length ? 'La cola está activa. Se procesa una película a la vez.' : 'No hay copias en curso ni pendientes.');
@@ -32,14 +45,14 @@ export function renderCopyQueue(data) {
         const label = entry.stop_requested ? 'Deteniendo y limpiando' : entry.active ? info.label : `En cola · posición ${entry.queue_position}`;
         const progress = Math.min(100,Math.max(0,Number(entry.percent) || 0));
         const timing = entry.phase === 'verifying' ? 'Verificando el contenido completo' : entry.phase === 'paused' ? 'Tiempo restante al reanudar' : duration(entry.eta_seconds);
-        return `<div class="copy-queue-row" data-hash="${escapeHtml(entry.torrent_hash)}">
+        return `<div class="copy-queue-row" data-active="${Boolean(entry.active)}" ${expand && !entry.active && ++waitingIndex>1 && !expanded ? 'hidden' : ''} data-hash="${escapeHtml(entry.torrent_hash)}">
             <div class="copy-queue-info">
                 <button class="copy-queue-title" data-action="details">${escapeHtml(entry.title)}</button>
                 <div class="copy-queue-stats">${escapeHtml(label)}${entry.active ? ` · ${progress.toFixed(1)}% · ${Number(entry.speed || 0).toFixed(2)} MB/s · ${escapeHtml(timing)}` : data.paused ? ' · esperando reanudación' : ''}</div>
                 ${entry.active ? `<div class="copy-queue-track"><span style="width:${progress}%"></span></div>` : ''}
             </div>
             <div class="copy-queue-actions">
-                ${entry.reorderable ? `<button class="btn secondary sm" data-action="up" aria-label="Subir ${escapeHtml(entry.title)}">Subir</button><button class="btn secondary sm" data-action="down" aria-label="Bajar ${escapeHtml(entry.title)}">Bajar</button><button class="btn secondary sm" data-action="first">Poner primero</button>` : ''}
+                ${entry.reorderable ? `<button class="btn secondary sm" data-action="up" title="Subir una posición" aria-label="Subir ${escapeHtml(entry.title)}">↑</button><button class="btn secondary sm" data-action="down" title="Bajar una posición" aria-label="Bajar ${escapeHtml(entry.title)}">↓</button><button class="btn secondary sm" data-action="first" title="Poner primero en la cola" aria-label="Poner primero ${escapeHtml(entry.title)}">⇈</button>` : ''}
                 <button class="btn danger sm" data-action="stop" ${entry.stop_requested ? 'disabled' : ''}>Detener</button>
             </div>
         </div>`;
@@ -79,6 +92,11 @@ async function mutate(path, payload) {
 export function initCopyQueue() {
     panel=document.getElementById('copy-queue-panel');
     if (!panel) return;
+    panel.querySelector('#copy-queue-expand')?.addEventListener('click',()=> {
+        expanded=!expanded;
+        try {localStorage.setItem('roverr.queue.expanded',String(expanded));} catch {}
+        if(current) renderCopyQueue(current);
+    });
     panel.querySelector('#copy-queue-toggle').disabled=true;
     panel.querySelector('#copy-queue-toggle').addEventListener('click',()=>mutate('/api/copy-queue/pause',{paused:!current?.paused}));
     panel.querySelector('#copy-queue-entries').addEventListener('click',event=>{

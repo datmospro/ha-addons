@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Roverr - Gestor de películas</title> <!-- Modular CSS Architecture -->
     <link rel="stylesheet" href="styles/base.css?v=8">
-    <link rel="stylesheet" href="styles/copy-queue.css?v=4.5.13">
     <link rel="stylesheet" href="styles/diagnostics.css?v=4.5.14">
     <link rel="stylesheet" href="styles/layout.css?v=8">
     <link rel="stylesheet" href="styles/components.css?v=8">
@@ -18,6 +17,8 @@
     <!-- Critical fix for text wrapping -->
     <link rel="stylesheet" href="styles/fix-text-wrap.css?v=8">
     <link rel="stylesheet" href="styles/movie-checkbox.css?v=8">
+    <link rel="stylesheet" href="styles/dashboard-filters.css?v=4.5.15">
+    <link rel="stylesheet" href="styles/copy-queue.css?v=4.5.15">
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Icons -->
@@ -51,7 +52,7 @@
                     <span class="qb-status-dot"></span>
                     <span class="qb-status-text">qBittorrent OK</span>
                 </div>
-                <span id="version-info">v4.5.14</span>
+                <span id="version-info">v4.5.15</span>
             </div>
         </aside>
 
@@ -72,7 +73,7 @@
                     <div class="movie-action-bar">
                         <!-- Selection actions -->
                         <button id="select-all-btn" class="btn secondary" style="display: none;">
-                            <i class="fa-solid fa-check-double"></i> Seleccionar todas
+                            <i class="fa-solid fa-check-double"></i> Seleccionar visibles
                         </button>
                         <button id="deselect-all-btn" class="btn secondary" style="display: none;">
                             <i class="fa-solid fa-xmark"></i> Deseleccionar todas
@@ -88,8 +89,7 @@
                         </button>
 
                         <div class="dashboard-actions">
-                            <button id="fetch-rss-btn" class="btn secondary"><i class="fa-solid fa-rss"></i> Fetch
-                                RSS</button>
+                            <button id="fetch-rss-btn" class="btn secondary"><i class="fa-solid fa-rss"></i> Consultar RSS</button>
                             <button id="refresh-btn" class="btn secondary"><i class="fa-solid fa-rotate"></i>
                                 Actualizar</button>
                         </div>
@@ -124,16 +124,28 @@
                 <div class="dashboard-content">
                     <section class="content-card copy-queue-panel" id="copy-queue-panel" aria-label="Actividad y cola de copias">
                         <div class="copy-queue-header">
-                            <h3>Actividad y cola de copias</h3>
-                            <button class="btn secondary" id="copy-queue-toggle">Pausar cola</button>
+                            <h3>Actividad y cola de copias <span id="copy-queue-count"></span></h3>
+                            <button class="btn secondary sm" id="copy-queue-toggle">Pausar cola</button>
                         </div>
                         <p id="copy-queue-state" role="status">Cargando actividad...</p>
-                        <p class="copy-queue-hint">Pausar conserva los parciales. Detener elimina la copia incompleta. El tiempo estimado corresponde al archivo en transferencia; la verificación se realiza después.</p>
+                        <details class="copy-queue-help"><summary>Ayuda</summary><p class="copy-queue-hint">Pausar conserva los parciales. Detener elimina la copia incompleta. El tiempo estimado corresponde al archivo en transferencia; la verificación se realiza después.</p></details>
                         <div id="copy-queue-entries"></div>
+                        <button class="btn secondary sm" id="copy-queue-expand" hidden aria-expanded="false">Ver toda la cola</button>
                         <details><summary>Últimos resultados</summary><div id="copy-queue-recent"></div></details>
                     </section>
                     <section class="content-card" id="movies-section">
                         <h3>Películas</h3>
+                        <div id="dashboard-counts" class="dashboard-counts" aria-label="Filtrar por estado"></div>
+                        <div id="dashboard-filters" class="dashboard-filters">
+                            <label class="dashboard-query">Buscar en el panel <input data-filter="query" type="search" placeholder="Título, año o nombre del torrent…" aria-keyshortcuts="/"></label>
+                            <label>Estado<select data-filter="status"><option value="all">Todos los estados</option><option value="downloading">Descargando</option><option value="copying">Copiando / verificando / en pausa</option><option value="queued">En cola</option><option value="pending">Pendientes</option><option value="new">Por descargar</option><option value="attention">Requiere revisión</option><option value="stopped">Detenidas</option><option value="copied">Copiadas</option></select></label>
+                            <label>Año<select data-filter="year"><option value="">Todos los años</option></select></label>
+                            <label>Origen<select data-filter="origin"><option value="">Todos los orígenes</option></select></label>
+                            <label>Ordenar<select data-filter="sort"><option value="recent">Añadidas recientemente</option><option value="title">Título A–Z</option><option value="year">Año más reciente</option><option value="size">Mayor tamaño</option><option value="queue">Orden de copia</option></select></label>
+                            <label class="dashboard-density"><input type="checkbox" data-filter="compact"> Carteles compactos</label>
+                            <button id="dashboard-reset" class="btn secondary sm">Limpiar filtros</button>
+                        </div>
+                        <p id="dashboard-results" class="dashboard-results" role="status"></p>
                         <div id="movies-grid" class="movies-grid">
                             <!-- Movies injected here -->
                         </div>
@@ -600,7 +612,7 @@
     </div>
 
     <!-- Main JavaScript - Version parameter forces cache refresh on updates -->
-    <script type="module" src="js/main.js?v=4.4.87"></script>
+    <script type="module" src="js/main.js?v=4.5.15"></script>
 
 </body>
 
