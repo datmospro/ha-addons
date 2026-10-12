@@ -1788,8 +1788,9 @@ def get_movie_details(torrent_hash, api_key):
             
             
         # Check if copying
-        if torrent_hash in COPY_PROGRESS:
-            status = 'copying'
+        copy_progress = get_copy_progress().get(torrent_hash)
+        if copy_progress:
+            status = copy_progress.get('status', 'copying')
         
         # Determine source_path display:
         # Only show "N/A" if movie hasn't started downloading yet (status=new)
@@ -1818,8 +1819,8 @@ def get_movie_details(torrent_hash, api_key):
         })
         
         # Add copy progress if copying
-        if torrent_hash in COPY_PROGRESS:
-            movie_details['copy_progress'] = COPY_PROGRESS[torrent_hash]
+        if copy_progress:
+            movie_details['copy_progress'] = copy_progress
         
         return movie_details
 

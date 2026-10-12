@@ -1,3 +1,15 @@
+# 4.5.5
+
+- Show **En cola** in movie details, with the current position among waiting
+  movies instead of a misleading copying percentage or transfer speed.
+- Hover over the status in cards/details to see the position, number waiting,
+  currently active movie and explanation that position 1 is next to start.
+- Use FIFO admission so the displayed queue order matches execution. Cancelled
+  waiting copies leave immediately and remaining positions update live through
+  WebSocket or polling. The active transfer is not counted as a waiting movie.
+
+No receptor script change is required for 4.5.5.
+
 # 4.5.4
 
 - Compare source/destination files before manual copying. When a destination

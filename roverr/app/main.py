@@ -51,8 +51,8 @@ async def broadcast_movies_update():
                 if t_hash and t_hash in progress_data:
                     prog = progress_data[t_hash]
                     movie['copy_progress'] = prog
-                    if prog['status'] == 'copying':
-                        movie['status'] = 'copying'
+                    if prog['status'] in ('copying', 'queued'):
+                        movie['status'] = prog['status']
                         
         from logic import get_torrent_client_status
         await manager.broadcast({
@@ -84,7 +84,7 @@ logger = logging.getLogger("Roverr")
 logger.info("=" * 80)
 logger.info("🚀 ROVERR - MEDIA MANAGER")
 logger.info("=" * 80)
-logger.info(f"📦 Version: 4.5.4")
+logger.info(f"📦 Version: 4.5.5")
 logger.info(f"🔧 Log Level: {logging.getLevelName(logger.getEffectiveLevel())}")
 logger.info("=" * 80)
 
@@ -202,7 +202,10 @@ async def ws_progress_broadcast_task():
                     "type": "copying",
                     "progress": prog.get('percent', 0) / 100.0, # Normalise to 0-1
                     "speed": prog.get('speed', 0),
-                    "state": prog.get('status', 'copying')
+                    "state": prog.get('status', 'copying'),
+                    "queue_position": prog.get('queue_position'),
+                    "queue_total": prog.get('queue_total'),
+                    "active_copy": prog.get('active_copy', '')
                 }
             
             # Detect completion
@@ -328,7 +331,7 @@ def api_get_torrents():
             prog = progress_data[t['hash']]
             t['copy_progress'] = prog
             # Override status if copying
-            if prog['status'] == 'copying':
+            if prog['status'] in ('copying', 'queued'):
                 t['status'] = 'copying'
             
     return torrents
@@ -401,8 +404,8 @@ def get_movies():
                 prog = progress_data[t_hash]
                 movie['copy_progress'] = prog
                 # Force status to 'copying' so the frontend shows the progress bar
-                if prog['status'] == 'copying':
-                    movie['status'] = 'copying'
+                if prog['status'] in ('copying', 'queued'):
+                    movie['status'] = prog['status']
                     logger.info(f"[API Movies] Forcing status to copying for {t_hash}")
     
     if data:
@@ -443,7 +446,7 @@ def get_movie_details_endpoint(torrent_hash: str):
         prog = progress_data[torrent_hash]
         details['copy_progress'] = prog
         # Force status to 'copying' so the frontend shows the progress bar
-        if prog['status'] == 'copying':
+        if prog['status'] in ('copying', 'queued'):
             details['status'] = 'copying'
             
     return details
@@ -1108,8 +1111,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 if t_hash and t_hash in progress_data:
                     prog = progress_data[t_hash]
                     movie['copy_progress'] = prog
-                    if prog['status'] == 'copying':
-                        movie['status'] = 'copying'
+                    if prog['status'] in ('copying', 'queued'):
+                        movie['status'] = prog['status']
                         
         from logic import get_torrent_client_status
         await websocket.send_json({

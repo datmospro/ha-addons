@@ -41,6 +41,20 @@ function getStatusIconAndLabel(status) {
     return icons[status] || { icon: '<i class="fa-solid fa-circle-question"></i>', label: status };
 }
 
+export function getCopyStatusTooltip(status, progress = {}) {
+    if (status === 'queued') {
+        const position = progress.queue_position ? `Posición ${progress.queue_position} de ${progress.queue_total} en la cola. ` : '';
+        const active = progress.active_copy ? `Ahora se está copiando: ${progress.active_copy}. ` : '';
+        return `${position}${active}Solo se copia una película a la vez. La posición 1 es la siguiente en comenzar.`;
+    }
+    if (status === 'copying') return 'La copia está en curso. Las demás películas esperan su turno en la cola.';
+    return '';
+}
+
+export function getQueueLabel(progress = {}) {
+    return progress.queue_position ? `En cola · posición ${progress.queue_position} de ${progress.queue_total}` : 'En cola';
+}
+
 /**
  * Template para barra de progreso
  */

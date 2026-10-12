@@ -15,7 +15,33 @@ COPY_PROGRESS = {} # {hash: {percent: float, speed: float, status: str}}
 STOP_FLAGS = set() # Set of hashes to stop
 RESERVED_SPACE = {} # {dest_path: reserved_bytes} - Track space reserved by active copies
 COPY_LOCK = threading.RLock()
-COPY_SLOT = threading.Semaphore(1)
+from contextlib import contextmanager
+COPY_CONDITION = threading.Condition(COPY_LOCK)
+COPY_WAITING = []
+COPY_ACTIVE = set()
+COPY_NAMES = {}
+
+@contextmanager
+def copy_turn(torrent_hash):
+    """FIFO admission; cancelled waiting jobs leave the queue immediately."""
+    admitted = False
+    try:
+        with COPY_CONDITION:
+            COPY_CONDITION.wait_for(lambda: torrent_hash in STOP_FLAGS or
+                                    (not COPY_ACTIVE and COPY_WAITING and COPY_WAITING[0] == torrent_hash))
+            check_copy_cancelled(torrent_hash)
+            COPY_WAITING.remove(torrent_hash)
+            COPY_ACTIVE.add(torrent_hash)
+            COPY_PROGRESS[torrent_hash]['status'] = 'copying'
+            admitted = True
+        yield
+    finally:
+        with COPY_CONDITION:
+            if torrent_hash in COPY_WAITING:
+                COPY_WAITING.remove(torrent_hash)
+            if admitted:
+                COPY_ACTIVE.discard(torrent_hash)
+            COPY_CONDITION.notify_all()
 COPY_OUTPUTS = {} # Only files created by the active task may be removed.
 COPY_REPLACEMENTS = {} # hash -> [(temporary file, final destination)]
 COPY_DIRECTORIES = {}
@@ -284,7 +310,15 @@ def release_disk_space_reservation(dest_path, reserved_bytes):
         logger.error(f"Error releasing disk space reservation: {e}")
 
 def get_copy_progress():
-    return COPY_PROGRESS
+    with COPY_LOCK:
+        waiting = [h for h in COPY_WAITING if h not in STOP_FLAGS]
+        active_name = COPY_NAMES.get(next(iter(COPY_ACTIVE), None), '')
+        snapshot = {h: dict(progress) for h, progress in list(COPY_PROGRESS.items())}
+        for position, torrent_hash in enumerate(waiting, 1):
+            if torrent_hash in snapshot:
+                snapshot[torrent_hash].update(queue_position=position, queue_total=len(waiting),
+                                              active_copy=active_name)
+        return snapshot
 
 def stop_copy(torrent_hash):
     """Persist a manual hold before signalling an active or queued transfer."""
@@ -296,6 +330,7 @@ def stop_copy(torrent_hash):
         active = torrent_hash in COPY_PROGRESS
         if active:
             STOP_FLAGS.add(torrent_hash)
+            COPY_CONDITION.notify_all()
         return bool(movie or active)
 
 def check_copy_cancelled(torrent_hash):
@@ -552,16 +587,19 @@ def manual_move(torrent_hash, config_ignored=None, automatic=False, decision=Non
             if automatic and movie and movie.copy_paused:
                 return {"success": False, "message": "Copy held for manual start"}
             if torrent_hash in COPY_PROGRESS:
-                return {"success": True, "message": "Copy already queued or running"}
+                return {"success": True, "status": "started", "message": "Copy already queued or running"}
             if not automatic and movie:
                 Movie.update(copy_paused=False).where(Movie.torrent_hash == torrent_hash).execute()
             STOP_FLAGS.discard(torrent_hash)
             COPY_PROGRESS[torrent_hash] = {'percent': 0, 'speed': 0, 'status': 'queued'}
+            COPY_WAITING.append(torrent_hash)
+            COPY_NAMES[torrent_hash] = movie.title if movie else torrent.name
 
         def _move_thread():
             try:
-                with COPY_SLOT:
+                with copy_turn(torrent_hash):
                     check_copy_cancelled(torrent_hash)
+                    COPY_PROGRESS[torrent_hash]['status'] = 'copying'
                     current = inspect_torrent_copy(torrent, settings)
                     if current['fingerprint'] != settings['_copy_fingerprint']:
                         Movie.update(copy_paused=True).where(Movie.torrent_hash == torrent_hash).execute()
@@ -579,6 +617,7 @@ def manual_move(torrent_hash, config_ignored=None, automatic=False, decision=Non
                 Movie._meta.database.close()
                 with COPY_LOCK:
                     COPY_PROGRESS.pop(torrent_hash, None)
+                    COPY_NAMES.pop(torrent_hash, None)
                     STOP_FLAGS.discard(torrent_hash)
                     COPY_OUTPUTS.pop(torrent_hash, None)
                     COPY_DIRECTORIES.pop(torrent_hash, None)

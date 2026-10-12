@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { getProgressClass } from './ui.js';
-import { getStatusClass, getStatusIconAndLabel } from './templates.js';
+import { getStatusClass, getStatusIconAndLabel, getCopyStatusTooltip } from './templates.js';
 
 let socket = null;
 let socketReconnectTimeout = null;
@@ -98,6 +98,7 @@ async function updateRealtimeProgress(progressData) {
                 const { icon: statusIcon, label: statusLabel } = getStatusIconAndLabel(status);
                 overlay.className = `overlay-status ${statusClass}`;
                 overlay.innerHTML = `${statusIcon} ${statusLabel}`;
+                overlay.title = getCopyStatusTooltip(status, p);
             }
         }
         
@@ -111,20 +112,9 @@ async function updateRealtimeProgress(progressData) {
                     const { showMovieDetails } = await import('./movies.js');
                     showMovieDetails(hash);
                 } else {
-                    const percentEl = progressContainer.querySelector('.progress-info span:first-child');
-                    const speedEl = progressContainer.querySelector('.progress-info span:last-child');
-                    const barEl = progressContainer.querySelector('.progress-bar .details-progress-fill');
-                    
-                    const label = p.type === 'copying' ? 'Copying...' : 'Downloading...';
-                    const percent = p.progress * 100;
-                    const percentStr = percent.toFixed(1);
-                    
-                    if (percentEl) percentEl.textContent = `${label} ${percentStr}%`;
-                    if (speedEl) speedEl.textContent = `${p.speed} MB/s`;
-                    if (barEl) {
-                        barEl.style.width = `${percent}%`;
-                        barEl.className = `details-progress-fill ${p.type}`;
-                    }
+                    const { updateProgressUI } = await import('./movies.js');
+                    const type = p.type === 'copying' && p.state === 'queued' ? 'queued' : p.type;
+                    updateProgressUI({ ...p, percent: p.progress * 100, progress: p.progress * 100 }, type);
                 }
             }
         }

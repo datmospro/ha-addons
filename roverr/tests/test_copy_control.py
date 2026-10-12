@@ -59,6 +59,9 @@ class CopyControlTests(unittest.TestCase):
         mover.COPY_OUTPUTS.clear()
         mover.COPY_DIRECTORIES.clear()
         mover.COPY_REPLACEMENTS.clear()
+        mover.COPY_WAITING.clear()
+        mover.COPY_ACTIVE.clear()
+        mover.COPY_NAMES.clear()
 
     def tearDown(self):
         for p in reversed(self.patches):
@@ -484,6 +487,39 @@ class CopyControlTests(unittest.TestCase):
             result = main.batch_copy_movies({'torrent_hashes': ['a']}, Mock())
         self.assertEqual(result['copied'], 0)
         self.assertEqual(result['conflicts'], [{'torrent_hash': 'a'}])
+
+    def test_queue_positions_follow_fifo_and_update_after_cancel(self):
+        for hash in ('a', 'b', 'c', 'd'):
+            self.movie(hash, status='pending', progress=1)
+        entered = threading.Event()
+        release = threading.Event()
+        processed = []
+        def process(qb, torrent, settings):
+            processed.append(torrent.hash)
+            if torrent.hash == 'a':
+                entered.set()
+                release.wait(3)
+        qb = Mock()
+        qb.torrents_info.side_effect = lambda torrent_hashes: [SimpleNamespace(**self.torrent(torrent_hashes))]
+        with patch.object(mover, 'get_qb_client', return_value=qb), patch.object(mover, 'process_single_torrent', side_effect=process):
+            try:
+                mover.manual_move('a')
+                self.assertTrue(entered.wait(2))
+                for hash in ('b', 'c', 'd'):
+                    mover.manual_move(hash)
+                snapshot = mover.get_copy_progress()
+                self.assertEqual([snapshot[h]['queue_position'] for h in ('b', 'c', 'd')], [1, 2, 3])
+                self.assertEqual(snapshot['b']['queue_total'], 3)
+                self.assertEqual(snapshot['b']['active_copy'], 'Film')
+                snapshot['b']['status'] = 'changed'
+                self.assertEqual(mover.COPY_PROGRESS['b']['status'], 'queued')
+                mover.stop_copy('c')
+                self.wait_for(lambda: 'c' not in mover.COPY_PROGRESS)
+                self.assertEqual(mover.get_copy_progress()['d']['queue_position'], 2)
+            finally:
+                release.set()
+            self.wait_for(lambda: not mover.COPY_PROGRESS)
+        self.assertEqual(processed, ['a', 'b', 'd'])
 
 
 if __name__ == '__main__':

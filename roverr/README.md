@@ -2,11 +2,11 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Addon-blue.svg)](https://www.home-assistant.io/)
-[![Version](https://img.shields.io/badge/version-4.5.4-green.svg)](https://github.com/datmospro/ha-addons)
+[![Version](https://img.shields.io/badge/version-4.5.5-green.svg)](https://github.com/datmospro/ha-addons)
 
 **Your personal media manager for Home Assistant.** Automate the organization of downloaded movies from your torrent client to your media server library (Jellyfin, Emby, Kodi, Plex, etc.).
 
-See [CHANGELOG.md](CHANGELOG.md) for the 4.5.4 upgrade instructions, including
+See [CHANGELOG.md](CHANGELOG.md) for the 4.5.5 upgrade instructions, including
 manual recovery of completed downloads and the remote Receptor script update.
 
 ---
