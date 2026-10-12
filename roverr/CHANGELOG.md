@@ -1,3 +1,13 @@
+# 4.5.9
+
+- Unify dashboard and details status labels in Spanish. Distinguish stopped
+  copies, destination conflicts and recovery from ordinary pending work.
+- Show the reason in the movie details as well as the dashboard tooltip, with
+  contextual Resume, Review destination and Retry copy buttons.
+- Refresh details when the reason or manual hold changes even if the internal
+  scheduler status stays the same. Preserve live recovery and queue tooltips.
+- Keep scheduler states and persistent queue semantics unchanged.
+
 # 4.5.8
 
 - Persist copy jobs, their FIFO order, source/path snapshot and confirmed

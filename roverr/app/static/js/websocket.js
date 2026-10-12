@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { getProgressClass } from './ui.js';
-import { getStatusClass, getStatusIconAndLabel, getCopyStatusTooltip } from './templates.js';
+import { getCopyStatusTooltip, getMovieStatus } from './templates.js';
 
 let socket = null;
 let socketReconnectTimeout = null;
@@ -49,7 +49,7 @@ export function connectWebSocket() {
                 renderMovieCards(data.movies || []);
                 const details = document.getElementById('movie-details-content');
                 const current = (data.movies || []).find(movie => movie.torrent_hash === details?.dataset.hash);
-                if (current && details.dataset.status !== current.status) {
+                if (current && (details.dataset.status !== current.status || details.dataset.statusInfo !== JSON.stringify([current.copy_paused, current.copy_pause_reason, current.status_reason]))) {
                     const { getCurrentView } = await import('./navigation.js');
                     if (getCurrentView() === 'movie-details') {
                         const { showMovieDetails } = await import('./movies.js');
@@ -105,7 +105,7 @@ async function updateRealtimeProgress(progressData) {
         if (!progress) return movie;
         const status = progress.type === 'copying'
             ? (progress.state === 'queued' ? 'queued' : 'copying') : 'downloading';
-        return { ...movie, status };
+        return { ...movie, status, copy_progress: progress.type === 'copying' ? progress : undefined };
     }));
 
     const { getCurrentView } = await import('./navigation.js');
@@ -129,8 +129,8 @@ async function updateRealtimeProgress(progressData) {
             const overlay = card.querySelector('.overlay-status');
             if (overlay) {
                 const status = p.type === 'copying' ? (p.state === 'queued' ? 'queued' : 'copying') : (p.state === 'downloading' ? 'downloading' : 'new');
-                const statusClass = getStatusClass(status);
-                const { icon: statusIcon, label: statusLabel } = getStatusIconAndLabel(status);
+                const statusClass = getMovieStatus({ status, copy_progress: p }).cssClass;
+                const { icon: statusIcon, label: statusLabel } = getMovieStatus({ status, copy_progress: p });
                 overlay.className = `overlay-status ${statusClass}`;
                 overlay.innerHTML = `${statusIcon} ${statusLabel}`;
                 overlay.title = getCopyStatusTooltip(status, p);

@@ -652,7 +652,9 @@ def sync_movies(torrents, api_key):
                                  
                          elif history.status == 'cancelled': movie.status = 'pending'
                          elif history.status == 'receptor_offline': movie.status = 'receptor_offline'
-                         elif history.status == 'error': movie.status = 'error'
+                         elif history.status == 'error':
+                             movie.status = 'error'
+                             movie.status_reason = history.message
                          elif history.status == 'skipped': movie.status = 'skipped'
                     else:
                         # 3. No history and not downloading -> Pending or Error
@@ -1335,6 +1337,9 @@ def get_movie_details(torrent_hash, api_key):
                         "backdrop_url": movie.backdrop_path,
                         "cast": json.loads(movie.cast) if movie.cast else [],
                         "crew": json.loads(movie.crew) if movie.crew else [],
+                        "copy_paused": movie.copy_paused,
+                        "copy_pause_reason": movie.copy_pause_reason,
+                        "status_reason": movie.status_reason,
                         "status": movie.status,  # Preserve original status (e.g., 'new')
                         "torrent_hash": torrent_hash,
                         "size": movie.size,
@@ -1744,6 +1749,7 @@ def get_movie_details(torrent_hash, api_key):
         movie_details.update({
             "status_reason": movie.status_reason if movie else None,
             "copy_paused": movie.copy_paused if movie else False,
+            "copy_pause_reason": movie.copy_pause_reason if movie else None,
             "torrent_name": t.name,
             "torrent_hash": t.hash,
             "size": t.size,

@@ -11,7 +11,7 @@ import {
     searchIndexers, addTorrent
 } from './api.js';
 import { showToast, formatBytes, getProgressClass, escapeHtml, openModal, closeModal, updateTorrentClientAlert } from './ui.js';
-import { getStatusClass, getStatusIconAndLabel, getCopyStatusTooltip, getQueueLabel } from './templates.js';
+import { getStatusClass, getCopyStatusTooltip, getQueueLabel, getMovieStatus } from './templates.js';
 import { switchView, getCurrentView } from './navigation.js';
 
 /**
@@ -177,8 +177,8 @@ export function renderMovieCards(movies) {
 
     movies.forEach(movie => {
         let card = existingCards.get(movie.torrent_hash);
-        const { icon: statusIcon, label: statusLabel } = getStatusIconAndLabel(movie.status);
-        const statusClass = getStatusClass(movie.status);
+        const { icon: statusIcon, label: statusLabel } = getMovieStatus(movie);
+        const statusClass = getMovieStatus(movie).cssClass;
 
         // Use poster_updated timestamp for cache-busting (only changes when poster updates)
         const cacheKey = movie.poster_updated || movie.torrent_hash.substring(0, 8);
@@ -222,7 +222,7 @@ function updateMovieCard(card, movie, posterSrc, statusClass, statusIcon, status
     overlay.className = `overlay-status ${statusClass}`;
     overlay.innerHTML = `${statusIcon} ${statusLabel}`;
     // Update tooltip for 'new' status with reason
-    const tooltip = getCopyStatusTooltip(movie.status, movie.copy_progress) || (['new', 'pending', 'error'].includes(movie.status) && movie.status_reason);
+    const tooltip = getMovieStatus(movie).reason;
     if (tooltip) {
         overlay.setAttribute('title', tooltip);
     } else {
@@ -269,7 +269,7 @@ function createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel)
         <input type="checkbox" class="movie-card-checkbox">
         <div class="poster-wrapper">
             <img src="${posterSrc}" alt="${escapeHtml(movie.title)}" loading="lazy" onerror="this.onerror=null; this.src='posters/placeholder_unidentified.png';">
-            <div class="overlay-status ${statusClass}" title="${escapeHtml(getCopyStatusTooltip(movie.status, movie.copy_progress) || (['new', 'pending', 'error'].includes(movie.status) ? movie.status_reason : '') || '')}">
+            <div class="overlay-status ${statusClass}" title="${escapeHtml(getMovieStatus(movie).reason)}">
                 ${statusIcon} ${statusLabel}
             </div>
         </div>
@@ -376,10 +376,11 @@ export async function showMovieDetails(hash) {
  */
 function renderMovieDetails(container, movie, hash) {
     container.dataset.status = movie.status;
+    container.dataset.statusInfo = JSON.stringify([movie.copy_paused, movie.copy_pause_reason, movie.status_reason]);
     console.log('renderMovieDetails called with movie:', movie.title, 'country_code:', movie.country_code);
     const runtime = movie.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m` : 'N/A';
-    const { icon: statusIcon, label: statusLabel } = getStatusIconAndLabel(movie.status);
-    const statusClass = getStatusClass(movie.status);
+    const { icon: statusIcon, label: statusLabel } = getMovieStatus(movie);
+    const statusClass = getMovieStatus(movie).cssClass;
     const defaultAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2364748b'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
 
     const castHTML = movie.cast && movie.cast.length > 0 ? movie.cast.map(person => `
@@ -425,12 +426,12 @@ function renderMovieDetails(container, movie, hash) {
                 <button class="btn secondary back-to-dashboard"><i class="fa-solid fa-arrow-left"></i> Back</button>
             </div>
             <div class="movie-action-bar">
-                ${movie.status !== 'moved' && !['copying', 'queued'].includes(movie.status) && movie.status !== 'receptor_offline' ?
-            `<button class="btn primary move-now-btn" data-hash="${movie.torrent_hash}"><i class="fa-solid fa-play"></i> Move Now</button>` : ''}
+                ${!['moved', 'moved_manually', 'copying', 'queued', 'receptor_offline', 'missing', 'new', 'downloading', 'orphaned'].includes(movie.status) ?
+            `<button class="btn primary move-now-btn" data-hash="${movie.torrent_hash}"><i class="fa-solid fa-play"></i> ${escapeHtml(getMovieStatus(movie).action)}</button>` : ''}
                 ${['copying', 'queued'].includes(movie.status) ?
-            `<button class="btn danger stop-copy-btn" data-hash="${movie.torrent_hash}"><i class="fa-solid fa-stop"></i> Stop Copy</button>` : ''}
+            `<button class="btn danger stop-copy-btn" data-hash="${movie.torrent_hash}"><i class="fa-solid fa-stop"></i> Detener copia</button>` : ''}
                 ${movie.status === 'missing' || movie.status === 'receptor_offline' ?
-            `<button class="btn warning retry-move-btn" data-hash="${hash}"><i class="fa-solid fa-rotate-right"></i> Retry Move</button>` : ''}
+            `<button class="btn warning retry-move-btn" data-hash="${hash}"><i class="fa-solid fa-rotate-right"></i> Reintentar copia</button>` : ''}
                 <button class="btn secondary identify-btn" data-hash="${hash}"><i class="fa-solid fa-magnifying-glass"></i> Identify Manually</button>
                 <button class="btn secondary manual-search-btn" data-hash="${hash}"><i class="fa-solid fa-globe"></i> Manual Search</button>
                 <button class="btn danger delete-movie-btn" data-hash="${hash}"><i class="fa-solid fa-trash"></i> Remove from Dashboard</button>
@@ -448,7 +449,7 @@ function renderMovieDetails(container, movie, hash) {
                 
                 
                 <div class="meta-row">
-                    <span class="badge status ${statusClass}" title="${escapeHtml(getCopyStatusTooltip(movie.status, movie.copy_progress) || (['new', 'pending', 'error'].includes(movie.status) ? movie.status_reason : '') || '')}">${statusIcon} ${statusLabel}</span>
+                    <span class="badge status ${statusClass}" title="${escapeHtml(getMovieStatus(movie).reason)}">${statusIcon} ${statusLabel}</span>
                     ${movie.source_tag ? `<span class="badge source-tag" style="background: rgba(255, 107, 107, 0.15); color: #ff6b6b; border: 1px solid rgba(255, 107, 107, 0.3); font-weight: 600;"><i class="fa-solid fa-film"></i> ${escapeHtml(movie.source_tag)}</span>` : ''}
                     <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
                     <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${movie.size > 0 ? formatBytes(movie.size) : 'N/A'}</span>
@@ -456,10 +457,11 @@ function renderMovieDetails(container, movie, hash) {
                     <button class="badge trailer-badge" data-hash="${hash}" title="Trailer" aria-label="Play YouTube trailer"><i class="fa-brands fa-youtube"></i></button>
                 </div>
                 
+                <div class="movie-status-reason" role="status" style="margin: 1rem 0; padding: 1rem; border: 1px solid var(--border); border-radius: 8px;" ${getMovieStatus(movie).reason ? '' : 'hidden'}>${escapeHtml(getMovieStatus(movie).reason)}</div>
                 ${['copying', 'queued'].includes(movie.status) && movie.copy_progress ? `
                 <div class="details-progress-container">
                     <div class="progress-info">
-                        <span>${movie.status === 'queued' ? getQueueLabel(movie.copy_progress) : `Copying... ${movie.copy_progress.percent}%`}</span>
+                        <span>${movie.status === 'queued' ? getQueueLabel(movie.copy_progress) : `Copiando... ${movie.copy_progress.percent}%`}</span>
                         <span>${movie.status === 'queued' ? 'Esperando turno' : `${movie.copy_progress.speed} MB/s`}</span>
                     </div>
                     <div class="progress-bar large">
@@ -470,7 +472,7 @@ function renderMovieDetails(container, movie, hash) {
                 ${movie.status === 'downloading' && movie.download_stats ? `
                 <div class="details-progress-container">
                     <div class="progress-info">
-                        <span>Downloading... ${movie.download_stats.progress.toFixed(1)}%</span>
+                        <span>Descargando... ${movie.download_stats.progress.toFixed(1)}%</span>
                         <span>${movie.download_stats.speed} MB/s</span>
                     </div>
                     <div class="progress-bar large">
@@ -717,10 +719,12 @@ export function updateProgressUI(progress, type) {
     const badge = document.querySelector('#movie-details-content .badge.status');
     if (badge && ['copying', 'queued'].includes(type)) {
         document.getElementById('movie-details-content').dataset.status = type;
-        const { icon, label } = getStatusIconAndLabel(type);
+        const { icon, label } = getMovieStatus({ status: type, copy_progress: progress });
         badge.className = `badge status ${getStatusClass(type)}`;
         badge.innerHTML = `${icon} ${label}`;
         badge.title = getCopyStatusTooltip(type, progress);
+        const reason = document.querySelector('#movie-details-content .movie-status-reason');
+        if (reason) { reason.textContent = badge.title; reason.hidden = !badge.title; }
     }
     if (type === 'queued') {
         if (percentEl) percentEl.textContent = getQueueLabel(progress);
@@ -728,7 +732,7 @@ export function updateProgressUI(progress, type) {
         if (barEl) barEl.style.width = '0%';
         return;
     }
-    const label = type === 'copying' ? 'Copying...' : 'Downloading...';
+    const label = type === 'copying' ? 'Copiando...' : 'Descargando...';
     const percent = type === 'copying' ? progress.percent : progress.progress.toFixed(1);
 
     if (percentEl) percentEl.textContent = `${label} ${percent}%`;
