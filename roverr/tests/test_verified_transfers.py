@@ -23,12 +23,14 @@ class VerifiedTransferTests(unittest.TestCase):
         self.final = self.base / 'library' / 'Film (2026).mkv'
         self.final.parent.mkdir()
         self.part = Path(str(self.final) + '.roverr-a.part')
+        mover.QUEUE_PAUSED.clear()
         mover.COPY_PROGRESS.clear()
         mover.COPY_OUTPUTS.clear()
         mover.COPY_REPLACEMENTS.clear()
         mover.STOP_FLAGS.clear()
 
     def tearDown(self):
+        mover.QUEUE_PAUSED.clear()
         mover.COPY_PROGRESS.clear()
         mover.COPY_OUTPUTS.clear()
         mover.COPY_REPLACEMENTS.clear()
@@ -155,6 +157,69 @@ class VerifiedTransferTests(unittest.TestCase):
         self.assertEqual(remote.TASKS['a']['status'],'error')
         self.assertEqual(self.final.read_bytes(),b'old')
         self.assertFalse(self.part.exists())
+
+    def test_receptor_pause_resume_http_preserves_active_partial(self):
+        from http.server import HTTPServer
+        import threading
+        import time
+        import requests
+        remote=self.load_receptor()
+        remote.MAX_SPEED_MBPS=2
+        self.source.write_bytes(b'x'*(3*1024*1024))
+        self.final.write_bytes(b'old')
+        comparison=remote.inspect_files(str(self.source),str(self.final.parent),'Film (2026)')
+        task=remote.CopyTaskHandler('a',str(self.source),str(self.final.parent),'Film (2026)',True,comparison['fingerprint'],True)
+        server=HTTPServer(('127.0.0.1',0),remote.ReceptorServer)
+        worker=threading.Thread(target=server.serve_forever,daemon=True)
+        worker.start()
+        task.start()
+        base=f'http://127.0.0.1:{server.server_port}'
+        try:
+            deadline=time.monotonic()+3
+            while not self.part.exists() and time.monotonic()<deadline:time.sleep(.01)
+            self.assertEqual(requests.post(base+'/pause/a',timeout=5).status_code,200)
+            deadline=time.monotonic()+3
+            while remote.TASKS['a'].get('phase')!='paused' and time.monotonic()<deadline:time.sleep(.01)
+            self.assertEqual(remote.TASKS['a']['phase'],'paused')
+            size=self.part.stat().st_size
+            time.sleep(.15)
+            self.assertEqual(self.part.stat().st_size,size)
+            self.assertEqual(self.final.read_bytes(),b'old')
+            self.assertEqual(requests.post(base+'/resume/a',timeout=5).status_code,200)
+            task.join(timeout=5)
+            self.assertFalse(task.is_alive())
+            self.assertTrue(remote.TASKS['a']['verified'])
+            self.assertEqual(self.final.read_bytes(),self.source.read_bytes())
+        finally:
+            remote.PAUSE_FLAGS.discard('a')
+            remote.STOP_FLAGS.add('a')
+            task.join(timeout=5)
+            server.shutdown();server.server_close();worker.join(timeout=5)
+
+    def test_receptor_stop_of_initially_paused_retry_removes_saved_partial(self):
+        import time
+        remote=self.load_receptor()
+        self.seed()
+        self.final.write_bytes(b'old')
+        comparison=remote.inspect_files(str(self.source),str(self.final.parent),'Film (2026)')
+        task=remote.CopyTaskHandler('a',str(self.source),str(self.final.parent),'Film (2026)',True,comparison['fingerprint'],True)
+        remote.PAUSE_FLAGS.add('a')
+        task.start()
+        try:
+            deadline=time.monotonic()+3
+            while remote.TASKS['a'].get('phase')!='paused' and time.monotonic()<deadline:time.sleep(.01)
+            self.assertEqual(remote.TASKS['a']['phase'],'paused')
+            self.assertTrue(self.part.exists())
+            remote.STOP_FLAGS.add('a')
+            task.join(timeout=3)
+            self.assertEqual(remote.TASKS['a']['status'],'cancelled')
+            self.assertFalse(self.part.exists())
+            self.assertFalse(Path(str(self.part)+'.json').exists())
+            self.assertEqual(self.final.read_bytes(),b'old')
+        finally:
+            remote.PAUSE_FLAGS.discard('a')
+            remote.STOP_FLAGS.add('a')
+            task.join(timeout=3)
 
     def test_remote_cleanup_removes_only_owned_partials_and_rejects_escape(self):
         from http.server import HTTPServer

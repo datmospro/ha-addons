@@ -11,5 +11,6 @@ export function translateMessage(message) {
         .replace(/Permission denied/g, 'Permiso denegado')
         .replace(/File not found in /g, 'Archivo no encontrado en ')
         .replace(/Invalid name format/g, 'El nombre del archivo no tiene un formato válido')
-        .replace(/Receptor offline/g, 'Receptor desconectado');
+        .replace(/Receptor offline/g, 'Receptor desconectado')
+        .replace(/Copy stopped by user/g, 'Copia detenida por el usuario');
 }

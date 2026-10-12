@@ -36,6 +36,10 @@ class CopyJob(BaseModel):
     created_at = DateTimeField(default=datetime.datetime.now)
     updated_at = DateTimeField(default=datetime.datetime.now)
 
+class CopyQueueControl(BaseModel):
+    id = IntegerField(primary_key=True, default=1)
+    paused = BooleanField(default=False)
+
 class Movie(BaseModel):
     class Meta:
         # Background metadata writers may hold an older Movie instance. They
@@ -131,7 +135,7 @@ def migrate_db():
 def init_db():
     db.connect()
     db.execute_sql('PRAGMA busy_timeout = 5000')  # Wait up to 5 seconds if database is locked
-    db.create_tables([MoveHistory, Movie, CopyJob])
+    db.create_tables([MoveHistory, Movie, CopyJob, CopyQueueControl])
     migrate_db()  # Run migration after creating tables
 
 def backup_database():

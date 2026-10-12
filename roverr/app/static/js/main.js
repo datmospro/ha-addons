@@ -4,9 +4,10 @@
  * Reemplaza app.js - líneas 23-44 (DOMContentLoaded)
  */
 
+import { initCopyQueue } from './copy-queue.js';
 import { initUI } from './ui.js';
 import { initNavigation } from './navigation.js';
-import { initDashboard, fetchTorrents, startDashboardAutoRefresh } from './dashboard.js';
+import { initDashboard, fetchTorrents, startDashboardAutoRefresh, stopDashboardAutoRefresh } from './dashboard.js';
 import { initSearch } from './search.js';
 import { initSettings, loadSettings } from './settings.js';
 import { initMovies, fetchMovies } from './movies.js';
@@ -44,6 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('✓ Settings initialized');
 
         initMovies();
+        initCopyQueue();
         console.log('✓ Movies initialized');
 
         // 3. Load initial data
@@ -72,7 +74,6 @@ document.addEventListener('DOMContentLoaded', async () => {
  * Cleanup on page unload
  */
 window.addEventListener('beforeunload', () => {
-    const { stopDashboardAutoRefresh } = require('./dashboard.js');
     stopDashboardAutoRefresh();
 });
 

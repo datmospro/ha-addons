@@ -740,7 +740,7 @@ export function updateProgressUI(progress, type) {
     if (badge && ['copying', 'queued'].includes(type)) {
         document.getElementById('movie-details-content').dataset.status = type;
         const { icon, label } = getMovieStatus({ status: type, copy_progress: progress });
-        badge.className = `badge status ${getStatusClass(type)}`;
+        badge.className = `badge status ${getMovieStatus({status:type,copy_progress:progress}).cssClass}`;
         badge.innerHTML = `${icon} ${label}`;
         badge.title = getCopyStatusTooltip(type, progress);
         const reason = document.querySelector('#movie-details-content .movie-status-reason');

@@ -1,3 +1,25 @@
+# 4.5.13
+
+- Add an activity panel showing the active transfer, progress, speed, approximate
+  remaining transfer time, FIFO positions and recent results. Verification
+  remains separate from the transfer time estimate.
+- Pause/resume the whole copy queue, including the active local or remote copy,
+  at block boundaries without deleting owned partial files. Persist the pause
+  in SQLite and restore it before admitting work after a restart.
+- Reorder waiting copies with Up, Down and Move first. Save their order and
+  update workers atomically without interrupting the active transfer.
+- Stop remains distinct: it works during pause and removes incomplete files.
+- Require receptor 4.5.13 for pause/resume support. The activity response does
+  not expose saved options or credentials.
+
+Validated with 96 backend regressions, including local/remote pause and resume,
+stop during pause, completion races, persisted FIFO changes and restoration
+of a paused queue in a separate process. Browser tests cover activity, ETA,
+queue controls and mobile layout.
+
+Restart the updated PC receptor when existing transfers finish, then update
+the addon. A paused queue stays paused until Resume queue is pressed.
+
 # 4.5.12
 
 - Resume an interrupted staged transfer only after matching its saved source

@@ -29,8 +29,8 @@ class CopyControlTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.base = Path(self.temp.name)
         self.db = SqliteDatabase(str(self.base / 'history.db'))
-        self.db.bind([database.Movie, database.MoveHistory, database.CopyJob])
-        self.db.create_tables([database.Movie, database.MoveHistory, database.CopyJob])
+        self.db.bind([database.Movie, database.MoveHistory, database.CopyJob, database.CopyQueueControl])
+        self.db.create_tables([database.Movie, database.MoveHistory, database.CopyJob, database.CopyQueueControl])
         self.settings = {
             'local_source_path': str(self.base / 'source'),
             'local_dest_path': str(self.base / 'library'),
@@ -54,6 +54,7 @@ class CopyControlTests(unittest.TestCase):
         ]
         for p in self.patches:
             p.start()
+        mover.QUEUE_PAUSED.clear()
         mover.COPY_PROGRESS.clear()
         mover.STOP_FLAGS.clear()
         mover.COPY_OUTPUTS.clear()
@@ -843,6 +844,194 @@ class CopyControlTests(unittest.TestCase):
             stop.assert_called_once()
         self.assertEqual(database.CopyJob.get_by_id(job.id).state,'cancelled')
 
+    def test_queue_pause_blocks_admission_and_is_persisted(self):
+        self.movie(status='pending',progress=1)
+        job=self.saved_job()
+        mover.set_copy_queue_paused(True)
+        entered=threading.Event()
+        def worker():
+            try:
+                with mover.copy_turn('a'):entered.set()
+            finally:database.Movie._meta.database.close()
+        mover.register_copy_job(job)
+        thread=threading.Thread(target=worker)
+        thread.start()
+        try:
+            self.assertFalse(entered.wait(.15))
+            self.assertTrue(database.CopyQueueControl.get_by_id(1).paused)
+            snapshot=mover.get_copy_queue_snapshot()
+            self.assertTrue(snapshot['paused'])
+            self.assertEqual(snapshot['entries'][0]['queue_position'],1)
+            mover.set_copy_queue_paused(False)
+            self.assertTrue(entered.wait(2))
+        finally:
+            mover.QUEUE_PAUSED.clear()
+            with mover.COPY_CONDITION:mover.COPY_CONDITION.notify_all()
+            thread.join(timeout=3)
+
+    def test_pause_active_local_copy_preserves_partial_and_resumes(self):
+        self.movie(status='pending',progress=1)
+        source=Path(self.settings['local_source_path'])/'Film (2026).mkv'
+        source.write_bytes(b'x'*(3*1024*1024))
+        self.settings['copy_speed_limit']=2
+        with self.fake_qb():
+            mover.manual_move('a')
+            self.wait_for(lambda:bool(list(Path(self.settings['local_dest_path']).rglob('*.part'))))
+            mover.set_copy_queue_paused(True)
+            try:
+                self.wait_for(lambda:mover.COPY_PROGRESS.get('a',{}).get('phase')=='paused')
+                partial=next(Path(self.settings['local_dest_path']).rglob('*.part'))
+                size=partial.stat().st_size
+                time.sleep(.15)
+                self.assertEqual(partial.stat().st_size,size)
+                self.assertGreater(size,0)
+                self.assertFalse(partial.with_name('Film (2026).mkv').exists())
+                self.assertEqual(mover.get_copy_queue_snapshot()['entries'][0]['phase'],'paused')
+            finally:mover.set_copy_queue_paused(False)
+            self.wait_for(lambda:not mover.COPY_PROGRESS)
+        destination=Path(self.settings['local_dest_path'])/'Film (2026)'/'Film (2026).mkv'
+        self.assertEqual(destination.read_bytes(),source.read_bytes())
+        self.assertEqual(database.CopyJob.get(database.CopyJob.torrent_hash=='a').state,'completed')
+
+    def test_stop_remains_responsive_while_local_copy_is_paused(self):
+        self.movie(status='pending',progress=1)
+        source=Path(self.settings['local_source_path'])/'Film (2026).mkv'
+        source.write_bytes(b'x'*(3*1024*1024))
+        self.settings['copy_speed_limit']=2
+        with self.fake_qb():
+            mover.manual_move('a')
+            self.wait_for(lambda:bool(list(Path(self.settings['local_dest_path']).rglob('*.part'))))
+            mover.set_copy_queue_paused(True)
+            try:
+                self.wait_for(lambda:mover.COPY_PROGRESS.get('a',{}).get('phase')=='paused')
+                mover.stop_copy('a')
+                self.wait_for(lambda:not mover.COPY_PROGRESS)
+                self.assertFalse(list(Path(self.settings['local_dest_path']).rglob('*.part')))
+                self.assertEqual(database.CopyJob.get(database.CopyJob.torrent_hash=='a').state,'cancelled')
+            finally:mover.set_copy_queue_paused(False)
+
+    def test_priority_changes_memory_and_saved_fifo_order(self):
+        for hash_value in ('a','b','c'):
+            self.movie(hash_value,status='pending',progress=1)
+            mover.register_copy_job(self.saved_job(hash_value))
+        snapshot=mover.change_copy_priority('c','first')
+        self.assertEqual(mover.COPY_WAITING,['c','a','b'])
+        self.assertEqual([entry['torrent_hash'] for entry in snapshot['entries']],['c','a','b'])
+        self.assertEqual([job.torrent_hash for job in database.CopyJob.select().order_by(database.CopyJob.queue_order)],['c','a','b'])
+        mover.change_copy_priority('a','down')
+        self.assertEqual(mover.COPY_WAITING,['c','b','a'])
+        mover.COPY_ACTIVE.add('c')
+        with self.assertRaises(ValueError):mover.change_copy_priority('c','down')
+        mover.COPY_ACTIVE.clear()
+        with self.assertRaises(ValueError):mover.change_copy_priority('missing','first')
+
+    def test_pause_and_priority_survive_independent_process_restart(self):
+        import subprocess
+        for hash_value in ('a','b','c'):
+            self.movie(hash_value,status='pending',progress=1)
+            mover.register_copy_job(self.saved_job(hash_value))
+        mover.change_copy_priority('c','first')
+        mover.set_copy_queue_paused(True)
+        self.reset_queue_memory()
+        self.db.close()
+        script="""import sys,time
+sys.path.insert(0,sys.argv[2])
+import database
+from peewee import SqliteDatabase
+db=SqliteDatabase(sys.argv[1]);db.bind([database.Movie,database.MoveHistory,database.CopyJob,database.CopyQueueControl])
+from modules import mover
+mover.load_settings=lambda:{}
+mover.recover_copy_jobs()
+time.sleep(.2)
+assert mover.QUEUE_PAUSED.is_set()
+assert not mover.COPY_ACTIVE
+assert mover.COPY_WAITING==['c','a','b'],mover.COPY_WAITING
+assert all(job.state=='queued' for job in database.CopyJob.select())
+assert mover.get_copy_queue_snapshot()['paused']
+print('PAUSED_ORDER_RESTORED')
+"""
+        child=subprocess.run([sys.executable,'-c',script,self.db.database,str(ROOT/'app')],capture_output=True,text=True,timeout=10)
+        self.assertEqual(child.returncode,0,child.stderr)
+        self.assertIn('PAUSED_ORDER_RESTORED',child.stdout)
+        mover.set_copy_queue_paused(False)
+
+    def test_paused_order_restores_without_dispatch_after_restart(self):
+        for hash_value in ('a','b','c'):
+            self.movie(hash_value,status='pending',progress=1)
+            mover.register_copy_job(self.saved_job(hash_value))
+        mover.change_copy_priority('c','first')
+        mover.set_copy_queue_paused(True)
+        self.reset_queue_memory()
+        mover.QUEUE_PAUSED.clear()
+        with patch.object(mover.threading,'Thread') as spawn:
+            mover.recover_copy_jobs()
+        self.assertTrue(mover.QUEUE_PAUSED.is_set())
+        self.assertEqual(mover.COPY_WAITING,['c','a','b'])
+        self.assertEqual(spawn.call_count,3)
+        mover.set_copy_queue_paused(False)
+
+    def test_queue_snapshot_exposes_eta_but_not_saved_options(self):
+        self.movie(status='pending',progress=1)
+        job=self.saved_job()
+        mover.register_copy_job(job)
+        mover.COPY_ACTIVE.add('a')
+        mover.COPY_WAITING.remove('a')
+        mover.COPY_PROGRESS['a'].update(status='copying',percent=25,speed=2,file_size=8*1024*1024,copied_bytes=2*1024*1024)
+        snapshot=mover.get_copy_queue_snapshot()
+        self.assertEqual(snapshot['entries'][0]['eta_seconds'],3)
+        self.assertNotIn('options_json',str(snapshot))
+        mover.COPY_PROGRESS['a']['phase']='verifying'
+        self.assertIsNone(mover.get_copy_queue_snapshot()['entries'][0]['eta_seconds'])
+        mover.COPY_ACTIVE.clear()
+
+    def test_pause_racing_remote_completion_does_not_block_final_status(self):
+        self.movie(status='pending',progress=1)
+        torrent=SimpleNamespace(**self.torrent('a'))
+        mover.QUEUE_PAUSED.set()
+        finished=Mock(status_code=200)
+        finished.json.return_value={'status':'done'}
+        inactive=Mock(status_code=404)
+        inactive.raise_for_status.side_effect=AssertionError('Read final status instead of rejecting an inactive pause')
+        with patch.object(mover.requests,'post',return_value=inactive),patch.object(mover.requests,'get',return_value=finished),patch.object(mover.time,'sleep'):
+            mover._poll_receptor_status(torrent,'localhost',8095,'src','dst',self.settings,'Film','2026')
+        self.assertEqual(database.MoveHistory.select().get().status,'success')
+        mover.QUEUE_PAUSED.clear()
+
+    def test_queue_controls_reject_bad_payloads_and_old_active_receptor(self):
+        self.assertFalse(main.pause_copy_queue_endpoint({'paused':'yes'})['success'])
+        self.assertFalse(main.prioritize_copy_endpoint({'torrent_hash':'a','direction':'bad'})['success'])
+        self.movie(status='pending',progress=1)
+        job=self.saved_job(remote=True)
+        mover.COPY_ACTIVE.add('a')
+        old=Mock(status_code=200)
+        old.json.return_value={'version':'4.5.12'}
+        with patch.object(mover.requests,'get',return_value=old):
+            result=main.pause_copy_queue_endpoint({'paused':True})
+        self.assertFalse(result['success'])
+        self.assertIn('4.5.13',result['message'])
+        self.assertFalse(mover.QUEUE_PAUSED.is_set())
+        mover.COPY_ACTIVE.clear()
+
+    def test_activity_tolerates_an_unreadable_terminal_job(self):
+        self.movie(status='pending',progress=1)
+        job=self.saved_job()
+        database.CopyJob.update(state='error',torrent_json='broken json').where(database.CopyJob.id==job.id).execute()
+        snapshot=mover.get_copy_queue_snapshot()
+        self.assertEqual(snapshot['recent'][0]['torrent_hash'],'a')
+
+    def test_stopped_paused_remote_task_does_not_send_another_pause(self):
+        self.movie(status='pending',progress=1)
+        torrent=SimpleNamespace(**self.torrent('a'))
+        mover.QUEUE_PAUSED.set()
+        mover.STOP_FLAGS.add('a')
+        response=Mock(status_code=200)
+        response.json.return_value={'status':'cancelled'}
+        with patch.object(mover.requests,'post',return_value=Mock(status_code=200)) as control,patch.object(mover.requests,'get',return_value=response):
+            mover._poll_receptor_status(torrent,'localhost',8095,'src','dst',self.settings,'Film','2026')
+        self.assertEqual(control.call_count,1)
+        self.assertTrue(control.call_args.args[0].endswith('/stop/a'))
+        mover.QUEUE_PAUSED.clear()
+
     def test_resume_space_reservation_credits_existing_owned_partial(self):
         source=Path(self.settings['local_source_path'])/'Film (2026).mkv'
         source.write_bytes(b'x'*100)
@@ -1020,7 +1209,7 @@ class CopyControlTests(unittest.TestCase):
 sys.path.insert(0,sys.argv[2])
 import database
 from peewee import SqliteDatabase
-db=SqliteDatabase(sys.argv[1]);db.bind([database.Movie,database.MoveHistory,database.CopyJob])
+db=SqliteDatabase(sys.argv[1]);db.bind([database.Movie,database.MoveHistory,database.CopyJob,database.CopyQueueControl])
 from modules import mover
 mover.load_settings=lambda:{'telegram_notify_on_move':False}
 original=mover.verify_copy
@@ -1054,7 +1243,7 @@ sys.path.insert(0,sys.argv[2])
 import database
 from peewee import SqliteDatabase
 db=SqliteDatabase(sys.argv[1])
-db.bind([database.Movie,database.MoveHistory,database.CopyJob])
+db.bind([database.Movie,database.MoveHistory,database.CopyJob,database.CopyQueueControl])
 from modules import mover
 mover.load_settings=lambda:{'telegram_notify_on_move':False}
 mover.recover_copy_jobs()

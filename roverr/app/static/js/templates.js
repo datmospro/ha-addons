@@ -12,6 +12,7 @@ import { escapeHtml, formatBytes, formatDate, getProgressClass } from './ui.js';
  */
 function getStatusClass(status) {
     if (['blocked', 'conflict'].includes(status)) return 'error';
+    if (status === 'paused') return 'pending';
     if (status === 'stopped') return 'skipped';
     if (['recovering', 'verifying', 'validating_resume'].includes(status)) return 'copying';
     if (status === 'moved' || status === 'moved_manually') return 'moved';
@@ -31,6 +32,7 @@ function getStatusIconAndLabel(status) {
         stopped: { icon: '<i class="fa-solid fa-stop"></i>', label: 'Detenida' },
         conflict: { icon: '<i class="fa-solid fa-triangle-exclamation"></i>', label: 'Revisar destino' },
         blocked: { icon: '<i class="fa-solid fa-triangle-exclamation"></i>', label: 'Requiere intervención' },
+        paused: { icon: '<i class="fa-solid fa-pause"></i>', label: 'Copia en pausa' },
         verifying: { icon: '<i class="fa-solid fa-shield-halved"></i>', label: 'Verificando copia' },
         validating_resume: { icon: '<i class="fa-solid fa-spinner fa-spin"></i>', label: 'Comprobando copia parcial' },
         recovering: { icon: '<i class="fa-solid fa-spinner fa-spin"></i>', label: 'Recuperando copia' },
@@ -54,9 +56,11 @@ function getStatusIconAndLabel(status) {
 export function getCopyStatusTooltip(status, progress = {}) {
     if (status === 'queued') {
         const position = progress.queue_position ? `Posición ${progress.queue_position} de ${progress.queue_total} en la cola. ` : '';
-        const active = progress.active_copy ? `Ahora se está copiando: ${progress.active_copy}. ` : '';
-        return `${position}${active}Solo se copia una película a la vez. La posición 1 es la siguiente en comenzar.`;
+        const active = progress.active_copy ? `${progress.queue_paused ? 'Copia activa' : 'Ahora se está copiando'}: ${progress.active_copy}. ` : '';
+        const paused = progress.queue_paused ? 'La cola está pausada. Pulsa Reanudar cola en el panel de actividad para continuar. ' : '';
+        return `${paused}${position}${active}Solo se copia una película a la vez. La posición 1 es la siguiente en comenzar.`;
     }
+    if (status === 'copying' && progress.phase === 'paused') return 'La copia está pausada y conserva el archivo parcial. Pulsa Reanudar cola en el panel de actividad para continuar.';
     if (status === 'copying' && progress.recovering) return 'Recuperando la copia anterior. La cola espera a confirmar el estado del receptor para evitar transferencias duplicadas.';
     if (status === 'copying' && progress.phase === 'verifying') return 'Comprobando el contenido completo del origen y del destino mediante SHA-256. La película se marcará como copiada cuando termine la verificación.';
     if (status === 'copying' && progress.phase === 'validating_resume') return 'Comprobando que el archivo parcial coincide con el origen antes de reanudar la transferencia.';
@@ -112,7 +116,7 @@ export function getMovieStatus(movie) {
     const isDownloadComplete = movie.state !== 'rss' && !['new', 'downloading', 'orphaned'].includes(status)
         && (movie.download_stats ? movie.download_stats.progress >= 100 : (movie.progress == null || movie.progress >= 1));
     if (status === 'copying' && progress.recovering) status = 'recovering';
-    else if (status === 'copying' && ['verifying', 'validating_resume'].includes(progress.phase)) status = progress.phase;
+    else if (status === 'copying' && ['verifying', 'validating_resume', 'paused'].includes(progress.phase)) status = progress.phase;
     else if (!['moved', 'moved_manually', 'copying', 'queued', 'downloading'].includes(status)) {
         if (isDownloadComplete && movie.copy_pause_reason === 'conflict') {
             status = 'conflict';

@@ -8,7 +8,7 @@ import requests
 import uuid
 from copy_conflicts import inspect_files
 from verified_copy import prepare_resume, verify_copy, source_identity, remove_resume_metadata
-from database import MoveHistory, Movie, CopyJob
+from database import MoveHistory, Movie, CopyJob, CopyQueueControl
 from peewee import fn
 import json
 import datetime
@@ -29,18 +29,20 @@ COPY_ACTIVE = set()
 COPY_NAMES = {}
 RECOVERY_LOCK = threading.RLock()
 COPY_JOB_CONTEXT = threading.local()
+QUEUE_PAUSED = threading.Event()
 
 def _record_history(**values):
     return MoveHistory.create(copy_job_id=getattr(COPY_JOB_CONTEXT, 'job_id', None), **values)
 
 @contextmanager
-def copy_turn(torrent_hash, allow_stopped=False):
+def copy_turn(torrent_hash, allow_stopped=False, allow_paused=False):
     """FIFO admission; cancelled waiting jobs leave the queue immediately."""
     admitted = False
     try:
         with COPY_CONDITION:
             COPY_CONDITION.wait_for(lambda: (torrent_hash in STOP_FLAGS and not allow_stopped) or
-                                    (not COPY_ACTIVE and COPY_WAITING and COPY_WAITING[0] == torrent_hash))
+                                    (not COPY_ACTIVE and COPY_WAITING and COPY_WAITING[0] == torrent_hash and
+                                     (not QUEUE_PAUSED.is_set() or allow_paused or torrent_hash in STOP_FLAGS)))
             if not allow_stopped:
                 check_copy_cancelled(torrent_hash)
             COPY_WAITING.remove(torrent_hash)
@@ -327,6 +329,8 @@ def get_copy_progress():
         waiting = [h for h in COPY_WAITING if h not in STOP_FLAGS]
         active_name = COPY_NAMES.get(next(iter(COPY_ACTIVE), None), '')
         snapshot = {h: dict(progress) for h, progress in list(COPY_PROGRESS.items())}
+        for value in snapshot.values():
+            value['queue_paused'] = QUEUE_PAUSED.is_set()
         for position, torrent_hash in enumerate(waiting, 1):
             if torrent_hash in snapshot:
                 snapshot[torrent_hash].update(queue_position=position, queue_total=len(waiting),
@@ -360,6 +364,123 @@ def stop_copy(torrent_hash):
         threading.Thread(target=Context().run, args=(run_copy_job, cleanup_job.id), daemon=True).start()
     return result
 
+def wait_for_copy_resume(torrent_hash):
+    """Pause at a block boundary without converting pause into cancellation."""
+    check_copy_cancelled(torrent_hash)
+    started = time.monotonic()
+    previous = None
+    waited = False
+    with COPY_CONDITION:
+        while QUEUE_PAUSED.is_set():
+            check_copy_cancelled(torrent_hash)
+            progress = COPY_PROGRESS.setdefault(torrent_hash, {'status': 'copying'})
+            if not waited:
+                previous = progress.get('phase')
+            progress.update(phase='paused', speed=0)
+            waited = True
+            COPY_CONDITION.wait(timeout=.1)
+        check_copy_cancelled(torrent_hash)
+        if waited and torrent_hash in COPY_PROGRESS:
+            COPY_PROGRESS[torrent_hash]['phase'] = previous
+    return time.monotonic() - started if waited else 0
+
+
+def set_copy_queue_paused(paused):
+    if not isinstance(paused, bool):
+        raise ValueError('El estado de pausa debe ser verdadero o falso')
+    if paused:
+        # An old active receptor cannot honour a pause without deleting its partial.
+        with COPY_LOCK:
+            active_jobs = list(CopyJob.select().where(CopyJob.torrent_hash.in_(list(COPY_ACTIVE)))) if COPY_ACTIVE else []
+        for job in active_jobs:
+            options = json.loads(job.options_json)
+            if options.get('receptor_enabled'):
+                host, port = options.get('receptor_host'), options.get('receptor_port', 8095)
+                response = requests.get(f'http://{host}:{port}/ping', timeout=5)
+                response.raise_for_status()
+                if response.json().get('queue_pause') is not True:
+                    raise ValueError('Actualiza y reinicia el receptor a 4.5.13 antes de pausar una copia activa')
+    with COPY_CONDITION:
+        with CopyQueueControl._meta.database.atomic():
+            CopyQueueControl.insert(id=1, paused=paused).on_conflict_replace().execute()
+        if paused:
+            QUEUE_PAUSED.set()
+        else:
+            QUEUE_PAUSED.clear()
+        COPY_CONDITION.notify_all()
+    trigger_movies_update_callback()
+    return get_copy_queue_snapshot()
+
+
+def change_copy_priority(torrent_hash, direction):
+    if direction not in ('up', 'down', 'first'):
+        raise ValueError('Prioridad no válida')
+    with COPY_CONDITION:
+        with CopyJob._meta.database.atomic():
+            queued = list(CopyJob.select().where((CopyJob.state == 'queued') & (CopyJob.stop_requested == False)).order_by(CopyJob.queue_order, CopyJob.id))
+            hashes = [job.torrent_hash for job in queued if job.torrent_hash not in COPY_ACTIVE]
+            if torrent_hash not in hashes:
+                raise ValueError('Solo se puede cambiar la prioridad de una copia en cola')
+            index = hashes.index(torrent_hash)
+            target = 0 if direction == 'first' else max(0, index-1) if direction == 'up' else min(len(hashes)-1, index+1)
+            hashes.insert(target, hashes.pop(index))
+            for order, hash_value in enumerate(hashes, 1):
+                CopyJob.update(queue_order=order).where(CopyJob.torrent_hash == hash_value).execute()
+        # Restore-running jobs keep precedence; admitted waiting jobs follow saved order.
+        movable = set(hashes)
+        fixed = [hash_value for hash_value in COPY_WAITING if hash_value not in movable]
+        COPY_WAITING[:] = fixed + [hash_value for hash_value in hashes if hash_value in COPY_WAITING]
+        COPY_CONDITION.notify_all()
+    trigger_movies_update_callback()
+    return get_copy_queue_snapshot()
+
+
+def get_copy_queue_snapshot():
+    with COPY_LOCK:
+        control = CopyQueueControl.get_or_none(CopyQueueControl.id == 1)
+        progress = get_copy_progress()
+        active = set(COPY_ACTIVE)
+        jobs = list(CopyJob.select().where(CopyJob.state.in_(('queued', 'running'))).order_by(CopyJob.queue_order, CopyJob.id))
+        movies = {movie.torrent_hash: movie for movie in Movie.select().where(Movie.torrent_hash.in_([job.torrent_hash for job in jobs]))}
+        entries = []
+        waiting = 0
+        for job in sorted(jobs, key=lambda value: (value.torrent_hash not in active, value.state != 'running', value.queue_order)):
+            try:
+                payload = json.loads(job.torrent_json)
+                if not isinstance(payload, dict):
+                    payload = {}
+            except (ValueError, TypeError):
+                payload = {}
+            current = progress.get(job.torrent_hash, {})
+            is_active = job.torrent_hash in active
+            if not is_active and not job.stop_requested:
+                waiting += 1
+            size = current.get('file_size', 0)
+            copied = current.get('copied_bytes', 0)
+            speed = current.get('speed', 0)
+            eta = max(0, round((size-copied)/(speed*1024*1024))) if size and speed > 0 and current.get('phase') not in ('paused','verifying','validating_resume') else None
+            movie = movies.get(job.torrent_hash)
+            entries.append({'torrent_hash': job.torrent_hash, 'title': movie.title if movie else payload.get('name', job.torrent_hash),
+                            'torrent_name': payload.get('name', job.torrent_hash), 'active': is_active,
+                            'state': 'copying' if is_active else 'queued', 'stop_requested': job.stop_requested,
+                            'queue_position': None if is_active or job.stop_requested else current.get('queue_position', waiting),
+                            'reorderable': job.state == 'queued' and not is_active and not job.stop_requested,
+                            'percent': current.get('percent', 0), 'speed': speed, 'eta_seconds': eta,
+                            'phase': current.get('phase'), 'recovering': current.get('recovering', False),
+                            'resumed_bytes': current.get('resumed_bytes', 0)})
+        recent = []
+        for job in CopyJob.select().where(CopyJob.state.in_(('completed','cancelled','error'))).order_by(CopyJob.updated_at.desc()).limit(8):
+            try:
+                payload = json.loads(job.torrent_json)
+                if not isinstance(payload, dict):
+                    payload = {}
+            except (ValueError, TypeError):
+                payload = {}
+            recent.append({'torrent_hash': job.torrent_hash, 'title': payload.get('name', job.torrent_hash), 'state': job.state,
+                           'message': job.message, 'updated_at': job.updated_at.isoformat()})
+        return {'paused': bool(control and control.paused), 'entries': entries, 'recent': recent}
+
+
 def check_copy_cancelled(torrent_hash):
     if torrent_hash in STOP_FLAGS:
         raise InterruptedError("Copy stopped by user")
@@ -376,7 +497,9 @@ def cleanup_copy_outputs(torrent_hash):
 def copy_with_progress(src, dst, torrent_hash, speed_limit_mbps=0, overwrite=False):
     global COPY_PROGRESS, STOP_FLAGS
     check_copy_cancelled(torrent_hash)
-    cancelled = lambda: check_copy_cancelled(torrent_hash)
+    paused_seconds = [0]
+    def cancelled():
+        paused_seconds[0] += wait_for_copy_resume(torrent_hash)
     identity = source_identity(src)
     copied = 0
     mode = 'xb'
@@ -392,12 +515,13 @@ def copy_with_progress(src, dst, torrent_hash, speed_limit_mbps=0, overwrite=Fal
     initial_offset = copied
     file_size = identity['size']
     chunk_size = 1024 * 1024 # 1MB chunks
+    pause_baseline = paused_seconds[0]
     start_time = time.time()
     last_update = start_time
     
     COPY_PROGRESS[torrent_hash] = {
         'percent': round(copied / file_size * 100, 1) if file_size else 0,
-        'speed': 0, 'status': 'copying', 'resumed_bytes': initial_offset
+        'speed': 0, 'status': 'copying', 'resumed_bytes': initial_offset, 'file_size': file_size, 'copied_bytes': copied
     }
     
     try:
@@ -406,6 +530,7 @@ def copy_with_progress(src, dst, torrent_hash, speed_limit_mbps=0, overwrite=Fal
             fdst.seek(initial_offset)
             COPY_OUTPUTS.setdefault(torrent_hash, set()).add(dst)
             while True:
+                cancelled()
                 # Check for stop signal
                 if torrent_hash in STOP_FLAGS:
                     logger.info(f"Copy stopped by user for {torrent_hash}")
@@ -417,13 +542,15 @@ def copy_with_progress(src, dst, torrent_hash, speed_limit_mbps=0, overwrite=Fal
                 
                 fdst.write(chunk)
                 copied += len(chunk)
+                with COPY_LOCK:
+                    COPY_PROGRESS[torrent_hash].update(percent=round(copied / file_size * 100, 1) if file_size else 100, file_size=file_size, copied_bytes=copied)
                 
                 # Calculate Progress
                 percent = (copied / file_size) * 100 if file_size else 100
                 
                 # Calculate Speed & Limit
                 current_time = time.time()
-                elapsed = current_time - start_time
+                elapsed = current_time - start_time - (paused_seconds[0] - pause_baseline)
                 if elapsed > 0:
                     speed = ((copied - initial_offset) / 1024 / 1024) / elapsed # MB/s
                 else:
@@ -434,7 +561,7 @@ def copy_with_progress(src, dst, torrent_hash, speed_limit_mbps=0, overwrite=Fal
                     COPY_PROGRESS[torrent_hash] = {
                         'percent': round(percent, 1),
                         'speed': round(speed, 2),
-                        'status': 'copying', 'resumed_bytes': initial_offset
+                        'status': 'copying', 'resumed_bytes': initial_offset, 'file_size': file_size, 'copied_bytes': copied
                     }
                     last_update = current_time
                 
@@ -452,12 +579,12 @@ def copy_with_progress(src, dst, torrent_hash, speed_limit_mbps=0, overwrite=Fal
                         sleep_time = expected_time - elapsed
                         deadline = time.monotonic() + sleep_time
                         while time.monotonic() < deadline:
-                            check_copy_cancelled(torrent_hash)
+                            cancelled()
                             time.sleep(min(0.1, max(0, deadline - time.monotonic())))
                         
             fdst.flush()
             os.fsync(fdst.fileno())
-        COPY_PROGRESS[torrent_hash] = {'percent': 100, 'speed': 0, 'status': 'copying', 'phase': 'verifying', 'resumed_bytes': initial_offset}
+        COPY_PROGRESS[torrent_hash] = {'percent': 100, 'speed': 0, 'status': 'copying', 'phase': 'verifying', 'resumed_bytes': initial_offset, 'file_size': file_size, 'copied_bytes': copied}
         digest = verify_copy(src, dst, identity, cancelled)
         COPY_PROGRESS[torrent_hash]['sha256'] = digest
             
@@ -548,8 +675,8 @@ def inspect_torrent_copy(torrent, settings):
             raise ValueError(message)
         response.raise_for_status()
         info = response.json()
-        if not info.get('verified_resume'):
-            raise ValueError('Actualiza y reinicia el receptor del PC a 4.5.12 para copiar con verificación y reanudación')
+        if not info.get('verified_resume') or info.get('queue_pause') is not True:
+            raise ValueError('Actualiza y reinicia el receptor del PC a 4.5.13 para copiar, pausar y reanudar')
         if not isinstance(info.get('files'), list) or not info.get('fingerprint'):
             raise ValueError('El receptor no devolvió una comparación válida')
         info['location'] = f'Receptor {host}:{port}'
@@ -610,6 +737,11 @@ def recover_copy_jobs():
     """Register the old active job first, then all waiting jobs in saved order."""
     launch = []
     with RECOVERY_LOCK, COPY_LOCK:
+        control = CopyQueueControl.get_or_none(CopyQueueControl.id == 1)
+        if control and control.paused:
+            QUEUE_PAUSED.set()
+        else:
+            QUEUE_PAUSED.clear()
         jobs = sorted(CopyJob.select().where(CopyJob.state.in_(('queued', 'running'))),
                       key=lambda job: (job.state != 'running', job.queue_order))
         for old_job in jobs:
@@ -726,7 +858,7 @@ def run_copy_job(job_id):
     try:
         torrent = SimpleNamespace(**json.loads(job.torrent_json))
         settings = dict(load_settings(), **json.loads(job.options_json))
-        with copy_turn(torrent_hash, allow_stopped=settings.get('receptor_enabled', False) and (job.state == 'running' or settings.get('_verification_required', False))):
+        with copy_turn(torrent_hash, allow_stopped=settings.get('receptor_enabled', False) and (job.state == 'running' or settings.get('_verification_required', False)), allow_paused=job.state == 'running' and settings.get('receptor_enabled', False)):
             CopyJob.update(state='running', updated_at=datetime.datetime.now()).where(CopyJob.id == job.id).execute()
             if job.stop_requested:
                 STOP_FLAGS.add(torrent_hash)
@@ -1016,7 +1148,8 @@ def process_single_torrent(qb, torrent, settings):
                     "overwrite": settings.get('_overwrite', False),
                     "stage_all": settings.get('_stage_all', False),
                     "fingerprint": settings.get('_copy_fingerprint'),
-                    "attempt_id": settings.get("_copy_attempt_id")
+                    "attempt_id": settings.get("_copy_attempt_id"),
+                    "paused": QUEUE_PAUSED.is_set()
                 }
                 
                 resp = requests.post(f"http://{host}:{port}/copy", json=payload, timeout=5)
@@ -1222,6 +1355,7 @@ def _poll_receptor_status(torrent, host, port, source_path, dest_dir, settings, 
     logger.info(f"Started polling Receptor for {torrent.hash}")
     
     stop_sent = False
+    pause_sent = None
     while True:
         try:
             # Check for stop signal from Roverr UI
@@ -1234,6 +1368,17 @@ def _poll_receptor_status(torrent, host, port, source_path, dest_dir, settings, 
                 # Keep polling until the remote writer has closed its files
                 # and finished cleanup before releasing the transfer slot.
                 
+            wanted_pause = QUEUE_PAUSED.is_set()
+            if not stop_sent and wanted_pause and pause_sent is not True:
+                response = requests.post(f'http://{host}:{port}/pause/{torrent.hash}', timeout=5)
+                if response.status_code != 404:
+                    response.raise_for_status()
+                pause_sent = True
+            elif not stop_sent and not wanted_pause and pause_sent is True:
+                response = requests.post(f'http://{host}:{port}/resume/{torrent.hash}', timeout=5)
+                if response.status_code != 404:
+                    response.raise_for_status()
+                pause_sent = False
             resp = requests.get(url, timeout=3)
             
             if resp.status_code == 200:
@@ -1244,11 +1389,16 @@ def _poll_receptor_status(torrent, host, port, source_path, dest_dir, settings, 
                     break
                 
                 if status == "copying":
+                    if data.get('phase') == 'paused' and not QUEUE_PAUSED.is_set():
+                        response = requests.post(f'http://{host}:{port}/resume/{torrent.hash}', timeout=5)
+                        if response.status_code != 404:
+                            response.raise_for_status()
+                        pause_sent = False
                     COPY_PROGRESS[torrent.hash] = {
                         'percent': data.get("percent", 0),
                         'speed': data.get("speed", 0),
                         'status': 'copying',
-                        'is_receptor': True, 'phase': data.get('phase'), 'resumed_bytes': data.get('resumed_bytes', 0)
+                        'is_receptor': True, 'phase': data.get('phase'), 'resumed_bytes': data.get('resumed_bytes', 0), 'file_size': data.get('file_size', 0), 'copied_bytes': data.get('copied_bytes', 0)
                     }
                 elif status == "done":
                     if settings.get("_verification_required") and data.get("verified") is not True:

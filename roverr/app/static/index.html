@@ -1,11 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Roverr - Media Manager</title> <!-- Modular CSS Architecture -->
+    <title>Roverr - Gestor de películas</title> <!-- Modular CSS Architecture -->
     <link rel="stylesheet" href="styles/base.css?v=8">
+    <link rel="stylesheet" href="styles/copy-queue.css?v=4.5.13">
     <link rel="stylesheet" href="styles/layout.css?v=8">
     <link rel="stylesheet" href="styles/components.css?v=8">
     <link rel="stylesheet" href="styles/movies.css?v=8">
@@ -120,8 +121,18 @@
                 </div>
 
                 <div class="dashboard-content">
+                    <section class="content-card copy-queue-panel" id="copy-queue-panel" aria-label="Actividad y cola de copias">
+                        <div class="copy-queue-header">
+                            <h3>Actividad y cola de copias</h3>
+                            <button class="btn secondary" id="copy-queue-toggle">Pausar cola</button>
+                        </div>
+                        <p id="copy-queue-state" role="status">Cargando actividad...</p>
+                        <p class="copy-queue-hint">Pausar conserva los parciales. Detener elimina la copia incompleta. El tiempo estimado corresponde al archivo en transferencia; la verificación se realiza después.</p>
+                        <div id="copy-queue-entries"></div>
+                        <details><summary>Últimos resultados</summary><div id="copy-queue-recent"></div></details>
+                    </section>
                     <section class="content-card" id="movies-section">
-                        <h3>Movies</h3>
+                        <h3>Películas</h3>
                         <div id="movies-grid" class="movies-grid">
                             <!-- Movies injected here -->
                         </div>

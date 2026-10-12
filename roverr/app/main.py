@@ -3,7 +3,7 @@ import asyncio
 import logging
 from fastapi import FastAPI, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from contextlib import asynccontextmanager
 from database import init_db, MoveHistory
 from logic import process_torrents, get_active_torrents, manual_move, mark_as_moved, load_settings, save_settings, get_copy_progress, stop_copy, get_movie_data, get_qb_client
@@ -241,7 +241,8 @@ async def ws_progress_broadcast_task():
                     "active_copy": prog.get('active_copy', ''),
                     "recovering": prog.get('recovering', False),
                     "phase": prog.get("phase"),
-                    "resumed_bytes": prog.get("resumed_bytes", 0)
+                    "resumed_bytes": prog.get("resumed_bytes", 0),
+                    "queue_paused": prog.get("queue_paused", False)
                 }
             
             # Detect completion
@@ -555,6 +556,27 @@ def delete_movie_endpoint(torrent_hash: str):
     if success:
         return {"success": True, "message": "Película eliminada"}
     return {"success": False, "message": "Película no encontrada"}
+
+@app.get('/api/copy-queue')
+def copy_queue_endpoint():
+    from modules.mover import get_copy_queue_snapshot
+    return JSONResponse(get_copy_queue_snapshot(), headers={'Cache-Control': 'no-store'})
+
+@app.post('/api/copy-queue/pause')
+def pause_copy_queue_endpoint(payload: dict):
+    from modules.mover import set_copy_queue_paused
+    try:
+        return {'success': True, 'queue': set_copy_queue_paused(payload.get('paused'))}
+    except Exception as error:
+        return {'success': False, 'message': str(error)}
+
+@app.post('/api/copy-queue/priority')
+def prioritize_copy_endpoint(payload: dict):
+    from modules.mover import change_copy_priority
+    try:
+        return {'success': True, 'queue': change_copy_priority(payload.get('torrent_hash'), payload.get('direction'))}
+    except Exception as error:
+        return {'success': False, 'message': str(error)}
 
 @app.post("/api/stop/{torrent_hash}")
 def stop_copy_endpoint(torrent_hash: str):

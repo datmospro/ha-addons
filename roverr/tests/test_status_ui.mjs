@@ -29,3 +29,7 @@ console.log('Undownloaded RSS and size rejection: regression checks passed');
 assert.equal(getMovieStatus({status:'copying',copy_progress:{phase:'verifying'}}).label,'Verificando copia');
 assert.equal(getMovieStatus({status:'copying',copy_progress:{phase:'validating_resume'}}).label,'Comprobando copia parcial');
 assert.match(getMovieStatus({status:'copying',copy_progress:{resumed_bytes:1024}}).reason,/reanudada/);
+
+assert.equal(getMovieStatus({status:'copying',copy_progress:{phase:'paused'}}).label,'Copia en pausa');
+
+assert.match(getMovieStatus({status:'queued',copy_progress:{queue_paused:true,queue_position:1,queue_total:2}}).reason,/La cola está pausada/);

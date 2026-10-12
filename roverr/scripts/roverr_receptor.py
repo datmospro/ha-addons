@@ -2,6 +2,7 @@ import os
 import time
 import json
 import threading
+import copy
 import logging
 import shutil
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -185,6 +186,7 @@ logger = logging.getLogger("RoverrReceptor")
 # Structure: { task_id (torrent_hash): {'status': 'copying|done|error', 'percent': 0-100, 'speed': float_mbps, 'error_msg': ''} }
 TASKS = {}
 STOP_FLAGS = set()
+PAUSE_FLAGS = set()
 TASKS_LOCK = threading.Lock()
 
 class CopyTaskHandler(threading.Thread):
@@ -217,11 +219,33 @@ class CopyTaskHandler(threading.Thread):
                 if speed is not None: TASKS[self.task_id]['speed'] = speed
                 if error_msg: TASKS[self.task_id]['error_msg'] = error_msg
 
-    def _copy_file(self, src_file, dst_file):
-        """Copies a single file with progress and speed tracking"""
-        def cancelled():
+    def checkpoint(self):
+        if self.task_id in STOP_FLAGS:
+            raise InterruptedError('Copy stopped by user')
+        started = time.monotonic()
+        waited = False
+        previous = None
+        while self.task_id in PAUSE_FLAGS:
             if self.task_id in STOP_FLAGS:
                 raise InterruptedError('Copy stopped by user')
+            with TASKS_LOCK:
+                if not waited:
+                    previous = TASKS[self.task_id].get('phase')
+                TASKS[self.task_id].update(phase='paused', speed=0)
+            waited = True
+            time.sleep(.1)
+        if self.task_id in STOP_FLAGS:
+            raise InterruptedError('Copy stopped by user')
+        if waited:
+            with TASKS_LOCK:
+                TASKS[self.task_id]['phase'] = previous
+        return time.monotonic()-started if waited else 0
+
+    def _copy_file(self, src_file, dst_file):
+        """Copies a single file with progress and speed tracking"""
+        paused_seconds = [0]
+        def cancelled():
+            paused_seconds[0] += self.checkpoint()
         cancelled()
         os.makedirs(os.path.dirname(dst_file), exist_ok=True)
         identity = source_identity(src_file)
@@ -239,7 +263,8 @@ class CopyTaskHandler(threading.Thread):
         file_size = identity['size']
         initial_offset = copied
         with TASKS_LOCK:
-            TASKS[self.task_id].update(phase='copying', resumed_bytes=initial_offset)
+            TASKS[self.task_id].update(phase='copying', resumed_bytes=initial_offset, file_size=file_size, copied_bytes=copied, percent=round(copied/file_size*100,1) if file_size else 0)
+        pause_baseline = paused_seconds[0]
         start_time = time.time()
         last_update = start_time
         
@@ -252,6 +277,7 @@ class CopyTaskHandler(threading.Thread):
             fdst.seek(initial_offset)
             self.created_files.add(dst_file)
             while True:
+                cancelled()
                 # Check for cancellation
                 if self.task_id in STOP_FLAGS:
                     logger.info(f"Task {self.task_id} aborted by user.")
@@ -263,14 +289,18 @@ class CopyTaskHandler(threading.Thread):
                 
                 fdst.write(chunk)
                 copied += len(chunk)
+                with TASKS_LOCK:
+                    TASKS[self.task_id].update(file_size=file_size, copied_bytes=copied, percent=round(copied/file_size*100,1) if file_size else 100)
 
                 current_time = time.time()
-                elapsed = current_time - start_time
+                elapsed = current_time - start_time - (paused_seconds[0] - pause_baseline)
                 
                 if current_time - last_update > 0.5 or copied == file_size:
                     percent = round((copied / file_size) * 100, 1) if file_size > 0 else 100.0
                     speed = round(((copied - initial_offset) / 1024 / 1024) / elapsed, 2) if elapsed > 0 else 0.0
                     
+                    with TASKS_LOCK:
+                        TASKS[self.task_id].update(file_size=file_size, copied_bytes=copied)
                     self.update_state(status=None, percent=percent, speed=speed)
                     last_update = current_time
                     
@@ -285,7 +315,7 @@ class CopyTaskHandler(threading.Thread):
             fdst.flush()
             os.fsync(fdst.fileno())
         with TASKS_LOCK:
-            TASKS[self.task_id].update(phase='verifying', speed=0)
+            TASKS[self.task_id].update(phase='verifying', speed=0, file_size=file_size, copied_bytes=copied)
         digest = verify_copy(src_file, dst_file, identity, cancelled)
         with TASKS_LOCK:
             TASKS[self.task_id].setdefault('sha256', {})[os.path.basename(dst_file)] = digest
@@ -303,6 +333,10 @@ class CopyTaskHandler(threading.Thread):
             if comparison['conflict'] and not self.overwrite:
                 raise FileExistsError('Destination already exists; compare before copying')
             os.makedirs(self.dest_dir, exist_ok=True)
+            if self.staging:
+                for row in comparison['files']:
+                    temporary = row['destination']['path'] + '.roverr-' + self.task_id + '.part'
+                    self.created_files.update((temporary, temporary + '.json', temporary + '.json.tmp'))
 
             if os.path.isfile(self.source_path):
                 # It's a single file
@@ -354,8 +388,7 @@ class CopyTaskHandler(threading.Thread):
             else:
                 raise ValueError("Source path is neither a file nor a directory.")
 
-            if self.task_id in STOP_FLAGS:
-                raise InterruptedError('Copy stopped by user')
+            self.checkpoint()
             if self.staging:
                 current = inspect_files(self.source_path, self.dest_dir, self.folder_name)
                 if self.fingerprint and current['fingerprint'] != self.fingerprint:
@@ -394,6 +427,7 @@ class CopyTaskHandler(threading.Thread):
             self.update_state('error', error_msg=str(e))
             
         finally:
+            PAUSE_FLAGS.discard(self.task_id)
             if self.task_id in STOP_FLAGS:
                 STOP_FLAGS.remove(self.task_id)
 
@@ -413,7 +447,8 @@ class ReceptorServer(BaseHTTPRequestHandler):
         # Healthcheck endpoint (Roverr logic ping)
         if parsed.path == '/' or parsed.path == '/ping':
             self._send_json(200, {
-                'version': '4.5.12',
+                'version': '4.5.13',
+                'queue_pause': True,
                 'service': 'Roverr Receptor', 
                 'status': 'ok', 
                 'message': 'Roverr Receptor is online.'
@@ -424,7 +459,7 @@ class ReceptorServer(BaseHTTPRequestHandler):
         if parsed.path.startswith('/status/'):
             task_id = parsed.path.split('/')[-1]
             with TASKS_LOCK:
-                task_info = TASKS.get(task_id)
+                task_info = copy.deepcopy(TASKS.get(task_id))
             
             if task_info:
                 self._send_json(200, task_info)
@@ -470,6 +505,7 @@ class ReceptorServer(BaseHTTPRequestHandler):
                 return
             if parsed.path == '/inspect':
                 comparison['verified_resume'] = True
+                comparison['queue_pause'] = True
                 self._send_json(200, comparison)
                 return
             overwrite = data.get('overwrite', False) is True
@@ -492,9 +528,24 @@ class ReceptorServer(BaseHTTPRequestHandler):
 
             # Start background thread
             thread = CopyTaskHandler(task_id, source_path, dest_dir, folder_name, overwrite, fingerprint, staged, data.get("attempt_id"))
+            if data.get('paused') is True:
+                PAUSE_FLAGS.add(task_id)
             thread.start()
             
             self._send_json(202, {'status': 'accepted', 'message': f'Copy task {task_id} started.'})
+            return
+
+        if parsed.path.startswith('/pause/') or parsed.path.startswith('/resume/'):
+            task_id = parsed.path.split('/')[-1]
+            with TASKS_LOCK:
+                if TASKS.get(task_id, {}).get('status') != 'copying':
+                    self._send_json(404, {'error': 'La tarea no está activa'})
+                    return
+                if parsed.path.startswith('/pause/'):
+                    PAUSE_FLAGS.add(task_id)
+                else:
+                    PAUSE_FLAGS.discard(task_id)
+            self._send_json(200, {'status': 'accepted'})
             return
 
         if parsed.path == '/cleanup':
