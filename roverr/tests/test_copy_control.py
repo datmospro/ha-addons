@@ -142,6 +142,15 @@ class CopyControlTests(unittest.TestCase):
             move.assert_not_called()
         self.assertTrue(database.Movie.get(database.Movie.torrent_hash == 'a').copy_paused)
 
+    def test_stale_metadata_writer_cannot_clear_cancellation_hold(self):
+        old_instance = self.movie(status='pending')
+        mover.stop_copy('a')
+        old_instance.overview = 'Metadata loaded before cancellation'
+        old_instance.save()
+        saved = database.Movie.get(database.Movie.torrent_hash == 'a')
+        self.assertTrue(saved.copy_paused)
+        self.assertEqual(saved.overview, old_instance.overview)
+
     def test_local_cancel_deletes_output_directory_and_never_succeeds(self):
         self.movie(status='pending', progress=1)
         src = Path(self.settings['local_source_path']) / 'Film (2026).mkv'

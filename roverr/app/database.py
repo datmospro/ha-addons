@@ -24,6 +24,11 @@ class MoveHistory(BaseModel):
     timestamp = DateTimeField(default=datetime.datetime.now)
 
 class Movie(BaseModel):
+    class Meta:
+        # Background metadata writers may hold an older Movie instance. They
+        # must not overwrite a cancellation hold saved by another thread.
+        only_save_dirty = True
+
     torrent_hash = CharField(unique=True)
     title = CharField()
     year = CharField(null=True)
