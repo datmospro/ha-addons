@@ -5,6 +5,7 @@ import shutil
 import threading
 import unicodedata
 import requests
+from copy_conflicts import inspect_files
 from database import MoveHistory, Movie
 from .config import logger, load_settings, trigger_movies_update_callback
 from .notifications import send_telegram_notification
@@ -16,6 +17,7 @@ RESERVED_SPACE = {} # {dest_path: reserved_bytes} - Track space reserved by acti
 COPY_LOCK = threading.RLock()
 COPY_SLOT = threading.Semaphore(1)
 COPY_OUTPUTS = {} # Only files created by the active task may be removed.
+COPY_REPLACEMENTS = {} # hash -> [(temporary file, final destination)]
 COPY_DIRECTORIES = {}
 SPACE_LOCK = threading.Lock() # Thread-safe access to RESERVED_SPACE
 
@@ -309,7 +311,14 @@ def cleanup_copy_outputs(torrent_hash):
     if directory and os.path.isdir(directory) and not os.listdir(directory):
         os.rmdir(directory)
 
-def copy_with_progress(src, dst, torrent_hash, speed_limit_mbps=0):
+def copy_with_progress(src, dst, torrent_hash, speed_limit_mbps=0, overwrite=False):
+    if overwrite:
+        final_destination = dst
+        dst = dst + '.roverr-' + torrent_hash + '.part'
+        # A leftover temporary file belongs to a previous attempt for this hash.
+        if os.path.isfile(dst):
+            os.remove(dst)
+        COPY_REPLACEMENTS.setdefault(torrent_hash, []).append((dst, final_destination))
     global COPY_PROGRESS, STOP_FLAGS
     
     check_copy_cancelled(torrent_hash)
@@ -421,7 +430,79 @@ def find_file_in_path(base_path, filename):
 
 from .client import get_qb_client
 
-def manual_move(torrent_hash, config_ignored=None, automatic=False):
+def copy_paths(torrent, settings):
+    item = os.path.basename(torrent.content_path.replace('\\', '/').rstrip('/'))
+    match = re.search(r"(.+?)\s*\((\d{4})\)", item)
+    if not match:
+        raise ValueError("Torrent filename must contain 'Title (Year)'")
+    folder = f"{sanitize_path_component(match[1].strip())} ({sanitize_path_component(match[2])})"
+    source_base = settings.get('local_source_path')
+    dest_base = settings.get('local_dest_path')
+    if not source_base or not dest_base:
+        raise ValueError('Source and destination paths are required')
+    source = find_file_in_path(source_base, item)
+    if not source:
+        if not settings.get('receptor_enabled'):
+            raise FileNotFoundError(f'Source not found: {item}')
+        source = torrent.content_path
+    destination = os.path.join(dest_base, folder)
+    if os.path.commonpath([os.path.realpath(destination), os.path.realpath(dest_base)]) != os.path.realpath(dest_base):
+        raise ValueError('Destination escapes library directory')
+    if settings.get('receptor_enabled'):
+        for line in settings.get('receptor_path_mapping', '').splitlines():
+            if '=' not in line:
+                continue
+            linux, windows = (value.strip() for value in line.split('=', 1))
+            for key, value in [('source', source), ('destination', destination)]:
+                if linux and (value == linux or value.startswith(linux.rstrip('/') + '/')):
+                    mapped = (windows + value[len(linux):]).replace('/', '\\')
+                    if key == 'source':
+                        source = mapped
+                    else:
+                        destination = mapped
+    return source, destination, folder
+
+def inspect_torrent_copy(torrent, settings):
+    source, destination, folder = copy_paths(torrent, settings)
+    if settings.get('receptor_enabled'):
+        host, port = settings.get('receptor_host'), settings.get('receptor_port', 8095)
+        response = requests.post(f'http://{host}:{port}/inspect', json={
+            'source': source, 'destination': destination, 'folder_name': folder
+        }, timeout=15)
+        if response.status_code == 404:
+            raise ValueError('Actualiza y reinicia el receptor del PC para comparar archivos (4.5.4)')
+        if response.status_code != 200:
+            try:
+                message = response.json().get('error', 'Error al comparar los archivos en el receptor')
+            except ValueError:
+                message = 'El receptor no pudo comparar los archivos'
+            raise ValueError(message)
+        response.raise_for_status()
+        info = response.json()
+        if not isinstance(info.get('files'), list) or not info.get('fingerprint'):
+            raise ValueError('El receptor no devolvió una comparación válida')
+        info['location'] = f'Receptor {host}:{port}'
+    else:
+        info = inspect_files(source, destination, folder)
+        info['location'] = 'Home Assistant'
+    info['torrent_hash'] = torrent.hash
+    info['torrent_name'] = torrent.name
+    return info
+
+def commit_copy_outputs(torrent, settings):
+    replacements = COPY_REPLACEMENTS.get(torrent.hash, [])
+    if not replacements:
+        return
+    current = inspect_torrent_copy(torrent, settings)
+    if current['fingerprint'] != settings['_copy_fingerprint']:
+        raise ValueError('Los archivos cambiaron durante la copia. Vuelve a comparar el destino.')
+    with COPY_LOCK:
+        check_copy_cancelled(torrent.hash)
+        for temporary, final in replacements:
+            os.replace(temporary, final)
+            COPY_OUTPUTS.get(torrent.hash, set()).discard(temporary)
+
+def manual_move(torrent_hash, config_ignored=None, automatic=False, decision=None):
     """
     Manually triggers a move operation for a specific torrent
     """
@@ -443,6 +524,30 @@ def manual_move(torrent_hash, config_ignored=None, automatic=False):
         if torrent.progress < 1:
             return {"success": False, "message": "Download is not complete"}
         with COPY_LOCK:
+            if torrent_hash in COPY_PROGRESS:
+                return {"success": True, "status": "started", "message": "Copy already queued or running"}
+        inspection = inspect_torrent_copy(torrent, settings)
+        action = (decision or {}).get('action')
+        if action not in (None, 'overwrite', 'keep'):
+            return {"success": False, "message": "Invalid copy decision"}
+        stale = decision is not None and decision.get('fingerprint') != inspection['fingerprint']
+        if stale or (inspection['conflict'] and action is None):
+            if automatic:
+                Movie.update(copy_paused=True).where(Movie.torrent_hash == torrent_hash).execute()
+            return {"success": False, "status": "conflict", "comparison": inspection,
+                    "message": "Los archivos han cambiado; revisa la comparación" if stale else "El archivo de destino ya existe"}
+        if action == 'keep':
+            if not inspection['all_destinations_exist']:
+                return {"success": False, "message": "Faltan archivos de destino; no se puede marcar como copiada"}
+            MoveHistory.create(torrent_name=torrent.name, status='manual',
+                               message='Existing destination kept by user',
+                               source_path=inspection['source_path'],
+                               dest_path=os.path.join(settings['local_dest_path'], inspection['folder_name']))
+            Movie.update(status='moved_manually', copy_paused=True).where(Movie.torrent_hash == torrent_hash).execute()
+            trigger_movies_update_callback()
+            return {"success": True, "status": "marked", "message": "Archivo conservado y película marcada como copiada"}
+        settings = dict(settings, _overwrite=action == 'overwrite', _copy_fingerprint=inspection['fingerprint'])
+        with COPY_LOCK:
             movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
             if automatic and movie and movie.copy_paused:
                 return {"success": False, "message": "Copy held for manual start"}
@@ -457,6 +562,13 @@ def manual_move(torrent_hash, config_ignored=None, automatic=False):
             try:
                 with COPY_SLOT:
                     check_copy_cancelled(torrent_hash)
+                    current = inspect_torrent_copy(torrent, settings)
+                    if current['fingerprint'] != settings['_copy_fingerprint']:
+                        Movie.update(copy_paused=True).where(Movie.torrent_hash == torrent_hash).execute()
+                        MoveHistory.create(torrent_name=torrent.name, status='error',
+                                           message='Destino cambiado mientras esperaba. Vuelve a copiar para comparar.',
+                                           source_path=current['source_path'], dest_path=current['destination_path'])
+                        return
                     COPY_PROGRESS[torrent_hash]['status'] = 'copying'
                     process_single_torrent(qb, torrent, settings)
             except InterruptedError:
@@ -470,11 +582,12 @@ def manual_move(torrent_hash, config_ignored=None, automatic=False):
                     STOP_FLAGS.discard(torrent_hash)
                     COPY_OUTPUTS.pop(torrent_hash, None)
                     COPY_DIRECTORIES.pop(torrent_hash, None)
+                    COPY_REPLACEMENTS.pop(torrent_hash, None)
                 trigger_movies_update_callback()
 
         threading.Thread(target=_move_thread, daemon=True).start()
         
-        return {"success": True, "message": f"Started processing {torrent.name} in background"}
+        return {"success": True, "status": "started", "message": f"Started processing {torrent.name} in background"}
     except Exception as e:
         return {"success": False, "message": str(e)}
 
@@ -622,7 +735,9 @@ def process_single_torrent(qb, torrent, settings):
                     "task_id": torrent.hash,
                     "source": receptor_source,
                     "destination": receptor_dest,
-                    "folder_name": folder_name
+                    "folder_name": folder_name,
+                    "overwrite": settings.get('_overwrite', False),
+                    "fingerprint": settings.get('_copy_fingerprint')
                 }
                 
                 resp = requests.post(f"http://{host}:{port}/copy", json=payload, timeout=5)
@@ -666,7 +781,7 @@ def process_single_torrent(qb, torrent, settings):
             new_name = f"{folder_name}{ext}"
             dest_file = os.path.join(dest_dir, new_name)
             
-            if not os.path.exists(dest_file):
+            if not os.path.exists(dest_file) or settings.get('_overwrite', False):
                 # Check and reserve disk space BEFORE copying
                 success, message, details = check_and_reserve_disk_space(source_path, dest_dir)
                 
@@ -685,8 +800,9 @@ def process_single_torrent(qb, torrent, settings):
                 reserved_bytes = details['required_bytes']
                 try:
                     logger.info(f"Copying {source_path} to {dest_file}")
-                    copy_with_progress(source_path, dest_file, torrent.hash, limit)
+                    copy_with_progress(source_path, dest_file, torrent.hash, limit, overwrite=settings.get('_overwrite', False))
                     check_copy_cancelled(torrent.hash)
+                    commit_copy_outputs(torrent, settings)
                     MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_file, status='success')
                     trigger_movies_update_callback()
                     
@@ -749,9 +865,9 @@ def process_single_torrent(qb, torrent, settings):
                             new_name = f"{folder_name}{ext}"
                             dest_file = os.path.join(dest_dir, new_name)
                             
-                            if not os.path.exists(dest_file):
+                            if not os.path.exists(dest_file) or settings.get('_overwrite', False):
                                 logger.info(f"Copying {src_file} to {dest_file}")
-                                copy_with_progress(src_file, dest_file, torrent.hash, limit)
+                                copy_with_progress(src_file, dest_file, torrent.hash, limit, overwrite=settings.get('_overwrite', False))
                                 copied = True
                             else:
                                 logger.info(f"File already exists: {dest_file}")
@@ -761,6 +877,7 @@ def process_single_torrent(qb, torrent, settings):
                             
                 check_copy_cancelled(torrent.hash)
                 if copied:
+                    commit_copy_outputs(torrent, settings)
                     MoveHistory.create(torrent_name=torrent.name, source_path=source_path, dest_path=dest_dir, status='success')
                     trigger_movies_update_callback()
                     
@@ -807,6 +924,8 @@ def process_single_torrent(qb, torrent, settings):
                            message="Copy stopped by user", source_path=source_path, dest_path=dest_dir)
         trigger_movies_update_callback()
     except Exception as e:
+        if settings.get('_overwrite'):
+            cleanup_copy_outputs(torrent.hash)
         logger.error(f"Error moving {torrent.name}: {e}")
         MoveHistory.create(torrent_name=torrent.name, status='error', message=str(e), source_path="", dest_path="")
         trigger_movies_update_callback()

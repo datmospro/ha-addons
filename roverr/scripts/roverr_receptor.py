@@ -7,6 +7,68 @@ import shutil
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
+"""Filesystem-only copy inspection, also embedded in the standalone receptor."""
+import hashlib
+import json
+import os
+import re
+from datetime import datetime, timezone
+
+
+def file_info(path):
+    try:
+        stat = os.stat(path)
+    except FileNotFoundError:
+        return {'path': path, 'exists': False, 'size': None,
+                'modified': None, 'mtime_ns': None}
+    if not os.path.isfile(path):
+        raise ValueError(f'Expected a file: {path}')
+    return {'path': path, 'exists': True, 'size': stat.st_size,
+            'modified': datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat(),
+            'mtime_ns': stat.st_mtime_ns}
+
+
+def inspect_files(source, destination, folder_name):
+    if not os.path.exists(source):
+        raise FileNotFoundError(f'Source not found: {source}')
+    if not folder_name or os.path.basename(folder_name) != folder_name or folder_name in ('.', '..'):
+        raise ValueError('Invalid destination folder name')
+    if os.path.isfile(source):
+        sources = [source]
+    elif os.path.isdir(source):
+        sources = sorted(os.path.join(root, name)
+                         for root, _, files in os.walk(source) for name in files
+                         if os.path.splitext(name)[1].lower() in ('.mkv', '.mp4', '.avi'))
+    else:
+        raise ValueError('Invalid source path')
+    if not sources:
+        raise ValueError('No video files found in source')
+    entries = []
+    seen = set()
+    for path in sources:
+        target = os.path.join(destination, folder_name + os.path.splitext(path)[1])
+        target_real = os.path.realpath(target)
+        dest_real = os.path.realpath(destination)
+        if os.path.commonpath([target_real, dest_real]) != dest_real:
+            raise ValueError('Destination file escapes destination directory')
+        if os.path.normcase(target_real) == os.path.normcase(os.path.realpath(path)):
+            raise ValueError('Source and destination refer to the same file')
+        if os.path.normcase(target_real) in seen:
+            raise ValueError('Multiple source files would use the same destination filename')
+        seen.add(os.path.normcase(target_real))
+        src, dst = file_info(path), file_info(target)
+        difference = dst['size'] - src['size'] if dst['exists'] else None
+        entries.append({'source': src, 'destination': dst,
+                        'difference_bytes': difference,
+                        'same_size': dst['exists'] and difference == 0})
+    fingerprint = hashlib.sha256(json.dumps(entries, sort_keys=True).encode()).hexdigest()
+    return {'source_path': source, 'destination_path': destination,
+            'folder_name': folder_name, 'files': entries,
+            'conflict': any(row['destination']['exists'] for row in entries),
+            'all_destinations_exist': all(row['destination']['exists'] for row in entries),
+            'fingerprint': fingerprint}
+
+
 # Configuration
 BIND_HOST = '0.0.0.0'
 BIND_PORT = 8095
@@ -33,12 +95,15 @@ STOP_FLAGS = set()
 TASKS_LOCK = threading.Lock()
 
 class CopyTaskHandler(threading.Thread):
-    def __init__(self, task_id, source_path, dest_dir, folder_name):
+    def __init__(self, task_id, source_path, dest_dir, folder_name, overwrite=False, fingerprint=None):
         super().__init__()
         self.task_id = task_id
         self.source_path = source_path
         self.dest_dir = dest_dir
         self.folder_name = folder_name
+        self.overwrite = overwrite
+        self.fingerprint = fingerprint
+        self.replacements = []
         self.created_files = set()
         self.chunk_size = 1024 * 1024  # 1MB chunks
         
@@ -60,6 +125,12 @@ class CopyTaskHandler(threading.Thread):
 
     def _copy_file(self, src_file, dst_file):
         """Copies a single file with progress and speed tracking"""
+        if self.overwrite:
+            final = dst_file
+            dst_file = dst_file + '.roverr-' + self.task_id + '.part'
+            if os.path.isfile(dst_file):
+                os.remove(dst_file)
+            self.replacements.append((dst_file, final))
         file_size = os.path.getsize(src_file)
 
         copied = 0
@@ -108,6 +179,11 @@ class CopyTaskHandler(threading.Thread):
             if not os.path.exists(self.source_path):
                 raise FileNotFoundError(f"Source not found: {self.source_path}")
 
+            comparison = inspect_files(self.source_path, self.dest_dir, self.folder_name)
+            if self.fingerprint and comparison['fingerprint'] != self.fingerprint:
+                raise ValueError('Files changed before copy started; compare again')
+            if comparison['conflict'] and not self.overwrite:
+                raise FileExistsError('Destination already exists; compare before copying')
             os.makedirs(self.dest_dir, exist_ok=True)
 
             if os.path.isfile(self.source_path):
@@ -121,7 +197,7 @@ class CopyTaskHandler(threading.Thread):
                 
                 dest_file = os.path.join(self.dest_dir, new_name)
                 
-                if os.path.exists(dest_file):
+                if os.path.exists(dest_file) and not self.overwrite:
                     logger.info(f"File already exists (skipping): {dest_file}")
                     # You could append a timestamp or overwrite based on needs. We overwrite or skip.
                     # For safety, let's just abort if it exists to match Roverr logic.
@@ -146,7 +222,7 @@ class CopyTaskHandler(threading.Thread):
                                 
                             dest_file = os.path.join(self.dest_dir, new_name)
                             
-                            if not os.path.exists(dest_file):
+                            if not os.path.exists(dest_file) or self.overwrite:
                                 logger.info(f"Copying video file {src_file} -> {dest_file}")
                                 self._copy_file(src_file, dest_file)
                                 found = True
@@ -162,6 +238,16 @@ class CopyTaskHandler(threading.Thread):
 
             if self.task_id in STOP_FLAGS:
                 raise InterruptedError('Copy stopped by user')
+            if self.overwrite:
+                current = inspect_files(self.source_path, self.dest_dir, self.folder_name)
+                if self.fingerprint and current['fingerprint'] != self.fingerprint:
+                    raise ValueError('Files changed during copy; original destination preserved')
+                with TASKS_LOCK:
+                    if self.task_id in STOP_FLAGS:
+                        raise InterruptedError('Copy stopped by user')
+                    for temporary, final in self.replacements:
+                        os.replace(temporary, final)
+                        self.created_files.discard(temporary)
             # Success
             logger.info(f"Task {self.task_id} completed successfully.")
             self.update_state('done', percent=100.0, speed=0.0)
@@ -179,6 +265,10 @@ class CopyTaskHandler(threading.Thread):
             
         except Exception as e:
             logger.error(f"Task {self.task_id} failed: {e}", exc_info=True)
+            if self.overwrite:
+                for path in self.created_files:
+                    if os.path.isfile(path):
+                        os.remove(path)
             self.update_state('error', error_msg=str(e))
             
         finally:
@@ -201,6 +291,7 @@ class ReceptorServer(BaseHTTPRequestHandler):
         # Healthcheck endpoint (Roverr logic ping)
         if parsed.path == '/' or parsed.path == '/ping':
             self._send_json(200, {
+                'version': '4.5.4',
                 'service': 'Roverr Receptor', 
                 'status': 'ok', 
                 'message': 'Roverr Receptor is online.'
@@ -224,7 +315,7 @@ class ReceptorServer(BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         
-        if parsed.path == '/copy':
+        if parsed.path in ('/copy', '/inspect'):
             content_length = int(self.headers.get('Content-Length', 0))
             if content_length == 0:
                 self._send_json(400, {'error': 'Empty request body.'})
@@ -242,10 +333,28 @@ class ReceptorServer(BaseHTTPRequestHandler):
             dest_dir = data.get('dest_dir') or data.get('destination')
             folder_name = data.get('folder_name', '') # Explicit name format 'Title (Year)'
             
-            if not all([task_id, source_path, dest_dir]):
+            if not all([source_path, dest_dir]) or (parsed.path == '/copy' and not task_id):
                 self._send_json(400, {'error': 'Missing required fields: task_id, source(source_path), destination(dest_dir)'})
                 return
+
+            if parsed.path == '/copy' and (not isinstance(task_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', task_id)):
+                self._send_json(400, {'error': 'Invalid task ID'})
+                return
                 
+            try:
+                comparison = inspect_files(source_path, dest_dir, folder_name)
+            except (ValueError, OSError) as error:
+                self._send_json(400, {'error': str(error)})
+                return
+            if parsed.path == '/inspect':
+                self._send_json(200, comparison)
+                return
+            overwrite = data.get('overwrite', False) is True
+            fingerprint = data.get('fingerprint')
+            if (fingerprint and comparison['fingerprint'] != fingerprint) or (comparison['conflict'] and (not overwrite or not fingerprint)):
+                self._send_json(409, {'status': 'conflict', 'comparison': comparison})
+                return
+
             logger.info(f"Received mapped copy request: {source_path} -> {dest_dir}")
                 
             # Prevent double-starting
@@ -258,7 +367,7 @@ class ReceptorServer(BaseHTTPRequestHandler):
                     STOP_FLAGS.remove(task_id)
 
             # Start background thread
-            thread = CopyTaskHandler(task_id, source_path, dest_dir, folder_name)
+            thread = CopyTaskHandler(task_id, source_path, dest_dir, folder_name, overwrite, fingerprint)
             thread.start()
             
             self._send_json(202, {'status': 'accepted', 'message': f'Copy task {task_id} started.'})

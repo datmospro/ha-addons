@@ -152,10 +152,20 @@ export async function fetchRSS() {
  * Mueve un torrent manualmente
  * Líneas 264-291 de app.js
  */
-export async function moveManually(hash) {
+export async function moveManually(hash, decision = null) {
     try {
-        const res = await fetch(`${API_BASE}/move/${hash}`, { method: 'POST' });
-        return await res.json();
+        while (true) {
+            const res = await fetch(`${API_BASE}/move/${hash}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: decision ? JSON.stringify(decision) : null
+            });
+            const data = await res.json();
+            if (!res.ok) return { success: false, message: data.detail || 'Error al comprobar la copia' };
+            if (data.status !== 'conflict') return data;
+            const { showCopyConflict } = await import('./copy-conflict.js');
+            decision = await showCopyConflict(data.comparison);
+            if (!decision) return { success: false, status: 'cancelled', message: 'Copia cancelada' };
+        }
     } catch (e) {
         console.error("Error moving torrent:", e);
         return { success: false, message: 'Error starting move' };
@@ -387,12 +397,18 @@ export async function identifyMovie(hash, tmdbId) {
  */
 export async function batchCopyMovies(torrentHashes) {
     try {
-        const res = await fetch(`${API_BASE}/movies/batch-copy`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ torrent_hashes: torrentHashes })
-        });
-        return await res.json();
+        let copied = 0, marked = 0, skipped = 0;
+        const errors = [];
+        // Resolve each conflict before proceeding so dialogs never overlap.
+        for (const hash of torrentHashes) {
+            const result = await moveManually(hash);
+            if (result.status === 'started') copied++;
+            else if (result.status === 'marked') marked++;
+            else if (result.status === 'cancelled') skipped++;
+            else errors.push(result.message);
+        }
+        return { success: errors.length === 0, copied, marked, skipped,
+                 message: errors.join('; ') };
     } catch (e) {
         console.error('Error copying movies:', e);
         return { success: false, message: 'Error copying movies' };

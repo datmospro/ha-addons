@@ -84,7 +84,7 @@ logger = logging.getLogger("Roverr")
 logger.info("=" * 80)
 logger.info("🚀 ROVERR - MEDIA MANAGER")
 logger.info("=" * 80)
-logger.info(f"📦 Version: 4.5.3")
+logger.info(f"📦 Version: 4.5.4")
 logger.info(f"🔧 Log Level: {logging.getLevelName(logger.getEffectiveLevel())}")
 logger.info("=" * 80)
 
@@ -478,9 +478,8 @@ def get_movie_trailer_endpoint(torrent_hash: str):
         return {"success": False, "message": str(e)}
 
 @app.post("/api/move/{torrent_hash}")
-def move_torrent_endpoint(torrent_hash: str, background_tasks: BackgroundTasks):
-    background_tasks.add_task(manual_move, torrent_hash)
-    return {"status": "started", "message": "Move started in background"}
+def move_torrent_endpoint(torrent_hash: str, payload: dict = None):
+    return manual_move(torrent_hash, decision=payload)
 
 @app.post("/api/mark/{torrent_hash}")
 def mark_moved_endpoint(torrent_hash: str):
@@ -662,6 +661,7 @@ def batch_copy_movies(payload: dict, background_tasks: BackgroundTasks):
     copied = 0
     skipped = 0
     errors = []
+    conflicts = []
     
     for hash in torrent_hashes:
         try:
@@ -673,20 +673,25 @@ def batch_copy_movies(payload: dict, background_tasks: BackgroundTasks):
                 skipped += 1
                 continue
             
-            # Skip error states: error, orphaned
-            if status in ['error', 'orphaned']:
+            # File conflicts previously appear as errors; allow retry/inspection.
+            if status in ['orphaned', 'moved', 'moved_manually']:
                 skipped += 1
                 continue
             
-            # Trigger copy via background task
-            background_tasks.add_task(manual_move, hash)
-            copied += 1
+            result = manual_move(hash)
+            if result.get('status') == 'conflict':
+                conflicts.append(result['comparison'])
+            elif result.get('success'):
+                copied += 1
+            else:
+                errors.append(f"{hash}: {result.get('message', 'Copy failed')}")
                 
         except Exception as e:
             errors.append(f"{hash}: {str(e)}")
     
     return {
         "success": True,
+        "conflicts": conflicts,
         "copied": copied,
         "skipped": skipped,
         "errors": errors

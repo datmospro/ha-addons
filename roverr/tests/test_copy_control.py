@@ -21,6 +21,7 @@ import database
 from peewee import SqliteDatabase
 from modules import mover, tmdb, config
 import main
+from copy_conflicts import inspect_files
 
 
 class CopyControlTests(unittest.TestCase):
@@ -41,6 +42,7 @@ class CopyControlTests(unittest.TestCase):
             'rss_feeds': [{'label': 'films', 'auto_copy': True}],
         }
         Path(self.settings['local_source_path']).mkdir()
+        (Path(self.settings['local_source_path']) / 'Film (2026).mkv').write_bytes(b'x')
         self.patches = [
             patch.object(mover, 'load_settings', return_value=self.settings),
             patch.object(tmdb, 'load_settings', return_value=self.settings),
@@ -56,6 +58,7 @@ class CopyControlTests(unittest.TestCase):
         mover.STOP_FLAGS.clear()
         mover.COPY_OUTPUTS.clear()
         mover.COPY_DIRECTORIES.clear()
+        mover.COPY_REPLACEMENTS.clear()
 
     def tearDown(self):
         for p in reversed(self.patches):
@@ -178,8 +181,8 @@ class CopyControlTests(unittest.TestCase):
         sentinel = dst / 'existing.txt'
         sentinel.write_text('keep')
         original = mover.copy_with_progress
-        def cancel_after_first(*args):
-            original(*args)
+        def cancel_after_first(*args, **kwargs):
+            original(*args, **kwargs)
             mover.STOP_FLAGS.add('a')
         torrent = SimpleNamespace(hash='a', name='Film (2026)', content_path='Film (2026)')
         with patch.object(mover, 'copy_with_progress', side_effect=cancel_after_first):
@@ -272,6 +275,215 @@ class CopyControlTests(unittest.TestCase):
         self.assertEqual(remote.TASKS['a']['status'], 'cancelled')
         self.assertFalse(dest.exists())
         self.assertTrue(source.exists())
+
+    def existing_destination(self, content=b'old'):
+        dest = Path(self.settings['local_dest_path']) / 'Film (2026)' / 'Film (2026).mkv'
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(content)
+        return dest
+
+    def fake_qb(self):
+        qb = Mock()
+        qb.torrents_info.return_value = [SimpleNamespace(**self.torrent())]
+        return patch.object(mover, 'get_qb_client', return_value=qb)
+
+    def test_inspection_compares_exact_sizes_and_dates(self):
+        src = Path(self.settings['local_source_path']) / 'Film (2026).mkv'
+        src.write_bytes(b'123456789')
+        dst = self.existing_destination(b'123')
+        result = inspect_files(str(src), str(dst.parent), 'Film (2026)')
+        row = result['files'][0]
+        self.assertTrue(result['conflict'])
+        self.assertEqual(row['source']['size'], 9)
+        self.assertEqual(row['destination']['size'], 3)
+        self.assertEqual(row['difference_bytes'], -6)
+        self.assertFalse(row['same_size'])
+        self.assertTrue(row['destination']['modified'])
+
+    def test_existing_file_returns_decision_without_copying(self):
+        self.movie(status='error')
+        dst = self.existing_destination()
+        with self.fake_qb():
+            result = mover.manual_move('a')
+        self.assertEqual(result['status'], 'conflict')
+        self.assertEqual(result['comparison']['files'][0]['destination']['path'], str(dst))
+        self.assertEqual(dst.read_bytes(), b'old')
+        self.assertFalse(mover.COPY_PROGRESS)
+
+    def test_manual_copy_http_route_returns_conflict_then_accepts_keep(self):
+        from fastapi.testclient import TestClient
+        self.movie(status='error')
+        dst = self.existing_destination()
+        client = TestClient(main.app)
+        def request_copy(*args, **kwargs):
+            try:
+                return mover.manual_move(*args, **kwargs)
+            finally:
+                # The temporary test database must release the connection
+                # owned by FastAPI's request worker before Windows removes it.
+                database.Movie._meta.database.close()
+        try:
+            with self.fake_qb(), patch.object(main, 'manual_move', side_effect=request_copy):
+                response = client.post('/api/move/a')
+                self.assertEqual(response.status_code, 200)
+                comparison = response.json()['comparison']
+                response = client.post('/api/move/a', json={'action': 'keep', 'fingerprint': comparison['fingerprint']})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()['status'], 'marked')
+            self.assertEqual(dst.read_bytes(), b'old')
+        finally:
+            client.close()
+
+    def test_keep_marks_copied_without_changing_existing_file(self):
+        self.movie(status='error')
+        dst = self.existing_destination()
+        with self.fake_qb():
+            comparison = mover.manual_move('a')['comparison']
+            result = mover.manual_move('a', decision={'action': 'keep', 'fingerprint': comparison['fingerprint']})
+        self.assertEqual(result['status'], 'marked')
+        self.assertEqual(dst.read_bytes(), b'old')
+        self.assertEqual(database.Movie.get(database.Movie.torrent_hash == 'a').status, 'moved_manually')
+        self.assertEqual(database.MoveHistory.select().get().status, 'manual')
+
+    def test_overwrite_replaces_file_after_success(self):
+        self.movie(status='error')
+        dst = self.existing_destination()
+        with self.fake_qb():
+            comparison = mover.manual_move('a')['comparison']
+            result = mover.manual_move('a', decision={'action': 'overwrite', 'fingerprint': comparison['fingerprint']})
+            self.assertEqual(result['status'], 'started')
+            self.wait_for(lambda: not mover.COPY_PROGRESS)
+        self.assertEqual(dst.read_bytes(), b'x')
+        self.assertEqual(database.MoveHistory.select().get().status, 'success')
+        self.assertFalse(list(dst.parent.glob('*.part')))
+
+    def test_cancel_overwrite_preserves_original_and_removes_temporary(self):
+        self.movie(status='error')
+        dst = self.existing_destination()
+        src = Path(self.settings['local_source_path']) / 'Film (2026).mkv'
+        src.write_bytes(b'x' * (2 * 1024 * 1024))
+        self.settings['copy_speed_limit'] = .1
+        with self.fake_qb():
+            comparison = mover.manual_move('a')['comparison']
+            mover.manual_move('a', decision={'action': 'overwrite', 'fingerprint': comparison['fingerprint']})
+            self.wait_for(lambda: bool(list(dst.parent.glob('*.part'))))
+            self.assertEqual(dst.read_bytes(), b'old')
+            mover.stop_copy('a')
+            self.wait_for(lambda: not mover.COPY_PROGRESS)
+        self.assertEqual(dst.read_bytes(), b'old')
+        self.assertFalse(list(dst.parent.glob('*.part')))
+        self.assertEqual(database.MoveHistory.select().get().status, 'cancelled')
+
+    def test_stale_decision_reopens_comparison_instead_of_overwriting(self):
+        self.movie(status='pending')
+        dst = self.existing_destination()
+        with self.fake_qb():
+            comparison = mover.manual_move('a')['comparison']
+            dst.write_bytes(b'changed-after-dialog')
+            result = mover.manual_move('a', decision={'action': 'overwrite', 'fingerprint': comparison['fingerprint']})
+        self.assertEqual(result['status'], 'conflict')
+        self.assertNotEqual(result['comparison']['fingerprint'], comparison['fingerprint'])
+        self.assertEqual(dst.read_bytes(), b'changed-after-dialog')
+        self.assertFalse(mover.COPY_PROGRESS)
+
+    def test_external_destination_change_during_copy_is_preserved(self):
+        self.movie(status='pending')
+        dst = self.existing_destination()
+        original = mover.copy_with_progress
+        def external_change(*args, **kwargs):
+            original(*args, **kwargs)
+            dst.write_bytes(b'external-change')
+        with self.fake_qb(), patch.object(mover, 'copy_with_progress', side_effect=external_change):
+            comparison = mover.manual_move('a')['comparison']
+            mover.manual_move('a', decision={'action': 'overwrite', 'fingerprint': comparison['fingerprint']})
+            self.wait_for(lambda: not mover.COPY_PROGRESS)
+        self.assertEqual(dst.read_bytes(), b'external-change')
+        self.assertFalse(list(dst.parent.glob('*.part')))
+        self.assertEqual(database.MoveHistory.select().get().status, 'error')
+
+    def test_automatic_conflict_holds_without_overwriting(self):
+        self.movie(status='pending')
+        dst = self.existing_destination()
+        with self.fake_qb():
+            result = mover.manual_move('a', automatic=True)
+        self.assertEqual(result['status'], 'conflict')
+        self.assertTrue(database.Movie.get(database.Movie.torrent_hash == 'a').copy_paused)
+        self.assertEqual(dst.read_bytes(), b'old')
+
+    def test_inspection_rejects_source_equals_destination(self):
+        source = Path(self.settings['local_source_path']) / 'Film (2026).mkv'
+        with self.assertRaisesRegex(ValueError, 'same file'):
+            inspect_files(str(source), str(source.parent), 'Film (2026)')
+
+    def load_receptor(self):
+        spec = importlib.util.spec_from_file_location('test_receptor_conflicts', ROOT / 'scripts/roverr_receptor.py')
+        remote = importlib.util.module_from_spec(spec)
+        with patch.object(logging, 'FileHandler', return_value=logging.NullHandler()):
+            spec.loader.exec_module(remote)
+        return remote
+
+    def test_receptor_overwrite_replaces_after_success(self):
+        remote = self.load_receptor()
+        source = Path(self.settings['local_source_path']) / 'Film (2026).mkv'
+        dst = self.existing_destination()
+        comparison = remote.inspect_files(str(source), str(dst.parent), 'Film (2026)')
+        task = remote.CopyTaskHandler('a', str(source), str(dst.parent), 'Film (2026)', True, comparison['fingerprint'])
+        task.run()
+        self.assertEqual(remote.TASKS['a']['status'], 'done')
+        self.assertEqual(dst.read_bytes(), b'x')
+
+    def test_receptor_cancel_overwrite_preserves_existing_file(self):
+        remote = self.load_receptor()
+        source = Path(self.settings['local_source_path']) / 'Film (2026).mkv'
+        dst = self.existing_destination()
+        comparison = remote.inspect_files(str(source), str(dst.parent), 'Film (2026)')
+        task = remote.CopyTaskHandler('a', str(source), str(dst.parent), 'Film (2026)', True, comparison['fingerprint'])
+        original = task._copy_file
+        def cancel(src, target):
+            original(src, target)
+            remote.STOP_FLAGS.add('a')
+        with patch.object(task, '_copy_file', side_effect=cancel):
+            task.run()
+        self.assertEqual(remote.TASKS['a']['status'], 'cancelled')
+        self.assertEqual(dst.read_bytes(), b'old')
+        self.assertFalse(list(dst.parent.glob('*.part')))
+
+    def test_receptor_http_inspect_and_explicit_overwrite_protocol(self):
+        from http.server import HTTPServer
+        import requests
+        remote = self.load_receptor()
+        source = Path(self.settings['local_source_path']) / 'Film (2026).mkv'
+        dst = self.existing_destination()
+        server = HTTPServer(('127.0.0.1', 0), remote.ReceptorServer)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        url = f'http://127.0.0.1:{server.server_port}'
+        payload = {'task_id': 'a', 'source': str(source), 'destination': str(dst.parent), 'folder_name': 'Film (2026)'}
+        try:
+            result = requests.post(url + '/inspect', json=payload, timeout=3)
+            self.assertEqual(result.status_code, 200)
+            comparison = result.json()
+            self.assertTrue(comparison['conflict'])
+            self.assertEqual(requests.post(url + '/copy', json=payload, timeout=3).status_code, 409)
+            self.assertEqual(requests.post(url + '/copy', json=dict(payload, overwrite=True), timeout=3).status_code, 409)
+            with patch.object(remote, 'CopyTaskHandler') as task:
+                response = requests.post(url + '/copy', json=dict(payload, overwrite=True, fingerprint=comparison['fingerprint']), timeout=3)
+                self.assertEqual(response.status_code, 202)
+                task.assert_called_once_with('a', str(source), str(dst.parent), 'Film (2026)', True, comparison['fingerprint'])
+                task.return_value.start.assert_called_once()
+            self.assertEqual(dst.read_bytes(), b'old')
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(2)
+
+    def test_batch_error_movie_returns_comparison_for_decision(self):
+        import logic
+        self.movie(status='error')
+        with patch.object(logic, 'manual_move', return_value={'status': 'conflict', 'comparison': {'torrent_hash': 'a'}}):
+            result = main.batch_copy_movies({'torrent_hashes': ['a']}, Mock())
+        self.assertEqual(result['copied'], 0)
+        self.assertEqual(result['conflicts'], [{'torrent_hash': 'a'}])
 
 
 if __name__ == '__main__':

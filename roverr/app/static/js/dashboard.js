@@ -147,8 +147,8 @@ async function handleFetchRSS() {
 export async function manualMove(hash) {
     const data = await apiMoveManually(hash);
 
-    if (data.status === 'started') {
-        showToast('Move started', 'success');
+    if (data.status === 'started' || data.status === 'marked') {
+        showToast(data.status === 'marked' ? data.message : 'Copia en cola', 'success');
 
         // If in details view for this movie, reload it
         const detailsContainer = document.getElementById('movie-details-content');
@@ -160,7 +160,7 @@ export async function manualMove(hash) {
         }
 
         await fetchTorrents();
-    } else {
+    } else if (data.status !== 'cancelled') {
         showToast(data.message, 'error');
     }
 }

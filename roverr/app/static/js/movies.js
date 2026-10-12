@@ -1262,7 +1262,7 @@ function updateSelectionUI() {
     if (stopSelectedBtn) stopSelectedBtn.style.display = hasSelection ? 'inline-flex' : 'none';
 
     const hasNonErrorMovies = Array.from(selectedMovies.values()).some(
-        m => m.status !== 'error' && m.status !== 'orphaned'
+        m => !['orphaned', 'moved', 'moved_manually'].includes(m.status)
     );
     copySelectedBtn.style.display = (hasSelection && hasNonErrorMovies) ? 'inline-flex' : 'none';
 
@@ -1305,7 +1305,7 @@ async function copySelectedMovies() {
 
     const validHashes = hashes.filter(hash => {
         const movie = selectedMovies.get(hash);
-        return movie.status !== 'error' && movie.status !== 'orphaned';
+        return !['orphaned', 'moved', 'moved_manually'].includes(movie.status);
     });
 
     if (validHashes.length === 0) {
@@ -1316,7 +1316,7 @@ async function copySelectedMovies() {
     const data = await batchCopyMovies(validHashes);
 
     if (data.success) {
-        showToast(`${data.copied} movies queued for copy`, 'success');
+        showToast(`${data.copied} copias en cola; ${data.marked || 0} conservadas; ${data.skipped || 0} canceladas`, 'success');
         deselectAllMovies();
         await fetchMovies();
     } else {

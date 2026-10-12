@@ -1,3 +1,27 @@
+# 4.5.4
+
+- Compare source/destination files before manual copying. When a destination
+  exists, show a dialog with real paths, exact sizes, modification times and the
+  size difference for each file. Equal sizes do not imply verified integrity.
+- Offer **Sobrescribir**, **Conservar y marcar como copiada** and **Cancelar**.
+  The same dialog is used for individual and selected movie copies, including
+  retries of movies currently marked as errors.
+- Overwrite through temporary files and replace the destination after copying
+  finishes; cancelling preserves an existing destination. Recheck the comparison
+  before queued work starts and before replacing files so stale decisions cannot
+  overwrite a changed file.
+- Detect conflicts on the PC via a new Receptor inspection endpoint. Automatic
+  copies hold existing-file conflicts for a manual decision instead of overwriting.
+
+Update and restart the PC's `roverr_receptor.py` before using 4.5.4. The addon
+reports an actionable message if the running receptor lacks file comparison.
+
+Validated with 29 regression tests, including local/remote conflict inspection,
+HTTP routes, retaining files, overwrite completion/cancellation and stale
+comparisons. Browser smoke tests cover desktop/mobile layout and all three
+dialog actions. Install `httpx` alongside addon dependencies to run the HTTP
+route tests.
+
 # 4.5.3
 
 - Monitor download completion with no browser connected. Automatic copy no
