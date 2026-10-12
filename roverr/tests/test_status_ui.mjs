@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-const source=fs.readFileSync(new URL('../app/static/js/templates.js',import.meta.url),'utf8').replace(/^import .* from '.\/ui.js';$/m,'');
+const source=fs.readFileSync(new URL('../app/static/js/templates.js',import.meta.url),'utf8').replace(/^import .* from '.\/ui.js';$/m,'').replace("'./messages.js'", JSON.stringify(new URL('../app/static/js/messages.js',import.meta.url).href));
 const {getMovieStatus}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 assert.equal(getMovieStatus({status:'pending',copy_paused:true,copy_pause_reason:'manual'}).label,'Detenida');
 assert.equal(getMovieStatus({status:'pending',copy_paused:true,copy_pause_reason:'manual'}).action,'Reanudar copia');
@@ -19,7 +19,7 @@ const sizeReason = 'No torrent within size limits (max: 12000 MB)';
 for (const pauseReason of [null, 'manual', 'conflict']) {
     const rss = getMovieStatus({status:'new',state:'rss',progress:0,copy_paused:true,copy_pause_reason:pauseReason,status_reason:sizeReason});
     assert.equal(rss.label,'Por descargar');
-    assert.equal(rss.reason,sizeReason);
+    assert.equal(rss.reason,'No se encontró ningún torrent dentro del tamaño máximo de 12000 MB');
     assert.notEqual(rss.action,'Reanudar copia');
 }
 assert.equal(getMovieStatus({status:'pending',progress:0.5,copy_paused:true,copy_pause_reason:'manual'}).status,'pending');

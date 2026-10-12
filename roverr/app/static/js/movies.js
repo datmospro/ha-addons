@@ -4,6 +4,7 @@
  * Extraído de app.js - líneas 1056-1237, 1239-1567, 1587-1838
  */
 
+import { groupMovies, getMovieVersions } from './movie-groups.js';
 import { state } from './state.js';
 import {
     getMovies, getMovieDetails, identifyMovie as apiIdentifyMovie,
@@ -119,7 +120,7 @@ export async function fetchMovies(isPolling = false) {
     if (!moviesGrid) return;
 
     if (!isPolling && moviesGrid.children.length === 0) {
-        moviesGrid.innerHTML = '<div style="text-align: center; grid-column: 1/-1;">Loading movies...</div>';
+        moviesGrid.innerHTML = '<div style="text-align: center; grid-column: 1/-1;">Cargando películas...</div>';
     }
 
     const data = await getMovies();
@@ -134,7 +135,7 @@ export async function fetchMovies(isPolling = false) {
     updateSeriesNotification(ignored);
 
     if (movies.length === 0) {
-        moviesGrid.innerHTML = '<div style="text-align: center; grid-column: 1/-1;">No movies found.</div>';
+        moviesGrid.innerHTML = '<div style="text-align: center; grid-column: 1/-1;">No se encontraron películas.</div>';
         return;
     }
 
@@ -155,8 +156,8 @@ export function updateSeriesNotification(ignored) {
 
     if (ignored.length > 0) {
         notificationArea.innerHTML = `
-            <div class="series-badge" title="Ignored Series:\n${ignored.join('\n')}">
-                <i class="fa-solid fa-tv"></i> ${ignored.length} Series Ignored
+            <div class="series-badge" title="Series ignoradas:\n${ignored.join('\n')}">
+                <i class="fa-solid fa-tv"></i> ${ignored.length} series ignoradas
             </div>
         `;
         notificationArea.style.display = 'block';
@@ -169,6 +170,16 @@ export function updateSeriesNotification(ignored) {
  * Renderiza las tarjetas de películas
  */
 export function renderMovieCards(movies) {
+    movies = groupMovies(movies);
+    // Keep selection attached to the logical movie when its active version changes.
+    const selected = state.getSelectedMovies();
+    for (const movie of movies) {
+        const previous = movie.versions.find(version => selected.has(version.torrent_hash));
+        if (previous) {
+            movie.versions.forEach(version => selected.delete(version.torrent_hash));
+            selected.set(movie.torrent_hash, {torrent_hash:movie.torrent_hash, title:movie.title, status:movie.status, version_hashes:movie.versions.map(version => version.torrent_hash)});
+        }
+    }
     // Map existing cards
     const existingCards = new Map();
     moviesGrid.querySelectorAll('.movie-card').forEach(card => {
@@ -211,7 +222,8 @@ function updateMovieCard(card, movie, posterSrc, statusClass, statusIcon, status
     card.dataset.movie = JSON.stringify({
         torrent_hash: movie.torrent_hash,
         title: movie.title,
-        status: movie.status
+        status: movie.status,
+        version_hashes: (movie.versions || [movie]).map(version => version.torrent_hash)
     });
     card.dataset.backdrop = movie.backdrop_url || '';
 
@@ -233,7 +245,7 @@ function updateMovieCard(card, movie, posterSrc, statusClass, statusIcon, status
     if (title.textContent !== movie.title) title.textContent = movie.title;
 
     const meta = card.querySelector('.movie-meta');
-    meta.innerHTML = `<span>${movie.year || 'N/A'}</span>${movie.size > 0 ? `<span>${formatBytes(movie.size)}</span>` : ''}`;
+    meta.innerHTML = `${movie.versions?.length > 1 ? `<span>${movie.versions.length} versiones</span>` : ''}<span>${movie.year || 'N/A'}</span>${movie.size > 0 ? `<span>${formatBytes(movie.size)}</span>` : ''}`;
 
     const progressBar = card.querySelector('.progress-bar');
     if (movie.status === 'moved' || movie.status === 'skipped' || movie.status === 'error' || movie.status === 'receptor_offline') {
@@ -245,7 +257,7 @@ function updateMovieCard(card, movie, posterSrc, statusClass, statusIcon, status
 
         let progressPercent = movie.progress * 100;
         if (movie.status === 'copying' && movie.copy_progress) {
-            progressPercent = movie.copy_progress.percent;
+            progressPercent = (movie.copy_progress.percent ?? (movie.copy_progress.progress ?? 0) * 100);
         }
         fill.style.width = `${progressPercent}%`;
     }
@@ -262,7 +274,8 @@ function createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel)
     card.dataset.movie = JSON.stringify({
         torrent_hash: movie.torrent_hash,
         title: movie.title,
-        status: movie.status
+        status: movie.status,
+        version_hashes: (movie.versions || [movie]).map(version => version.torrent_hash)
     });
 
     card.innerHTML = `
@@ -276,6 +289,7 @@ function createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel)
         <div class="movie-info">
             <div class="movie-title" title="${escapeHtml(movie.title)}">${escapeHtml(movie.title)}</div>
             <div class="movie-meta">
+                ${movie.versions?.length > 1 ? `<span>${movie.versions.length} versiones</span>` : ''}
                 <span>${movie.year || 'N/A'}</span>
                 ${movie.size > 0 ? `<span>${formatBytes(movie.size)}</span>` : ''}
             </div>
@@ -283,25 +297,21 @@ function createMovieCard(movie, posterSrc, statusClass, statusIcon, statusLabel)
         </div>
         <div class="progress-bar" style="display: ${['moved', 'skipped', 'error', 'receptor_offline'].includes(movie.status) ? 'none' : 'block'}">
             <div class="fill ${['copying', 'queued'].includes(movie.status) ? 'copying' : getProgressClass(movie.state)}"
-                 style="width: ${(movie.status === 'copying' && movie.copy_progress) ? movie.copy_progress.percent : movie.progress * 100}%"></div>
+                 style="width: ${(movie.status === 'copying' && movie.copy_progress) ? (movie.copy_progress.percent ?? (movie.copy_progress.progress ?? 0) * 100) : movie.progress * 100}%"></div>
         </div>
     `;
 
     // Event listeners
     card.addEventListener('click', (e) => {
         if (!e.target.classList.contains('movie-card-checkbox')) {
-            showMovieDetails(movie.torrent_hash);
+            showMovieDetails(card.dataset.hash);
         }
     });
 
     const checkbox = card.querySelector('.movie-card-checkbox');
     checkbox.addEventListener('click', (e) => {
         e.stopPropagation();
-        toggleMovieSelection(movie.torrent_hash, {
-            torrent_hash: movie.torrent_hash,
-            title: movie.title,
-            status: movie.status
-        }, e);
+        toggleMovieSelection(card.dataset.hash, JSON.parse(card.dataset.movie), e);
     });
 
     // Dashboard hover reactivity
@@ -337,7 +347,7 @@ export async function showMovieDetails(hash) {
     switchView('movie-details');
     const container = document.getElementById('movie-details-content');
     container.setAttribute('data-hash', hash);
-    container.innerHTML = '<div style="text-align: center; padding: 2rem;">Loading details...</div>';
+    container.innerHTML = '<div style="text-align: center; padding: 2rem;">Cargando ficha...</div>';
 
     // Pre-apply backdrop immediately if cached in state
     const globalBackdrop = document.getElementById('global-backdrop');
@@ -378,6 +388,8 @@ function renderMovieDetails(container, movie, hash) {
     container.dataset.status = movie.status;
     container.dataset.statusInfo = JSON.stringify([movie.copy_paused, movie.copy_pause_reason, movie.status_reason]);
     console.log('renderMovieDetails called with movie:', movie.title, 'country_code:', movie.country_code);
+    const versions = getMovieVersions(state.getMovies(), hash);
+    container.dataset.versions = JSON.stringify(versions.map(version => [version.torrent_hash, version.status, version.status_reason]));
     const runtime = movie.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m` : 'N/A';
     const { icon: statusIcon, label: statusLabel } = getMovieStatus(movie);
     const statusClass = getMovieStatus(movie).cssClass;
@@ -389,7 +401,7 @@ function renderMovieDetails(container, movie, hash) {
             <div class="cast-name">${escapeHtml(person.name)}</div>
             <div class="cast-character">como ${escapeHtml(person.character)}</div>
         </div>
-    `).join('') : '<p>No cast information available.</p>';
+    `).join('') : '<p>No hay información del reparto.</p>';
 
     const crewHTML = movie.crew && movie.crew.length > 0 ? movie.crew.map(person => `
         <div class="cast-card">
@@ -397,7 +409,7 @@ function renderMovieDetails(container, movie, hash) {
             <div class="cast-name">${escapeHtml(person.name)}</div>
             <div class="cast-character">como ${escapeHtml(person.job)}</div>
         </div>
-    `).join('') : '<p>No crew information available.</p>';
+    `).join('') : '<p>No hay información del equipo.</p>';
 
     // Update global cinematic backdrop
     const globalBackdrop = document.getElementById('global-backdrop');
@@ -422,8 +434,8 @@ function renderMovieDetails(container, movie, hash) {
     container.innerHTML = `
         <div class="movie-sticky-header">
             <div class="header-top">
-                <h2>Movie Details</h2>
-                <button class="btn secondary back-to-dashboard"><i class="fa-solid fa-arrow-left"></i> Back</button>
+                <h2>Ficha de la película</h2>
+                <button class="btn secondary back-to-dashboard"><i class="fa-solid fa-arrow-left"></i> Volver</button>
             </div>
             <div class="movie-action-bar">
                 ${!['moved', 'moved_manually', 'copying', 'queued', 'receptor_offline', 'missing', 'new', 'downloading', 'orphaned'].includes(movie.status) ?
@@ -432,9 +444,9 @@ function renderMovieDetails(container, movie, hash) {
             `<button class="btn danger stop-copy-btn" data-hash="${movie.torrent_hash}"><i class="fa-solid fa-stop"></i> Detener copia</button>` : ''}
                 ${movie.status === 'missing' || movie.status === 'receptor_offline' ?
             `<button class="btn warning retry-move-btn" data-hash="${hash}"><i class="fa-solid fa-rotate-right"></i> Reintentar copia</button>` : ''}
-                <button class="btn secondary identify-btn" data-hash="${hash}"><i class="fa-solid fa-magnifying-glass"></i> Identify Manually</button>
-                <button class="btn secondary manual-search-btn" data-hash="${hash}"><i class="fa-solid fa-globe"></i> Manual Search</button>
-                <button class="btn danger delete-movie-btn" data-hash="${hash}"><i class="fa-solid fa-trash"></i> Remove from Dashboard</button>
+                <button class="btn secondary identify-btn" data-hash="${hash}"><i class="fa-solid fa-magnifying-glass"></i> Identificar película</button>
+                <button class="btn secondary manual-search-btn" data-hash="${hash}"><i class="fa-solid fa-globe"></i> Buscar descarga</button>
+                <button class="btn danger delete-movie-btn" data-hash="${hash}"><i class="fa-solid fa-trash"></i> Eliminar del panel</button>
             </div>
         </div>
         
@@ -448,24 +460,31 @@ function renderMovieDetails(container, movie, hash) {
                 <h1>${escapeHtml(movie.title)} <span class="year">(${movie.year || 'N/A'})</span></h1>
                 
                 
+                ${versions.length > 1 ? `<section class="movie-versions" style="margin: 1rem 0; padding: 1rem; border: 1px solid var(--border); border-radius: 8px;">
+                    <h3>Versiones y descargas (${versions.length})</h3>
+                    <p>Las acciones de esta ficha se aplican a la versión seleccionada. Abre otra versión para gestionarla.</p>
+                    ${versions.map(version => `<button class="btn secondary movie-version-btn" data-hash="${escapeHtml(version.torrent_hash)}" style="display: block; margin: .5rem 0; width: 100%; text-align: left; white-space: normal;" ${version.torrent_hash === hash ? 'disabled aria-current="true"' : ''}>
+                    ${escapeHtml(version.torrent_name || version.title)} · ${escapeHtml(getMovieStatus(version).label)}${version.size ? ` · ${formatBytes(version.size)}` : ''}
+                    ${getMovieStatus(version).reason ? `<small style="display:block">${escapeHtml(getMovieStatus(version).reason)}</small>` : ''}</button>`).join('')}
+                </section>` : ''}
                 <div class="meta-row">
                     <span class="badge status ${statusClass}" title="${escapeHtml(getMovieStatus(movie).reason)}">${statusIcon} ${statusLabel}</span>
                     ${movie.source_tag ? `<span class="badge source-tag" style="background: rgba(255, 107, 107, 0.15); color: #ff6b6b; border: 1px solid rgba(255, 107, 107, 0.3); font-weight: 600;"><i class="fa-solid fa-film"></i> ${escapeHtml(movie.source_tag)}</span>` : ''}
                     <span class="badge runtime"><i class="fa-regular fa-clock"></i> ${runtime}</span>
                     <span class="badge size"><i class="fa-solid fa-hard-drive"></i> ${movie.size > 0 ? formatBytes(movie.size) : 'N/A'}</span>
                     ${movie.country_code ? `<span class="badge country" title="${escapeHtml(getCountryName(movie.country_code))}"><span class="flag-emoji">${countryCodeToFlag(movie.country_code)}</span></span>` : ''}
-                    <button class="badge trailer-badge" data-hash="${hash}" title="Trailer" aria-label="Play YouTube trailer"><i class="fa-brands fa-youtube"></i></button>
+                    <button class="badge trailer-badge" data-hash="${hash}" title="Trailer" aria-label="Reproducir tráiler en YouTube"><i class="fa-brands fa-youtube"></i></button>
                 </div>
                 
                 <div class="movie-status-reason" role="status" style="margin: 1rem 0; padding: 1rem; border: 1px solid var(--border); border-radius: 8px;" ${getMovieStatus(movie).reason ? '' : 'hidden'}>${escapeHtml(getMovieStatus(movie).reason)}</div>
                 ${['copying', 'queued'].includes(movie.status) && movie.copy_progress ? `
                 <div class="details-progress-container">
                     <div class="progress-info">
-                        <span>${movie.status === 'queued' ? getQueueLabel(movie.copy_progress) : `Copiando... ${movie.copy_progress.percent}%`}</span>
+                        <span>${movie.status === 'queued' ? getQueueLabel(movie.copy_progress) : `Copiando... ${(movie.copy_progress.percent ?? (movie.copy_progress.progress ?? 0) * 100)}%`}</span>
                         <span>${movie.status === 'queued' ? 'Esperando turno' : `${movie.copy_progress.speed} MB/s`}</span>
                     </div>
                     <div class="progress-bar large">
-                        <div class="details-progress-fill copying" style="width: ${movie.copy_progress.percent}%"></div>
+                        <div class="details-progress-fill copying" style="width: ${(movie.copy_progress.percent ?? (movie.copy_progress.progress ?? 0) * 100)}%"></div>
                     </div>
                 </div>` : ''}
                 
@@ -492,15 +511,15 @@ function renderMovieDetails(container, movie, hash) {
                 </div>
                 
                 <div class="ratings-section">
-                    <h3>Ratings</h3>
+                    <h3>Valoraciones</h3>
                     <div class="ratings-grid">
-                        <div class="rating-badge tmdb ${movie.tmdb_id ? 'clickable' : ''}" ${movie.tmdb_id ? `data-url="https://www.themoviedb.org/movie/${movie.tmdb_id}"` : ''} title="${movie.tmdb_id ? 'View on TMDB' : ''}">
+                        <div class="rating-badge tmdb ${movie.tmdb_id ? 'clickable' : ''}" ${movie.tmdb_id ? `data-url="https://www.themoviedb.org/movie/${movie.tmdb_id}"` : ''} title="${movie.tmdb_id ? 'Ver en TMDB' : ''}">
                             <div class="rating-source">TMDB</div>
                             <div class="rating-value">${movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A'}</div>
                             <div class="rating-count">${movie.vote_count ? `${movie.vote_count} votes` : ''}</div>
                         </div>
                         ${movie.imdb_id ? `
-                        <div class="rating-badge imdb clickable" data-url="https://www.imdb.com/title/${movie.imdb_id}" title="View on IMDb">
+                        <div class="rating-badge imdb clickable" data-url="https://www.imdb.com/title/${movie.imdb_id}" title="Ver en IMDb">
                             <div class="rating-source">IMDb</div>
                             <div class="rating-value">${movie.imdb_rating || 'N/A'}</div>
                             <div class="rating-count">${movie.imdb_votes ? `${movie.imdb_votes} votes` : ''}</div>
@@ -510,17 +529,17 @@ function renderMovieDetails(container, movie, hash) {
                 
                 <div class="paths-box">
                     <div class="path-item">
-                        <label>Current Location:</label>
-                        ${movie.source_path && movie.source_path !== 'N/A' ? `<code>${escapeHtml(movie.source_path)}</code>` : '<span class="badge secondary" style="background: var(--bg-tertiary); color: var(--text-muted); border: 1px solid var(--border); font-size: 0.85rem; padding: 0.25rem 0.6rem; border-radius: 6px;">Not available</span>'}
+                        <label>Ubicación actual:</label>
+                        ${movie.source_path && movie.source_path !== 'N/A' ? `<code>${escapeHtml(movie.source_path)}</code>` : '<span class="badge secondary" style="background: var(--bg-tertiary); color: var(--text-muted); border: 1px solid var(--border); font-size: 0.85rem; padding: 0.25rem 0.6rem; border-radius: 6px;">No disponible</span>'}
                     </div>
                     <div class="path-item">
-                        <label>Destination:</label>
-                        ${movie.dest_path && movie.dest_path !== 'N/A' ? `<code>${escapeHtml(movie.dest_path)}</code>` : '<span class="badge secondary" style="background: var(--bg-tertiary); color: var(--text-muted); border: 1px solid var(--border); font-size: 0.85rem; padding: 0.25rem 0.6rem; border-radius: 6px;">Not available</span>'}
+                        <label>Destino:</label>
+                        ${movie.dest_path && movie.dest_path !== 'N/A' ? `<code>${escapeHtml(movie.dest_path)}</code>` : '<span class="badge secondary" style="background: var(--bg-tertiary); color: var(--text-muted); border: 1px solid var(--border); font-size: 0.85rem; padding: 0.25rem 0.6rem; border-radius: 6px;">No disponible</span>'}
                     </div>
                 </div>
                 
                 <div class="synopsis">
-                    <h3>Synopsis</h3>
+                    <h3>Sinopsis</h3>
                     <p>${movie.overview || 'No synopsis available.'}</p>
                 </div>
                 
@@ -571,6 +590,7 @@ function setupMovieDetailsListeners(hash) {
         });
     }
 
+    container.querySelectorAll('.movie-version-btn').forEach(button => button.addEventListener('click', () => showMovieDetails(button.dataset.hash)));
     const moveBtn = container.querySelector('.move-now-btn');
     if (moveBtn) {
         moveBtn.addEventListener('click', async () => {
@@ -749,13 +769,13 @@ async function identifyMovie(hash) {
     currentIdentifyHash = hash;
     const movie = await getMovieDetails(hash);
     if (movie.error) {
-        showToast('Error loading movie details', 'error');
+        showToast('Error al cargar la ficha', 'error');
         return;
     }
 
     const modal = document.getElementById('identify-modal');
     if (!modal) {
-        showToast('Identification modal not loaded', 'error');
+        showToast('No se pudo abrir la ventana de identificación', 'error');
         return;
     }
 
@@ -768,7 +788,7 @@ async function identifyMovie(hash) {
 
     // Setup input value
     searchInput.value = movie.title || '';
-    resultsEl.innerHTML = '<p class="empty-state" style="text-align: center; color: var(--text-muted); font-style: italic; padding: 2rem 0;">Click Search to find matches.</p>';
+    resultsEl.innerHTML = '<p class="empty-state" style="text-align: center; color: var(--text-muted); font-style: italic; padding: 2rem 0;">Pulsa Buscar para encontrar coincidencias.</p>';
     loadingEl.style.display = 'none';
 
     // Show modal
@@ -793,7 +813,7 @@ async function identifyMovie(hash) {
 
 async function performIdentifySearch(query) {
     if (!query) {
-        showToast('Please enter a movie title', 'warning');
+        showToast('Introduce el título de la película', 'warning');
         return;
     }
 
@@ -814,7 +834,7 @@ async function performIdentifySearch(query) {
         }
 
         if (!data.results || data.results.length === 0) {
-            resultsEl.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 2rem;">No matches found on TMDB.</div>`;
+            resultsEl.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 2rem;">No se encontraron coincidencias en TMDB.</div>`;
             return;
         }
 
@@ -822,7 +842,7 @@ async function performIdentifySearch(query) {
     } catch (e) {
         console.error(e);
         loadingEl.style.display = 'none';
-        resultsEl.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 2rem;">Error performing search</div>`;
+        resultsEl.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 2rem;">Error al realizar la búsqueda</div>`;
     }
 }
 
@@ -862,23 +882,23 @@ window.executeIdentifyMovie = async function (tmdbId, title) {
     if (!currentIdentifyHash) return;
     
     closeModal('identify-modal');
-    showToast(`Identifying torrent as "${title}"...`, 'info');
+    showToast(`Identificando el torrent como "${title}"...`, 'info');
     
     try {
         const data = await apiIdentifyMovie(currentIdentifyHash, tmdbId);
         if (data.success) {
-            showToast('Movie identified successfully!', 'success');
+            showToast('Película identificada correctamente.', 'success');
             showMovieDetails(currentIdentifyHash);
             
             // Also refresh dashboard to update titles/poster
             const { fetchMovies } = await import('./movies.js');
             await fetchMovies();
         } else {
-            showToast(data.message || 'Error identifying movie', 'error');
+            showToast(data.message || 'Error al identificar la película', 'error');
         }
     } catch (e) {
         console.error(e);
-        showToast('Error identifying movie', 'error');
+        showToast('Error al identificar la película', 'error');
     }
 }
 
@@ -922,7 +942,7 @@ let manualSearchContext = {
 async function handleManualSearch(hash) {
     const movie = await getMovieDetails(hash);
     if (movie.error) {
-        showToast('Error loading movie details', 'error');
+        showToast('Error al cargar la ficha', 'error');
         return;
     }
 
@@ -940,7 +960,7 @@ async function handleManualSearch(hash) {
     const loadingEl = document.getElementById('manual-search-loading');
     const resultsEl = document.getElementById('manual-search-results');
 
-    titleEl.textContent = `Manual Search: ${movie.title}`;
+    titleEl.textContent = `Buscar descarga: ${movie.title}`;
 
     // Set input to movie title
     searchInput.value = movie.title;
@@ -974,8 +994,8 @@ async function handleManualSearch(hash) {
     if (data.results.length === 0) {
         resultsEl.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--text-muted);">
             <i class="fa-solid fa-search" style="font-size: 2rem; opacity: 0.5; margin-bottom: 0.5rem;"></i>
-            <p>No results found for "<strong>${escapeHtml(movie.title)}</strong>"</p>
-            <p style="font-size: 0.9rem; margin-top: 0.5rem;">Try modifying the search query above and click Search.</p>
+            <p>No se encontraron resultados para "<strong>${escapeHtml(movie.title)}</strong>"</p>
+            <p style="font-size: 0.9rem; margin-top: 0.5rem;">Modifica la búsqueda y pulsa Buscar.</p>
         </div>`;
         return;
     }
@@ -990,7 +1010,7 @@ async function performCustomSearch() {
 
     const customQuery = searchInput.value.trim();
     if (!customQuery) {
-        showToast('Please enter a search query', 'warning');
+        showToast('Introduce una búsqueda', 'warning');
         return;
     }
 
@@ -1009,8 +1029,8 @@ async function performCustomSearch() {
     if (data.results.length === 0) {
         resultsEl.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--text-muted);">
             <i class="fa-solid fa-search" style="font-size: 2rem; opacity: 0.5; margin-bottom: 0.5rem;"></i>
-            <p>No results found for "<strong>${escapeHtml(customQuery)}</strong>"</p>
-            <p style="font-size: 0.9rem; margin-top: 0.5rem;">Try a different search query.</p>
+            <p>No se encontraron resultados para "<strong>${escapeHtml(customQuery)}</strong>"</p>
+            <p style="font-size: 0.9rem; margin-top: 0.5rem;">Prueba con otra búsqueda.</p>
         </div>`;
         return;
     }
@@ -1036,7 +1056,7 @@ function renderManualSearchResults(container, results, movieTitle, originalHash)
                             </div>
                         </div>
                         <button class="btn primary download-manual-btn" data-url="${escapeHtml(result.download_url)}" data-title="${escapeHtml(movieTitle)}" style="white-space: nowrap; flex-shrink: 0;">
-                            <i class="fa-solid fa-download"></i> Download
+                            <i class="fa-solid fa-download"></i> Descargar
                         </button>
                     </div>
                 </div>
@@ -1053,11 +1073,11 @@ function renderManualSearchResults(container, results, movieTitle, originalHash)
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Adding...';
 
-            showToast(`Adding torrent for ${title}...`, 'info');
+            showToast(`Añadiendo torrent para ${title}...`, 'info');
             const res = await addTorrent(url, title);
 
             if (res.success) {
-                showToast('Torrent added successfully!', 'success');
+                showToast('Torrent añadido correctamente.', 'success');
 
                 // Update button state to success
                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Added';
@@ -1065,11 +1085,11 @@ function renderManualSearchResults(container, results, movieTitle, originalHash)
                 btn.classList.add('success');
 
                 // Delete the old movie entry from Dashboard DB to avoid duplicates
-                if (originalHash) {
+                if (originalHash && state.getMovies().find(movie => movie.torrent_hash === originalHash)?.state === 'rss') {
                     console.log(`Deleting old movie entry ${originalHash} to prevent duplicates...`);
                     await batchDeleteMovies([originalHash], {
                         deleteFromDB: true,
-                        deleteFromDestination: false,
+                        deleteFromDestino: false,
                         ignoreMovie: false
                     });
                 }
@@ -1087,7 +1107,7 @@ function renderManualSearchResults(container, results, movieTitle, originalHash)
                     }
                 }, 1500);
             } else {
-                showToast(res.message || 'Error adding torrent', 'error');
+                showToast(res.message || 'Error al añadir el torrent', 'error');
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-download"></i> Download';
             }
@@ -1103,13 +1123,13 @@ async function showTrailerModal(hash) {
     const modalTitle = document.getElementById('trailer-modal-title');
 
     if (!modal || !trailerContainer) {
-        showToast('Error loading trailer modal', 'error');
+        showToast('Error al abrir el tráiler', 'error');
         return;
     }
 
     // Show loading state
     modalTitle.textContent = 'Cargando tráiler...';
-    trailerContainer.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>';
+    trailerContainer.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Cargando...</div>';
     modal.classList.add('active');
 
     try {
@@ -1139,8 +1159,8 @@ async function showTrailerModal(hash) {
         `;
 
     } catch (error) {
-        console.error('Error loading trailer:', error);
-        trailerContainer.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--danger);">Error loading trailer</div>';
+        console.error('Error al cargar el tráiler:', error);
+        trailerContainer.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--danger);">Error al cargar el tráiler</div>';
         modalTitle.textContent = 'Error';
     }
 }
@@ -1303,7 +1323,7 @@ function updateSelectionUI() {
 }
 
 async function stopSelectedCopies() {
-    const hashes = Array.from(state.getSelectedMovies().keys());
+    const hashes = [...new Set([...state.getSelectedMovies().values()].flatMap(movie => movie.version_hashes || [movie.torrent_hash]))];
     if (!hashes.length) return;
     if (!confirm('¿Detener las copias seleccionadas? Se eliminarán los archivos creados por las copias incompletas y quedarán pendientes de inicio manual.')) return;
     stopSelectedBtn.disabled = true;
@@ -1330,7 +1350,7 @@ async function copySelectedMovies() {
     });
 
     if (validHashes.length === 0) {
-        showToast('No valid movies to copy', 'warning');
+        showToast('No hay películas disponibles para copiar', 'warning');
         return;
     }
 
@@ -1341,7 +1361,7 @@ async function copySelectedMovies() {
         deselectAllMovies();
         await fetchMovies();
     } else {
-        showToast(data.message || 'Error copying movies', 'error');
+        showToast(data.message || 'Error al copiar las películas', 'error');
     }
 }
 
@@ -1356,19 +1376,19 @@ async function confirmDeleteSelectedMovies() {
     if (watchlistMovie) {
         // Watchlist mode - only needs watchlist checked
         if (!deleteFromDB) {
-            showToast('Watchlist requires removing from dashboard', 'warning');
+            showToast('Para ponerla en seguimiento debes retirarla del panel', 'warning');
             return;
         }
     } else {
         // Normal delete mode
         if (!deleteFromDB && !deleteFromDestination) {
-            showToast('Please select at least one option', 'warning');
+            showToast('Selecciona al menos una opción', 'warning');
             return;
         }
     }
 
     const selectedMovies = state.getSelectedMovies();
-    const hashes = Array.from(selectedMovies.keys());
+    const hashes = [...new Set([...selectedMovies.values()].flatMap(movie => movie.version_hashes || [movie.torrent_hash]))];
     const isInDetailView = getCurrentView() === 'movie-details';
 
     const data = await batchDeleteMovies(hashes, {
@@ -1382,10 +1402,10 @@ async function confirmDeleteSelectedMovies() {
     if (data.success) {
         let message = '';
         if (data.added_to_watchlist) {
-            message = `${data.added_to_watchlist} movie(s) added to watchlist for ${watchlistDays} days`;
+            message = `${data.added_to_watchlist} películas en seguimiento durante ${watchlistDays} días`;
         } else {
-            if (deleteFromDB) message += `${data.deleted_from_db} removed from DB. `;
-            if (deleteFromDestination) message += `${data.deleted_from_folder} files deleted.`;
+            if (deleteFromDB) message += `${data.deleted_from_db} registros eliminados. `;
+            if (deleteFromDestination) message += `${data.deleted_from_folder} archivos eliminados.`;
         }
 
         showToast(message.trim(), 'success');
@@ -1398,7 +1418,7 @@ async function confirmDeleteSelectedMovies() {
 
         await fetchMovies();
     } else {
-        showToast(data.message || 'Error processing request', 'error');
+        showToast(data.message || 'Error al procesar la solicitud', 'error');
     }
 }
 

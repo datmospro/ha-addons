@@ -517,7 +517,7 @@ def get_movie_videos(tmdb_id, api_key):
         
         if res.status_code != 200:
             logger.error(f"TMDB videos API error: {res.status_code}")
-            return {"success": False, "message": "API error"}
+            return {"success": False, "message": "Error de la API"}
         
         data = res.json()
         videos = data.get('results', [])
@@ -537,7 +537,7 @@ def get_movie_videos(tmdb_id, api_key):
         ]
         
         if not trailers:
-            return {"success": False, "message": "No trailer available"}
+            return {"success": False, "message": "No hay tráiler disponible"}
         
         # Prioritize official trailers
         official_trailers = [t for t in trailers if t.get('official', False)]
@@ -1028,6 +1028,8 @@ def get_movie_data(torrents, api_key):
             ).start()
         
         movies.append({
+            "tmdb_id": m.tmdb_id,
+            "torrent_name": m.torrent_name,
             "copy_paused": m.copy_paused,
             "copy_pause_reason": m.copy_pause_reason,
             "title": m.title,
@@ -1060,7 +1062,7 @@ def identify_movie(torrent_hash, tmdb_id, api_key):
     """
     movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
     if not movie:
-        return False, "Movie not found in dashboard"
+        return False, "Película no encontrada en el panel"
         
     try:
         # Fetch complete details from TMDB (localized for metadata)
@@ -1069,7 +1071,7 @@ def identify_movie(torrent_hash, tmdb_id, api_key):
         res = requests.get(url, params=params, timeout=5)
         
         if res.status_code != 200:
-            return False, "TMDB ID not found"
+            return False, "ID de TMDB no encontrado"
             
         details = res.json()
         
@@ -1163,7 +1165,7 @@ def identify_movie(torrent_hash, tmdb_id, api_key):
             
         movie.save()
         trigger_movies_update_callback()
-        return True, "Movie identified successfully"
+        return True, "Película identificada correctamente"
         
     except Exception as e:
         logger.error(f"Error identifying movie {torrent_hash}: {e}")
@@ -1431,7 +1433,7 @@ def get_movie_details(torrent_hash, api_key):
                     "imdb_rating": movie.imdb_rating,
                     "imdb_votes": movie.imdb_votes
                 }
-            return {"error": "Movie not found in torrent client"}
+            return {"error": "Película no encontrada en el cliente de torrents"}
             
         t = torrents[0]
         name = t.name

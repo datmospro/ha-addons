@@ -1,3 +1,4 @@
+import { getMovieVersions } from './movie-groups.js';
 import { state } from './state.js';
 import { getProgressClass } from './ui.js';
 import { getCopyStatusTooltip, getMovieStatus } from './templates.js';
@@ -49,7 +50,7 @@ export function connectWebSocket() {
                 renderMovieCards(data.movies || []);
                 const details = document.getElementById('movie-details-content');
                 const current = (data.movies || []).find(movie => movie.torrent_hash === details?.dataset.hash);
-                if (current && (details.dataset.status !== current.status || details.dataset.statusInfo !== JSON.stringify([current.copy_paused, current.copy_pause_reason, current.status_reason]))) {
+                if (current && (details.dataset.versions !== JSON.stringify(getMovieVersions(data.movies || [], current.torrent_hash).map(version => [version.torrent_hash, version.status, version.status_reason])) || details.dataset.status !== current.status || details.dataset.statusInfo !== JSON.stringify([current.copy_paused, current.copy_pause_reason, current.status_reason]))) {
                     const { getCurrentView } = await import('./navigation.js');
                     if (getCurrentView() === 'movie-details') {
                         const { showMovieDetails } = await import('./movies.js');
@@ -108,6 +109,8 @@ async function updateRealtimeProgress(progressData) {
         return { ...movie, status, copy_progress: progress.type === 'copying' ? progress : undefined };
     }));
 
+    const { renderMovieCards } = await import('./movies.js');
+    renderMovieCards(state.getMovies());
     const { getCurrentView } = await import('./navigation.js');
     const currentView = getCurrentView();
     

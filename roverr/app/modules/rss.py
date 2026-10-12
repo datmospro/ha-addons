@@ -37,7 +37,7 @@ def test_rss_feed(url):
         
         # Check if we got any entries
         if not feed.entries:
-            return False, "RSS feed is empty or invalid", None
+            return False, "La fuente RSS está vacía o no es válida", None
         
         # Extract feed info
         feed_info = {
@@ -47,12 +47,12 @@ def test_rss_feed(url):
             'latest_entry': feed.entries[0].get('title', 'N/A') if feed.entries else 'N/A'
         }
         
-        logger.info(f"RSS feed valid: {feed_info['title']} ({feed_info['entries_count']} entries)")
-        return True, f"RSS feed valid: {feed_info['entries_count']} entries found", feed_info
+        logger.info(f"Fuente RSS válida: {feed_info['title']} ({feed_info['entries_count']} entries)")
+        return True, f"Fuente RSS válida: {feed_info['entries_count']} entradas encontradas", feed_info
         
     except Exception as e:
         logger.error(f"RSS feed test error: {e}")
-        return False, f"Error testing RSS feed: {str(e)}", None
+        return False, f"Error al probar la fuente RSS: {str(e)}", None
 
 def is_movie_ignored(title, year, tmdb_id, ignored_movies):
     def normalize(t):
@@ -181,8 +181,8 @@ def fetch_rss_movies(limit=30):
     ))
     
     if not feeds:
-        logger.warning("ÔÜá´©Å  [RSS] No RSS feeds configured")
-        return {"success": False, "message": "No RSS feeds configured"}
+        logger.warning("ÔÜá´©Å  [RSS] No hay fuentes RSS configuradas")
+        return {"success": False, "message": "No hay fuentes RSS configuradas"}
         
     # Create map for easy config lookup
     feed_map = {f.get('name'): f for f in feeds}
@@ -628,7 +628,7 @@ def fetch_rss_movies(limit=30):
                 progress=0.0,
                 size=0,
                 status='new', # Changed from 'rss_new' to 'new' per user request
-                status_reason="Auto-download disabled for this feed",  # Reason for 'new' status
+                status_reason="La descarga automática está desactivada para esta fuente RSS",  # Reason for 'new' status
                 cast=metadata.get('cast') if metadata else None,
                 crew=metadata.get('crew') if metadata else None,
                 vote_average=metadata.get('vote_average') if metadata else 0,

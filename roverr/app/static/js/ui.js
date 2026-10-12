@@ -1,3 +1,4 @@
+import { translateMessage } from './messages.js';
 /**
  * Utilidades de UI para Roverr
  * Extraído de app.js - funciones showToast, modales, utilidades
@@ -70,7 +71,7 @@ export function showToast(message, type = 'info') {
 
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    toast.textContent = message;
+    toast.textContent = translateMessage(message);
 
     toastContainer.appendChild(toast);
     setTimeout(() => {

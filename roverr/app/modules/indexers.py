@@ -114,7 +114,7 @@ def get_prowlarr_stats(indexer_config):
         logger.error(f"Request error connecting to Prowlarr: {e}")
         return {
             'success': False,
-            'message': f'Connection error: {str(e)}'
+            'message': f'Error de conexión: {str(e)}'
         }
     except Exception as e:
         logger.error(f"Error getting Prowlarr stats: {e}")
@@ -131,15 +131,15 @@ def test_indexer_connection(url, api_key):
         if resp.status_code == 200:
             content_type = resp.headers.get('Content-Type', '')
             if 'application/xml' in content_type or 'text/xml' in content_type or resp.text.strip().startswith('<?xml'):
-                return True, "Connection successful"
+                return True, "Conexión establecida"
             else:
                 # Show snippet of what we received
                 preview = resp.text[:100].replace('\n', ' ').replace('\r', '')
-                return False, f"Connected, but response is not valid XML. Received: {preview}..."
+                return False, f"Conexión establecida, pero la respuesta no es XML válido. Recibido: {preview}..."
         elif resp.status_code == 401:
-            return False, "Unauthorized: Invalid API Key"
+            return False, "Acceso denegado: clave API no válida"
         else:
-            return False, f"Connection failed: Status {resp.status_code}"
+            return False, f"Falló la conexión. Estado: {resp.status_code}"
 
     try:
         # Clean URL
@@ -162,7 +162,7 @@ def test_indexer_connection(url, api_key):
             alt_success, alt_message = check_response(alt_response)
             
             if alt_success:
-                return True, "Connection successful (URL auto-corrected to end with /api)"
+                return True, "Conexión establecida (URL corregida para terminar en /api)"
             else:
                 # If retry also failed, return the retry's error as it's likely the more 'correct' URL
                 return False, f"Retry ({alt_url}) failed: {alt_message}"
@@ -171,10 +171,10 @@ def test_indexer_connection(url, api_key):
             
     except requests.exceptions.RequestException as e:
         logger.error(f"Indexer connection error: {e}")
-        return False, f"Connection error: {str(e)}"
+        return False, f"Error de conexión: {str(e)}"
     except Exception as e:
         logger.error(f"Unexpected error testing indexer: {e}")
-        return False, f"Unexpected error: {str(e)}"
+        return False, f"Error inesperado: {str(e)}"
 
 def calculate_title_similarity(title1, title2):
     """
@@ -413,7 +413,7 @@ def search_indexers(query, settings, tmdb_id=None):
     
     indexers = settings.get('indexers', [])
     if not indexers:
-        logger.warning("ÔÜá´©Å  [SEARCH] No indexers configured")
+        logger.warning("ÔÜá´©Å  [SEARCH] No hay indexadores configurados")
         return {"results": [], "total": 0}
     
     logger.info(f"­ƒôí [SEARCH] Searching {len(indexers)} configured indexer(s)")
@@ -876,14 +876,14 @@ def auto_download_movie(title, year, preferred_size_gb, max_size_gb, label=None,
     
     if not results:
         logger.info(f"No search results found for: {query}")
-        return None, None, "No torrents found"
+        return None, None, "No se encontraron torrents"
         
     # 2. Select Best Torrent
     best_torrent = select_best_torrent(results, preferred_size_gb, max_size_gb)
     
     if not best_torrent:
         logger.info(f"No suitable torrent found for {title} within size limits (Max: {max_size_gb}MB)")
-        return None, None, f"No torrent within size limits (max: {max_size_gb} MB)"
+        return None, None, f"No se encontró ningún torrent dentro del tamaño máximo de {max_size_gb} MB"
         
     logger.info(f"Selected torrent: {best_torrent['title']} ({int(best_torrent['size_mb'])} MB)")
     
@@ -950,6 +950,6 @@ def auto_download_movie(title, year, preferred_size_gb, max_size_gb, label=None,
         return None, None, "Pendiente de confirmación de qBittorrent; se enlazará al detectar el torrent"
 
     except Exception as e:
-        logger.error(f"Error adding torrent to download client: {e}")
-        return None, None, f"Download client error: {str(e)}"
+        logger.error(f"Error al añadir el torrent to download client: {e}")
+        return None, None, f"Error del cliente de descargas: {str(e)}"
 

@@ -403,14 +403,14 @@ def update_settings(settings: dict):
     source_path = settings.get('local_source_path', '').strip()
     dest_path = settings.get('local_dest_path', '').strip()
     if not source_path or not dest_path:
-        raise HTTPException(status_code=400, detail="Source Path and Destination Path are required and cannot be empty")
+        raise HTTPException(status_code=400, detail="Las rutas de origen y destino son obligatorias")
     # This internal migration flag must survive settings saved by an older
     # browser tab, otherwise future completed downloads become recovery holds.
     current_settings = load_settings()
     if current_settings.get('copy_recovery_453_done'):
         settings['copy_recovery_453_done'] = True
     save_settings(settings)
-    return {"success": True, "message": "Settings saved"}
+    return {"success": True, "message": "Configuración guardada"}
 
 @app.get("/api/indexer/stats/{indexer_id}")
 def get_indexer_stats(indexer_id: int):
@@ -422,7 +422,7 @@ def get_indexer_stats(indexer_id: int):
         indexers = settings.get('indexers', [])
         
         if indexer_id >= len(indexers):
-            return {"success": False, "message": "Indexer not found"}
+            return {"success": False, "message": "Indexador no encontrado"}
         
         indexer = indexers[indexer_id]
         stats = get_prowlarr_stats(indexer)
@@ -479,7 +479,7 @@ def identify_movie_endpoint(torrent_hash: str, payload: dict):
     tmdb_id = payload.get('tmdb_id')
     
     if not api_key or not tmdb_id:
-        return {"success": False, "message": "Missing API Key or TMDB ID"}
+        return {"success": False, "message": "Falta la clave API o el ID de TMDB"}
         
     from logic import identify_movie
     success, message = identify_movie(torrent_hash, tmdb_id, api_key)
@@ -490,12 +490,12 @@ def get_movie_details_endpoint(torrent_hash: str):
     settings = load_settings()
     api_key = settings.get('tmdb_api_key')
     if not api_key:
-        return {"error": "No API Key"}
+        return {"error": "No Clave API"}
         
     from logic import get_movie_details, get_copy_progress
     details = get_movie_details(torrent_hash, api_key)
     if not details:
-        return {"error": "Movie not found"}
+        return {"error": "Película no encontrada"}
         
     # Inject Copy Progress
     progress_data = get_copy_progress()
@@ -518,16 +518,16 @@ def get_movie_trailer_endpoint(torrent_hash: str):
     api_key = settings.get('tmdb_api_key')
     
     if not api_key:
-        return {"success": False, "message": "TMDB API key not configured"}
+        return {"success": False, "message": "La clave API de TMDB no está configurada"}
     
     try:
         # Get movie from database to retrieve TMDB ID
         movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
         if not movie:
-            return {"success": False, "message": "Movie not found"}
+            return {"success": False, "message": "Película no encontrada"}
         
         if not movie.tmdb_id:
-            return {"success": False, "message": "TMDB ID not available for this movie"}
+            return {"success": False, "message": "Esta película no tiene ID de TMDB"}
         
         # Fetch trailer from TMDB
         trailer_data = get_movie_videos(movie.tmdb_id, api_key)
@@ -551,22 +551,22 @@ def delete_movie_endpoint(torrent_hash: str):
     from logic import delete_movie
     success = delete_movie(torrent_hash)
     if success:
-        return {"success": True, "message": "Movie deleted"}
-    return {"success": False, "message": "Movie not found"}
+        return {"success": True, "message": "Película eliminada"}
+    return {"success": False, "message": "Película no encontrada"}
 
 @app.post("/api/stop/{torrent_hash}")
 def stop_copy_endpoint(torrent_hash: str):
     success = stop_copy(torrent_hash)
     if success:
-        return {"success": True, "message": "Stop signal sent"}
-    return {"success": False, "message": "Could not stop copy (maybe not running?)"}
+        return {"success": True, "message": "Solicitud de parada enviada"}
+    return {"success": False, "message": "No se pudo detener la copia; comprueba su estado"}
 
 @app.post("/api/movies/batch-stop")
 def batch_stop_copies(payload: dict):
     from database import Movie
     hashes = payload.get('torrent_hashes', [])
     if not isinstance(hashes, list) or any(not isinstance(h, str) for h in hashes):
-        return {"success": False, "message": "Invalid torrent hashes"}
+        return {"success": False, "message": "Identificadores de torrent no válidos"}
     stopped = 0
     skipped = 0
     for torrent_hash in set(hashes):
@@ -579,7 +579,7 @@ def batch_stop_copies(payload: dict):
         else:
             skipped += 1
     return {"success": True, "stopped": stopped, "skipped": skipped,
-            "message": "Copies held; active transfers are stopping and cleaning up"}
+            "message": "Copias detenidas; se están cancelando las transferencias y limpiando los archivos incompletos"}
 
 @app.post("/api/movies/batch-delete")
 def batch_delete_movies(payload: dict):
@@ -765,7 +765,7 @@ def test_indexer(payload: dict):
     api_key = payload.get('api_key')
     
     if not url or not api_key:
-        return {"success": False, "message": "Missing URL or API Key"}
+        return {"success": False, "message": "Falta la URL o la clave API"}
         
     success, message = test_indexer_connection(url, api_key)
     return {"success": success, "message": message}
@@ -778,7 +778,7 @@ def test_telegram(payload: dict):
     chat_id = payload.get('chat_id')
     
     if not token or not chat_id:
-        return {"success": False, "message": "Missing Token or Chat ID"}
+        return {"success": False, "message": "Falta el token o el ID del chat"}
         
     success, message = test_telegram_connection(token, chat_id)
     return {"success": success, "message": message}
@@ -805,7 +805,7 @@ def test_receptor(payload: dict):
     port = payload.get('port', 8095)
     
     if not host:
-        return {"success": False, "message": "Missing Receptor Host"}
+        return {"success": False, "message": "Falta la dirección del receptor"}
         
     success, message = test_receptor_connection(host, port)
     return {"success": success, "message": message}
@@ -817,14 +817,14 @@ def search_tmdb(q: str):
     import requests
     
     if not q or len(q.strip()) < 2:
-        return {"success": False, "message": "Query too short", "results": []}
+        return {"success": False, "message": "La búsqueda es demasiado corta", "results": []}
     
     try:
         settings = load_settings()
         tmdb_api_key = settings.get('tmdb_api_key')
         
         if not tmdb_api_key:
-            return {"success": False, "message": "TMDB API key not configured", "results": []}
+            return {"success": False, "message": "La clave API de TMDB no está configurada", "results": []}
         
         url = "https://api.themoviedb.org/3/search/movie"
         params = {
@@ -837,7 +837,7 @@ def search_tmdb(q: str):
         response = requests.get(url, params=params, timeout=10)
         
         if response.status_code != 200:
-            return {"success": False, "message": f"TMDB API error: {response.status_code}", "results": []}
+            return {"success": False, "message": f"Error de la API de TMDB: {response.status_code}", "results": []}
         
         data = response.json()
         results = []
@@ -866,7 +866,7 @@ def search_movies(q: str, tmdb_id: int = None):
     from logic import search_indexers, load_settings
     
     if not q or len(q.strip()) < 2:
-        return {"success": False, "message": "Query too short", "results": []}
+        return {"success": False, "message": "La búsqueda es demasiado corta", "results": []}
     
     try:
         settings = load_settings()
@@ -887,7 +887,7 @@ def add_torrent_from_url(payload: dict):
     title = payload.get('title', 'Unknown')
     
     if not url:
-        return {"success": False, "message": "Missing torrent URL"}
+        return {"success": False, "message": "Falta la URL del torrent"}
     
     try:
         settings = load_settings()
@@ -923,10 +923,10 @@ def add_torrent_from_url(payload: dict):
                     break
         
         logger.info(f"Added torrent to download client: {title}")
-        return {"success": True, "message": f"Torrent added: {title}", "hash": torrent_hash}
+        return {"success": True, "message": f"Torrent añadido: {title}", "hash": torrent_hash}
         
     except Exception as e:
-        logger.error(f"Error adding torrent: {e}")
+        logger.error(f"Error al añadir el torrent: {e}")
         return {"success": False, "message": str(e)}
 
 @app.post("/api/test_rss_feed")
@@ -936,7 +936,7 @@ def test_rss_feed_endpoint(payload: dict):
     
     url = payload.get('url')
     if not url:
-        return {"success": False, "message": "Missing RSS URL"}
+        return {"success": False, "message": "Falta la URL RSS"}
     
     success, message, feed_info = test_rss_feed(url)
     return {"success": success, "message": message, "feed_info": feed_info}
@@ -1016,11 +1016,11 @@ def remove_watchlist_endpoint(torrent_hash: str):
     try:
         success = remove_from_watchlist(torrent_hash)
         if success:
-            return {"success": True, "message": "Removed from watchlist"}
+            return {"success": True, "message": "Película retirada del seguimiento"}
         else:
-            return {"success": False, "message": "Movie not found"}
+            return {"success": False, "message": "Película no encontrada"}
     except Exception as e:
-        logger.error(f"Error removing from watchlist: {e}")
+        logger.error(f"Error al retirar la película del seguimiento: {e}")
         return {"success": False, "message": str(e)}
 
 
@@ -1032,14 +1032,14 @@ def unignore_movie(data: dict):
     try:
         torrent_hash = data.get('hash')
         if not torrent_hash:
-            return {"success": False, "message": "No hash provided"}
+            return {"success": False, "message": "Falta el identificador del torrent"}
         
         movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
         if not movie:
-            return {"success": False, "message": "Movie not found"}
+            return {"success": False, "message": "Película no encontrada"}
         
         if not movie.ignored:
-            return {"success": False, "message": "Movie is not ignored"}
+            return {"success": False, "message": "La película no está ignorada"}
         
         movie.ignored = False
         movie.save()
@@ -1105,7 +1105,7 @@ def restore_backup(payload: dict):
     
     backup_path = payload.get('backup_path')
     if not backup_path:
-        return {"success": False, "message": "No backup_path provided"}
+        return {"success": False, "message": "Falta la ruta de la copia de seguridad"}
     
     try:
         success, message = restore_database_from_backup(backup_path)

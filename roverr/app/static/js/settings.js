@@ -198,7 +198,7 @@ function renderIndexersList() {
     const indexers = settings.indexers || [];
 
     if (indexers.length === 0) {
-        indexersList.innerHTML = '<li style="color: var(--text-muted); font-style: italic; justify-content: center;">No indexers configured</li>';
+        indexersList.innerHTML = '<li style="color: var(--text-muted); font-style: italic; justify-content: center;">No hay indexadores configurados</li>';
         return;
     }
 
@@ -209,7 +209,7 @@ function renderIndexersList() {
                 <span style="font-weight: 600;">${indexer.name}</span>
                 <span style="font-size: 0.8rem; color: var(--text-secondary); text-overflow: ellipsis; overflow: hidden;">${indexer.url}</span>
                 <div class="indexer-stats-container" data-indexer-id="${index}">
-                    <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">Loading stats...</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">Cargando estadísticas...</span>
                 </div>
             </div>
             <div style="display: flex; gap: 0.5rem;">
@@ -241,12 +241,12 @@ async function handleTestIndexer() {
     const key = document.getElementById('indexer-key').value.trim();
 
     if (!url || !key) {
-        showToast('Please enter URL and API Key to test', 'error');
+        showToast('Introduce la URL y la clave API para probar la conexión', 'error');
         return;
     }
 
     const btn = document.getElementById('test-indexer-btn');
-    setButtonLoading(btn, true, 'Testing...');
+    setButtonLoading(btn, true, 'Probando...');
 
     const startTime = Date.now();
     const data = await testIndexer(url, key);
@@ -280,7 +280,7 @@ function addIndexer() {
     const cats = catsInput.value.trim() || DEFAULT_INDEXER_CATEGORIES;
 
     if (!name || !url || !key) {
-        showToast('Please fill in Name, URL, and API Key', 'error');
+        showToast('Completa el nombre, la URL y la clave API', 'error');
         return;
     }
 
@@ -302,7 +302,7 @@ function addIndexer() {
  * LÃ­neas 826-830 de app.js
  */
 function removeIndexer(index) {
-    if (!confirm('Are you sure you want to remove this indexer?')) return;
+    if (!confirm('¿Quieres eliminar este indexador?')) return;
 
     const settings = state.getSettings();
     settings.indexers.splice(index, 1);
@@ -320,7 +320,7 @@ function renderRSSFeedsList() {
     const feeds = settings.rss_feeds || [];
 
     if (feeds.length === 0) {
-        rssFeedsList.innerHTML = '<li style="color: var(--text-muted); font-style: italic; justify-content: center;">No RSS feeds configured</li>';
+        rssFeedsList.innerHTML = '<li style="color: var(--text-muted); font-style: italic; justify-content: center;">No hay fuentes RSS configuradas</li>';
         return;
     }
 
@@ -330,10 +330,10 @@ function renderRSSFeedsList() {
             <div style="display: flex; flex-direction: column; gap: 0.25rem; overflow: hidden;">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <span style="font-weight: 600;">${feed.name}</span>
-                    ${feed.enabled ? '<span style="color: var(--success); font-size: 0.75rem;"><i class="fa-solid fa-circle" style="font-size: 0.5rem;"></i> Enabled</span>' : '<span style="color: var(--text-muted); font-size: 0.75rem;"><i class="fa-regular fa-circle" style="font-size: 0.5rem;"></i> Disabled</span>'}
+                    ${feed.enabled ? '<span style="color: var(--success); font-size: 0.75rem;"><i class="fa-solid fa-circle" style="font-size: 0.5rem;"></i> Activado</span>' : '<span style="color: var(--text-muted); font-size: 0.75rem;"><i class="fa-regular fa-circle" style="font-size: 0.5rem;"></i> Desactivado</span>'}
                 </div>
                 <span style="font-size: 0.8rem; color: var(--text-secondary); text-overflow: ellipsis; overflow: hidden;">${feed.url}</span>
-                <span style="font-size: 0.75rem; color: var(--text-muted);">Refresh: ${feed.refresh_interval}s ${feed.label ? `&bull; Label: ${feed.label}` : ''} ${feed.min_year ? `&bull; Min Year: ${feed.min_year}` : ''}</span>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Revisión: ${feed.refresh_interval}s ${feed.label ? `&bull; Etiqueta: ${feed.label}` : ''} ${feed.min_year ? `&bull; Año mínimo: ${feed.min_year}` : ''}</span>
             </div>
             <div style="display: flex; gap: 0.5rem;">
                 <button class="btn secondary sm edit-rss-btn" data-index="${index}"><i class="fa-solid fa-pencil"></i></button>
@@ -360,20 +360,20 @@ async function handleTestRSS() {
     const url = document.getElementById('rss-url').value.trim();
 
     if (!url) {
-        showToast('Please enter RSS URL to test', 'error');
+        showToast('Introduce la URL RSS para probarla', 'error');
         return;
     }
 
     const btn = document.getElementById('test-rss-btn');
-    setButtonLoading(btn, true, 'Testing...');
+    setButtonLoading(btn, true, 'Probando...');
 
     const data = await testRSSFeed(url);
 
     if (data.success) {
         const info = data.feed_info || {};
-        showToast(`RSS feed valid: ${info.entries_count || 0} entries found`, 'success');
+        showToast(`Fuente RSS válida: ${info.entries_count || 0} entradas encontradas`, 'success');
     } else {
-        showToast(data.message || 'Failed to validate RSS feed', 'error');
+        showToast(data.message || 'No se pudo validar la fuente RSS', 'error');
     }
 
     setButtonLoading(btn, false);
@@ -387,12 +387,12 @@ async function handleTestTelegram() {
     const chatId = document.getElementById('setting-telegram-chat-id').value.trim();
 
     if (!token || !chatId) {
-        showToast('Please enter Bot Token and Chat ID to test', 'error');
+        showToast('Introduce el token del bot y el ID del chat para probar la conexión', 'error');
         return;
     }
 
     const btn = document.getElementById('test-telegram-btn');
-    setButtonLoading(btn, true, 'Testing...');
+    setButtonLoading(btn, true, 'Probando...');
 
     const startTime = Date.now();
     const data = await testTelegram(token, chatId);
@@ -418,12 +418,12 @@ async function handleTestReceptor() {
     const port = parseInt(document.getElementById('setting-receptor-port').value) || 8095;
 
     if (!host) {
-        showToast('Please enter the receptor IP or host', 'error');
+        showToast('Introduce la dirección IP o el nombre del receptor', 'error');
         return;
     }
 
     const btn = document.getElementById('test-receptor-btn');
-    setButtonLoading(btn, true, 'Testing...');
+    setButtonLoading(btn, true, 'Probando...');
 
     try {
         const { testReceptor } = await import('./api.js');
@@ -440,7 +440,7 @@ async function handleTestReceptor() {
             showToast(data.message, 'error');
         }
     } catch (e) {
-        showToast('Error testing receptor connection locally', 'error');
+        showToast('Error al probar la conexión con el receptor', 'error');
     }
 
     setButtonLoading(btn, false);
@@ -456,12 +456,12 @@ async function handleTestQBittorrent() {
     const password = document.getElementById('setting-qb-pass').value;
 
     if (!host) {
-        showToast('Please enter the qBittorrent Host or IP', 'error');
+        showToast('Introduce la dirección de qBittorrent', 'error');
         return;
     }
 
     const btn = document.getElementById('test-qb-btn');
-    setButtonLoading(btn, true, 'Testing...');
+    setButtonLoading(btn, true, 'Probando...');
 
     try {
         const { testQBittorrent } = await import('./api.js');
@@ -482,7 +482,7 @@ async function handleTestQBittorrent() {
             updateTorrentClientAlert({ connected: false, host, port, last_error: data.message });
         }
     } catch (e) {
-        showToast('Error testing qBittorrent connection locally', 'error');
+        showToast('Error al probar la conexión con qBittorrent', 'error');
     }
 
     setButtonLoading(btn, false);
@@ -516,12 +516,12 @@ function addRSSFeed() {
     const minYear = minYearInput && minYearInput.value.trim() !== '' ? (parseInt(minYearInput.value) || '') : '';
 
     if (!name || !url) {
-        showToast('Please fill in Name and RSS URL', 'error');
+        showToast('Completa el nombre y la URL RSS', 'error');
         return;
     }
 
     if (refreshInterval < MIN_RSS_REFRESH_INTERVAL) {
-        showToast(`Refresh interval must be at least ${MIN_RSS_REFRESH_INTERVAL} seconds`, 'error');
+        showToast(`El intervalo de revisión debe ser de al menos ${MIN_RSS_REFRESH_INTERVAL} segundos`, 'error');
         return;
     }
 
@@ -557,7 +557,7 @@ function addRSSFeed() {
 
     state.setSettings(settings);
     renderRSSFeedsList();
-    showToast('RSS feed added successfully', 'success');
+    showToast('Fuente RSS añadida correctamente', 'success');
 }
 
 /**
@@ -565,7 +565,7 @@ function addRSSFeed() {
  * LÃ­neas 945-949 de app.js
  */
 function removeRSSFeed(index) {
-    if (!confirm('Are you sure you want to remove this RSS feed?')) return;
+    if (!confirm('¿Quieres eliminar esta fuente RSS?')) return;
 
     const settings = state.getSettings();
     settings.rss_feeds.splice(index, 1);
@@ -585,7 +585,7 @@ async function handleSaveSettings() {
     const destPath = destPathInput.value.trim();
     
     if (!sourcePath || !destPath) {
-        showToast('Source Path and Destination Path are required and cannot be empty', 'error');
+        showToast('Las rutas de origen y destino son obligatorias', 'error');
         if (!sourcePath) sourcePathInput.focus();
         else destPathInput.focus();
         return;
@@ -632,7 +632,7 @@ async function handleSaveSettings() {
  * Resetea la lista de pelÃ­culas ignoradas
  */
 async function handleResetIgnored() {
-    if (!confirm('Are you sure you want to restore ALL ignored movies? They will reappear in your dashboard.')) return;
+    if (!confirm('¿Quieres restaurar todas las películas ignoradas? Volverán a aparecer en el panel.')) return;
 
     try {
         const { resetIgnoredMovies } = await import('./api.js');
@@ -647,7 +647,7 @@ async function handleResetIgnored() {
         }
     } catch (e) {
         console.error(e);
-        showToast('Error resetting ignored list', 'error');
+        showToast('Error al restaurar la lista de ignoradas', 'error');
     }
 }
 
@@ -676,7 +676,7 @@ async function openIgnoredMoviesModal() {
         }
 
         if (data.movies.length === 0) {
-            listEl.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 2rem;">No ignored movies</div>`;
+            listEl.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 2rem;">No hay películas ignoradas</div>`;
             return;
         }
 
@@ -696,9 +696,9 @@ async function openIgnoredMoviesModal() {
             });
         }
     } catch (e) {
-        console.error('Error loading ignored movies:', e);
+        console.error('Error al cargar las películas ignoradas:', e);
         loadingEl.style.display = 'none';
-        listEl.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 2rem;">Error loading ignored movies</div>`;
+        listEl.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 2rem;">Error al cargar las películas ignoradas</div>`;
     }
 }
 
@@ -744,7 +744,7 @@ async function handleUnignoreMovie(hash) {
         }
     } catch (e) {
         console.error('Error unignoring movie:', e);
-        showToast('Error removing movie from ignored list', 'error');
+        showToast('Error al restaurar la película ignorada', 'error');
     }
 }
 
@@ -793,7 +793,7 @@ async function saveEditedIndexer() {
     const cats = document.getElementById('edit-indexer-cats').value.trim();
 
     if (!name || !url || !key) {
-        showToast('Please fill in Name, URL, and API Key', 'error');
+        showToast('Completa el nombre, la URL y la clave API', 'error');
         return;
     }
 
@@ -803,7 +803,7 @@ async function saveEditedIndexer() {
     state.setSettings(settings);
     renderIndexersList();
     closeEditIndexerModal();
-    showToast('Indexer updated', 'success');
+    showToast('Indexador actualizado', 'success');
 }
 
 async function testEditedIndexer() {
@@ -811,12 +811,12 @@ async function testEditedIndexer() {
     const key = document.getElementById('edit-indexer-key').value.trim();
 
     if (!url || !key) {
-        showToast('Please enter URL and API Key to test', 'error');
+        showToast('Introduce la URL y la clave API para probar la conexión', 'error');
         return;
     }
 
     const btn = document.getElementById('edit-indexer-test-btn');
-    setButtonLoading(btn, true, 'Testing...');
+    setButtonLoading(btn, true, 'Probando...');
 
     const startTime = Date.now();
     const data = await testIndexer(url, key);
@@ -878,12 +878,12 @@ async function saveEditedRSS() {
     const minYear = minYearVal !== '' ? (parseInt(minYearVal) || '') : '';
 
     if (!name || !url) {
-        showToast('Please fill in Name and RSS URL', 'error');
+        showToast('Completa el nombre y la URL RSS', 'error');
         return;
     }
 
     if (refreshInterval < MIN_RSS_REFRESH_INTERVAL) {
-        showToast(`Refresh interval must be at least ${MIN_RSS_REFRESH_INTERVAL} seconds`, 'error');
+        showToast(`El intervalo de revisión debe ser de al menos ${MIN_RSS_REFRESH_INTERVAL} segundos`, 'error');
         return;
     }
 
@@ -904,19 +904,19 @@ async function saveEditedRSS() {
     state.setSettings(settings);
     renderRSSFeedsList();
     closeEditRSSModal();
-    showToast('RSS feed updated', 'success');
+    showToast('Fuente RSS actualizada', 'success');
 }
 
 async function testEditedRSS() {
     const url = document.getElementById('edit-rss-url').value.trim();
 
     if (!url) {
-        showToast('Please enter RSS URL to test', 'error');
+        showToast('Introduce la URL RSS para probarla', 'error');
         return;
     }
 
     const btn = document.getElementById('edit-rss-test-btn');
-    setButtonLoading(btn, true, 'Testing...');
+    setButtonLoading(btn, true, 'Probando...');
 
     const startTime = Date.now();
     const data = await testRSSFeed(url);
@@ -927,9 +927,9 @@ async function testEditedRSS() {
 
     if (data.success) {
         const info = data.feed_info || {};
-        showToast(`RSS feed valid: ${info.entries_count || 0} entries found`, 'success');
+        showToast(`Fuente RSS válida: ${info.entries_count || 0} entradas encontradas`, 'success');
     } else {
-        showToast(data.message || 'Failed to validate RSS feed', 'error');
+        showToast(data.message || 'No se pudo validar la fuente RSS', 'error');
     }
 
     setButtonLoading(btn, false);
@@ -960,7 +960,7 @@ async function openWatchlistMoviesModal() {
     modal.classList.add('active');
 
     // Show loading
-    container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Loading watchlist...</p>';
+    container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Cargando seguimiento...</p>';
 
     try {
         const response = await fetch('/api/watchlist');
@@ -968,16 +968,16 @@ async function openWatchlistMoviesModal() {
 
         if (data.success && data.movies) {
             if (data.movies.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No movies in watchlist.</p>';
+                container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No hay películas en seguimiento.</p>';
             } else {
                 renderWatchlistMovies(data.movies, container);
             }
         } else {
-            container.innerHTML = '<p style="text-align: center; color: var(--danger);\">Error loading watchlist</p>';
+            container.innerHTML = '<p style="text-align: center; color: var(--danger);\">Error al cargar el seguimiento</p>';
         }
     } catch (error) {
-        console.error('Error loading watchlist:', error);
-        container.innerHTML = '<p style="text-align: center; color: var(--danger);\">Error loading watchlist</p>';
+        console.error('Error al cargar el seguimiento:', error);
+        container.innerHTML = '<p style="text-align: center; color: var(--danger);\">Error al cargar el seguimiento</p>';
     }
 }
 
@@ -994,7 +994,7 @@ function renderWatchlistMovies(movies, container) {
                 </small>
             </div>
             <button class="btn danger sm" onclick="window.removeFromWatchlist('${movie.torrent_hash}')">
-                <i class="fa-solid fa-trash"></i> Remove
+                <i class="fa-solid fa-trash"></i> Eliminar
             </button>
         </div>
     `).join('');
@@ -1004,7 +1004,7 @@ function renderWatchlistMovies(movies, container) {
  * Removes a movie from watchlist
  */
 async function removeFromWatchlist(hash) {
-    if (!confirm('Remove this movie from watchlist?')) return;
+    if (!confirm('¿Quieres retirar esta película del seguimiento?')) return;
 
     try {
         const response = await fetch(`/api/watchlist/${hash}`, {
@@ -1014,15 +1014,15 @@ async function removeFromWatchlist(hash) {
         const data = await response.json();
 
         if (data.success) {
-            showToast('Removed from watchlist', 'success');
+            showToast('Película retirada del seguimiento', 'success');
             // Reload watchlist
             openWatchlistMoviesModal();
         } else {
-            showToast(data.message || 'Error removing from watchlist', 'error');
+            showToast(data.message || 'Error al retirar la película del seguimiento', 'error');
         }
     } catch (error) {
-        console.error('Error removing from watchlist:', error);
-        showToast('Error removing from watchlist', 'error');
+        console.error('Error al retirar la película del seguimiento:', error);
+        showToast('Error al retirar la película del seguimiento', 'error');
     }
 }
 
@@ -1071,7 +1071,7 @@ async function loadIndexerStats(indexerId) {
     } catch (error) {
         console.error('Error loading indexer stats:', error);
         container.innerHTML = `
-            <span style="font-size: 0.75rem; color: var(--text-muted);">Stats unavailable</span>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Estadísticas no disponibles</span>
         `;
     }
 }

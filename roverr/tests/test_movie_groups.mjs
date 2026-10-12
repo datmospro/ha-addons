@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {groupMovies,getMovieVersions} from '../app/static/js/movie-groups.js';
+const movie=(hash,status,id=42,extra={})=>({torrent_hash:hash,title:'Película',year:'2025',tmdb_id:id,status,progress:1,...extra});
+assert.equal(groupMovies([movie('a','moved'),movie('b','copying')]).length,1);
+assert.equal(groupMovies([movie('a','moved'),movie('b','copying')])[0].torrent_hash,'b');
+assert.equal(groupMovies([movie('a','queued'),movie('b','copying')])[0].torrent_hash,'b');
+assert.equal(getMovieVersions([movie('a','moved'),movie('b','copying')],'a').length,2);
+assert.equal(groupMovies([movie('a','pending',42),movie('b','pending',43)]).length,2);
+assert.equal(groupMovies([movie('a','pending',42),movie('b','pending',43),movie('c','new',null)]).length,3);
+assert.equal(groupMovies([movie('a','pending',42),movie('b','new',null)]).length,1);
+assert.equal(groupMovies([movie('a','new',null),movie('b','pending',null,{title:'pelicula'})]).length,1);
+assert.equal(groupMovies([movie('a','new',null),movie('b','pending',null,{year:'2024'})]).length,2);
+assert.equal(groupMovies([movie('a','new',null,{year:null}),movie('b','new',null,{year:null})]).length,2);
+assert.equal(groupMovies([movie('b','pending'),movie('a','pending')])[0].torrent_hash,groupMovies([movie('a','pending'),movie('b','pending')])[0].torrent_hash);
+const originals=[movie('a','new'),movie('b','copying')];groupMovies(originals);assert.equal(originals[0].status,'new');
+console.log('Movie grouping: identity, ambiguity, ordering and preservation checks passed');

@@ -99,7 +99,7 @@ export async function getMovieDetails(hash) {
         return await res.json();
     } catch (e) {
         console.error("Error fetching movie details:", e);
-        return { error: 'Error loading movie details' };
+        return { error: 'Error al cargar la ficha' };
     }
 }
 
@@ -181,8 +181,8 @@ export async function stopCopy(hash) {
         const res = await fetch(`${API_BASE}/stop/${hash}`, { method: 'POST' });
         return await res.json();
     } catch (e) {
-        console.error("Error stopping copy:", e);
-        return { success: false, message: 'Error stopping copy' };
+        console.error("Error al detener la copia:", e);
+        return { success: false, message: 'Error al detener la copia' };
     }
 }
 
@@ -213,8 +213,8 @@ export async function addTorrent(url, title) {
         });
         return await res.json();
     } catch (e) {
-        console.error("Error adding torrent:", e);
-        return { success: false, message: 'Error adding torrent to download client' };
+        console.error("Error al añadir el torrent:", e);
+        return { success: false, message: 'Error al añadir el torrent to download client' };
     }
 }
 
@@ -232,15 +232,15 @@ export async function saveSettings(settingsData) {
         const data = await res.json();
 
         if (data.success) {
-            showToast('Settings saved successfully', 'success');
+            showToast('Configuración guardada correctamente', 'success');
         } else {
-            showToast('Error saving settings', 'error');
+            showToast('Error al guardar la configuración', 'error');
         }
 
         return data;
     } catch (e) {
-        console.error("Error saving settings:", e);
-        showToast('Error saving settings', 'error');
+        console.error("Error al guardar la configuración:", e);
+        showToast('Error al guardar la configuración', 'error');
         return { success: false };
     }
 }
@@ -276,7 +276,7 @@ export async function testRSSFeed(url) {
         });
         return await res.json();
     } catch (e) {
-        console.error("Error testing RSS feed:", e);
+        console.error("Error al probar la fuente RSS:", e);
         return { success: false, message: 'Error testing RSS feed' };
     }
 }
@@ -339,7 +339,7 @@ export async function searchTMDB(query) {
         return await res.json();
     } catch (e) {
         console.error('Search error:', e);
-        return { success: false, message: 'Error performing search' };
+        return { success: false, message: 'Error al realizar la búsqueda' };
     }
 }
 
@@ -366,7 +366,7 @@ export async function searchIndexers(query, tmdbId = null, signal = null) {
     } catch (e) {
         if (e.name === 'AbortError') {
             console.log('Search aborted successfully');
-            return { success: false, aborted: true, message: 'Search cancelled by user' };
+            return { success: false, aborted: true, message: 'Búsqueda cancelada by user' };
         }
         console.error('Indexer search error:', e);
         return { success: false, message: 'Error searching indexers' };
@@ -386,8 +386,8 @@ export async function identifyMovie(hash, tmdbId) {
         });
         return await res.json();
     } catch (e) {
-        console.error("Error identifying movie:", e);
-        return { success: false, message: 'Error identifying movie' };
+        console.error("Error al identificar la película:", e);
+        return { success: false, message: 'Error al identificar la película' };
     }
 }
 
@@ -410,8 +410,8 @@ export async function batchCopyMovies(torrentHashes) {
         return { success: errors.length === 0, copied, marked, skipped,
                  message: errors.join('; ') };
     } catch (e) {
-        console.error('Error copying movies:', e);
-        return { success: false, message: 'Error copying movies' };
+        console.error('Error al copiar las películas:', e);
+        return { success: false, message: 'Error al copiar las películas' };
     }
 }
 
@@ -435,8 +435,8 @@ export async function batchDeleteMovies(torrentHashes, options) {
         });
         return await res.json();
     } catch (e) {
-        console.error('Error deleting movies:', e);
-        return { success: false, message: 'Error deleting movies' };
+        console.error('Error al eliminar las películas:', e);
+        return { success: false, message: 'Error al eliminar las películas' };
     }
 }
 
@@ -479,7 +479,7 @@ export async function resetIgnoredMovies() {
         const res = await fetch(`${API_BASE}/reset-ignored`, { method: 'POST' });
         return await res.json();
     } catch (e) {
-        console.error("Error resetting ignored list:", e);
-        return { success: false, message: 'Error resetting ignored list' };
+        console.error("Error al restaurar la lista de ignoradas:", e);
+        return { success: false, message: 'Error al restaurar la lista de ignoradas' };
     }
 }

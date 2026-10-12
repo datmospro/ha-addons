@@ -1,3 +1,20 @@
+# 4.5.11
+
+- Group torrents with the same movie identity into one dashboard card, keeping
+  each torrent, copy job and history intact. Prefer active copy/queue status.
+- Show versions, sizes, states and blockers in the movie details; select a
+  version to manage its torrent. Bulk copy selects one representative per movie,
+  while bulk stop/removal includes every version of selected movies.
+- Preserve selection when the active version changes. Keep movies with different
+  TMDB IDs or ambiguous unidentified matches separate.
+- Translate movie actions, RSS controls, common messages and saved download
+  rejection reasons into Spanish.
+- Manual search no longer removes the existing real torrent record.
+
+Validated with 62 backend regressions, JavaScript status and identity tests,
+and browser checks for grouped versions, preserved selection, stopping every
+version, queue positions and completion refresh without F5.
+
 # 4.5.10
 
 - Preserve the original download rejection reason, including RSS size limits,

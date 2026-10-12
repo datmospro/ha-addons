@@ -141,7 +141,7 @@ window.searchIndexersForMovie = async function (title, originalTitle, year, tmdb
         if (currentSearchController) {
             currentSearchController.abort();
             currentSearchController = null;
-            showToast('Search cancelled', 'info');
+            showToast('Búsqueda cancelada', 'info');
             location.reload(); // Returns cleanly to TMDB search view
         }
     });
@@ -172,7 +172,7 @@ window.searchIndexersForMovie = async function (title, originalTitle, year, tmdb
                     </button>
                     <div style="text-align: center; padding: 4rem 2rem; color: var(--error);">
                         <i class="fa-solid fa-circle-exclamation" style="font-size: 3rem; margin-bottom: 1rem;"></i>
-                        <p style="font-size: 1.1rem;">${data.message || 'No torrents found'}</p>
+                        <p style="font-size: 1.1rem;">${data.message || 'No se encontraron torrents'}</p>
                     </div>
                 </div>
             `;
@@ -210,7 +210,7 @@ function renderIndexerResults(results, movieTitle, movieYear) {
                 </button>
                 <div style="text-align: center; padding: 4rem 2rem; color: var(--text-muted);">
                     <i class="fa-solid fa-circle-xmark" style="font-size: 3rem; opacity: 0.3; margin-bottom: 1rem;"></i>
-                    <p style="font-size: 1.1rem;">No torrents found for "${movieTitle}"</p>
+                    <p style="font-size: 1.1rem;">No se encontraron torrents for "${movieTitle}"</p>
                 </div>
             </div>
         `;
@@ -241,7 +241,7 @@ function renderIndexerResults(results, movieTitle, movieYear) {
                                 </div>
                             </div>
                             <button class="btn primary download-torrent-btn" data-url="${escapeHtml(result.download_url)}" data-title="${escapeHtml(result.title)}" style="white-space: nowrap; flex-shrink: 0;">
-                                <i class="fa-solid fa-download"></i> Download
+                                <i class="fa-solid fa-download"></i> Descargar
                             </button>
                         </div>
                     </div>
@@ -281,7 +281,7 @@ async function downloadTorrent(url, title, btnElement) {
     const data = await addTorrent(url, title);
 
     if (data.success) {
-        showToast(data.message || 'Torrent added to download client', 'success');
+        showToast(data.message || 'Torrent añadido al cliente de descargas', 'success');
 
         btnElement.innerHTML = '<i class="fa-solid fa-check"></i> Added';
         btnElement.classList.remove('primary');
@@ -301,7 +301,7 @@ async function downloadTorrent(url, title, btnElement) {
             }, 1000);
         }
     } else {
-        showToast(data.message || 'Failed to add torrent', 'error');
+        showToast(data.message || 'No se pudo añadir el torrent', 'error');
         btnElement.disabled = false;
         btnElement.innerHTML = originalContent;
     }

@@ -217,7 +217,7 @@ def check_and_reserve_disk_space(source_path, dest_path, safety_buffer_percent=5
         # 1. Calculate source size
         source_size = get_dir_size(source_path)
         if source_size == 0:
-            return False, "Source is empty (0 bytes)", {}
+            return False, "El origen está vacío (0 bytes)", {}
         
         # 2. Calculate required space with buffer
         buffer_bytes = max(
@@ -251,13 +251,13 @@ def check_and_reserve_disk_space(source_path, dest_path, safety_buffer_percent=5
                         return f"{mb:.0f}MB"
                 
                 message = (
-                    f"Insufficient disk space: Need {format_size(required_bytes)} "
+                    f"No hay espacio suficiente en disco. Se necesitan {format_size(required_bytes)} "
                     f"({format_size(source_size)} + {format_size(buffer_bytes)} buffer), "
-                    f"only {format_size(available_bytes)} available"
+                    f"solo hay {format_size(available_bytes)} disponibles"
                 )
                 
                 if total_reserved > 0:
-                    message += f", {format_size(total_reserved)} reserved by active copies"
+                    message += f", {format_size(total_reserved)} reservados por las copias activas"
                 
                 return False, message, {
                     'required_bytes': required_bytes,
@@ -275,7 +275,7 @@ def check_and_reserve_disk_space(source_path, dest_path, safety_buffer_percent=5
                 f"Disk free: {disk_free / (1024**3):.2f}GB"
             )
             
-            return True, "Space check passed", {
+            return True, "Comprobación de espacio correcta", {
                 'required_bytes': required_bytes,
                 'available_bytes': available_bytes,
                 'reserved_bytes': total_reserved,
@@ -283,8 +283,8 @@ def check_and_reserve_disk_space(source_path, dest_path, safety_buffer_percent=5
             }
             
     except Exception as e:
-        logger.error(f"Error checking disk space: {e}")
-        return False, f"Error checking disk space: {str(e)}", {}
+        logger.error(f"Error al comprobar el espacio en disco: {e}")
+        return False, f"Error al comprobar el espacio en disco: {str(e)}", {}
 
 def release_disk_space_reservation(dest_path, reserved_bytes):
     """
@@ -742,22 +742,22 @@ def manual_move(torrent_hash, config_ignored=None, automatic=False, decision=Non
         
         torrents = qb.torrents_info(torrent_hashes=torrent_hash)
         if not torrents:
-            return {"success": False, "message": "Torrent not found"}
+            return {"success": False, "message": "Torrent no encontrado"}
             
         torrent = torrents[0]
         
         if torrent.progress < 1:
-            return {"success": False, "message": "Download is not complete"}
+            return {"success": False, "message": "La descarga aún no ha terminado"}
         with COPY_LOCK:
             if torrent_hash in COPY_PROGRESS:
-                return {"success": True, "status": "started", "message": "Copy already queued or running"}
+                return {"success": True, "status": "started", "message": "La copia ya está en cola o en curso"}
             saved = CopyJob.get_or_none(CopyJob.torrent_hash == torrent_hash)
             if saved and saved.state in ('queued', 'running'):
-                return {"success": True, "status": "started", "message": "Copy awaiting persistent queue recovery"}
+                return {"success": True, "status": "started", "message": "La copia espera la recuperación de la cola guardada"}
         inspection = inspect_torrent_copy(torrent, settings)
         action = (decision or {}).get('action')
         if action not in (None, 'overwrite', 'keep'):
-            return {"success": False, "message": "Invalid copy decision"}
+            return {"success": False, "message": "La decisión de copia no es válida"}
         stale = decision is not None and decision.get('fingerprint') != inspection['fingerprint']
         if stale or (inspection['conflict'] and action is None):
             if automatic:
@@ -781,21 +781,21 @@ def manual_move(torrent_hash, config_ignored=None, automatic=False, decision=Non
         with COPY_LOCK:
             movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
             if automatic and movie and movie.copy_paused:
-                return {"success": False, "message": "Copy held for manual start"}
+                return {"success": False, "message": "La copia está detenida hasta que la inicies manualmente"}
             if torrent_hash in COPY_PROGRESS:
-                return {"success": True, "status": "started", "message": "Copy already queued or running"}
+                return {"success": True, "status": "started", "message": "La copia ya está en cola o en curso"}
             if not automatic and movie:
                 Movie.update(copy_paused=False, copy_pause_reason=None, status_reason=None).where(Movie.torrent_hash == torrent_hash).execute()
             STOP_FLAGS.discard(torrent_hash)
             existing_job = CopyJob.get_or_none(CopyJob.torrent_hash == torrent_hash)
             if existing_job and existing_job.state in ('queued', 'running'):
-                return {"success": True, "status": "started", "message": "Copy saved in persistent queue"}
+                return {"success": True, "status": "started", "message": "Copia guardada en la cola persistente"}
             job = save_copy_job(torrent, settings)
             register_copy_job(job)
 
         threading.Thread(target=Context().run, args=(run_copy_job, job.id), daemon=True).start()
 
-        return {"success": True, "status": "started", "message": f"Started processing {torrent.name} in background"}
+        return {"success": True, "status": "started", "message": f"Procesando {torrent.name} en segundo plano"}
     except Exception as e:
         return {"success": False, "message": str(e)}
 
@@ -807,11 +807,11 @@ def mark_as_moved(torrent_hash, config_ignored=None):
         
         torrents = qb.torrents_info(torrent_hashes=torrent_hash)
         if not torrents:
-             return {"success": False, "message": "Torrent not found"}
+             return {"success": False, "message": "Torrent no encontrado"}
         
         torrent = torrents[0]
         _record_history(torrent_name=torrent.name, status='manual', message="Manually marked as moved", source_path="", dest_path="")
-        return {"success": True, "message": "Marked as moved"}
+        return {"success": True, "message": "Marcada como copiada"}
     except Exception as e:
         return {"success": False, "message": str(e)}
 
@@ -1252,11 +1252,11 @@ def test_receptor_connection(host, port):
         if resp.status_code == 200:
             data = resp.json()
             if data.get("service") == "Roverr Receptor":
-                return True, "Successfully connected to Roverr Receptor."
+                return True, "Conexión establecida con el receptor de Roverr."
             else:
-                return False, "Connected to port, but the service is not Roverr Receptor."
-        return False, f"Receptor returned HTTP {resp.status_code}"
+                return False, "El puerto responde, pero el servicio no es el receptor de Roverr."
+        return False, f"El receptor respondió con HTTP {resp.status_code}"
     except requests.exceptions.RequestException as e:
         logger.error(f"Receptor connection test failed: {e}")
-        return False, f"Failed to connect to {host}:{port}. Is the script running?"
+        return False, f"No se pudo conectar con {host}:{port}. Comprueba que el receptor esté iniciado."
 

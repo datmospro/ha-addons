@@ -1,3 +1,4 @@
+import { translateMessage } from './messages.js';
 /**
  * Templates HTML para Roverr
  * Extrae los templates HTML del código JavaScript para mayor claridad
@@ -124,8 +125,9 @@ export function getMovieStatus(movie) {
     if (status === 'receptor_offline') reason ||= 'No se puede contactar con el receptor. Comprueba que esté iniciado y que su dirección y puerto sean correctos; después reintenta la copia.';
     if (status === 'missing') reason ||= 'El archivo copiado no se encuentra en el destino. Comprueba que la unidad esté montada antes de reintentar.';
     if (status === 'pending') reason ||= 'La descarga está completa y la copia aún no está en cola. Puedes iniciarla con Copiar.';
-    if (status === 'new') reason ||= 'La película todavía no tiene una descarga confirmada. Usa Manual Search para buscar un torrent.';
-    if (status === 'orphaned') reason ||= 'El torrent ya no está disponible en el cliente. Usa Manual Search para buscar una descarga.';
+    if (status === 'new') reason ||= 'La película todavía no tiene una descarga confirmada. Usa Buscar descarga para buscar un torrent.';
+    if (status === 'orphaned') reason ||= 'El torrent ya no está disponible en el cliente. Usa Buscar descarga para buscar una descarga.';
+    reason = translateMessage(reason);
     const badge = getStatusIconAndLabel(status);
     return { status, reason, action, cssClass: getStatusClass(status), ...badge };
 }
