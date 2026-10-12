@@ -521,6 +521,50 @@ class CopyControlTests(unittest.TestCase):
             self.wait_for(lambda: not mover.COPY_PROGRESS)
         self.assertEqual(processed, ['a', 'b', 'd'])
 
+    def test_worker_notifications_reach_server_event_loop(self):
+        async def check():
+            event = asyncio.Event()
+            with patch.object(main, 'MOVIES_UPDATE_LOOP', asyncio.get_running_loop()), patch.object(main, 'MOVIES_UPDATE_EVENT', event):
+                worker = threading.Thread(target=main.trigger_movies_broadcast)
+                worker.start()
+                worker.join(2)
+                await asyncio.wait_for(event.wait(), 1)
+                event.clear()
+                token = main.IN_MOVIES_BROADCAST.set(True)
+                try:
+                    main.trigger_movies_broadcast()
+                    await asyncio.sleep(0)
+                    self.assertFalse(event.is_set())
+                finally:
+                    main.IN_MOVIES_BROADCAST.reset(token)
+        asyncio.run(check())
+
+    def test_completion_never_broadcasts_old_progress_after_final_snapshot(self):
+        qb = Mock()
+        qb.torrents_info.return_value = []
+        snapshots = [{'a': {'status': 'copying', 'percent': 90}},
+                     {'a': {'status': 'done', 'percent': 100}, 'b': {'status': 'copying', 'percent': 0}}]
+        sleeps = 0
+        async def sleep(_):
+            nonlocal sleeps
+            sleeps += 1
+            if sleeps == 2:
+                raise asyncio.CancelledError
+        main.manager.active_connections.append(Mock())
+        try:
+            with patch.object(main, 'get_qb_client', return_value=qb), patch.object(main, 'get_copy_progress', side_effect=snapshots), \
+                 patch.object(main, 'process_torrents'), patch.object(main, 'load_settings', return_value=self.settings), \
+                 patch.object(main, 'broadcast_movies_update', new_callable=AsyncMock) as final, \
+                 patch.object(main.manager, 'broadcast', new_callable=AsyncMock) as progress, \
+                 patch.object(main.asyncio, 'sleep', side_effect=sleep):
+                with self.assertRaises(asyncio.CancelledError):
+                    asyncio.run(main.ws_progress_broadcast_task())
+                final.assert_awaited_once()
+                self.assertEqual(progress.await_count, 1)
+                self.assertEqual(list(progress.call_args.args[0]['progress']), ['a'])
+        finally:
+            main.manager.active_connections.clear()
+
 
 if __name__ == '__main__':
     unittest.main()

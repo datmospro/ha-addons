@@ -32,8 +32,25 @@ class ConnectionManager:
                 self.disconnect(connection)
 
 manager = ConnectionManager()
+from contextvars import ContextVar
+MOVIES_UPDATE_LOOP = None
+MOVIES_UPDATE_EVENT = None
+MOVIES_BROADCAST_LOCK = None
+IN_MOVIES_BROADCAST = ContextVar('in_movies_broadcast', default=False)
+
+async def movies_update_broadcaster():
+    while True:
+        await MOVIES_UPDATE_EVENT.wait()
+        MOVIES_UPDATE_EVENT.clear()
+        await broadcast_movies_update()
 
 async def broadcast_movies_update():
+    if MOVIES_BROADCAST_LOCK is None:
+        return await _broadcast_movies_update()
+    async with MOVIES_BROADCAST_LOCK:
+        return await _broadcast_movies_update()
+
+async def _broadcast_movies_update():
     if not manager.active_connections:
         return
     try:
@@ -41,7 +58,13 @@ async def broadcast_movies_update():
         api_key = settings.get('tmdb_api_key')
         torrents = await asyncio.to_thread(get_active_torrents, None)
         from logic import get_movie_data
-        data = await asyncio.to_thread(get_movie_data, torrents, api_key)
+        # sync_movies itself signals changes. Suppress only this recursive
+        # notification; updates from real copy workers still reach the event.
+        token = IN_MOVIES_BROADCAST.set(True)
+        try:
+            data = await asyncio.to_thread(get_movie_data, torrents, api_key)
+        finally:
+            IN_MOVIES_BROADCAST.reset(token)
         
         # Inject copy progress
         progress_data = get_copy_progress()
@@ -65,12 +88,12 @@ async def broadcast_movies_update():
         logger.error(f"Error broadcasting movies update: {e}")
 
 def trigger_movies_broadcast():
-    try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(broadcast_movies_update())
-    except RuntimeError:
-        # No running event loop in this thread
-        pass
+    if IN_MOVIES_BROADCAST.get():
+        return
+    loop = MOVIES_UPDATE_LOOP
+    event = MOVIES_UPDATE_EVENT
+    if loop is not None and event is not None and not loop.is_closed():
+        loop.call_soon_threadsafe(event.set)
 
 # Register logic callback
 logic.register_movies_update_callback(trigger_movies_broadcast)
@@ -84,7 +107,7 @@ logger = logging.getLogger("Roverr")
 logger.info("=" * 80)
 logger.info("🚀 ROVERR - MEDIA MANAGER")
 logger.info("=" * 80)
-logger.info(f"📦 Version: 4.5.5")
+logger.info(f"📦 Version: 4.5.6")
 logger.info(f"🔧 Log Level: {logging.getLevelName(logger.getEffectiveLevel())}")
 logger.info("=" * 80)
 
@@ -198,6 +221,8 @@ async def ws_progress_broadcast_task():
             
             # 2. Add copying progress
             for t_hash, prog in list(progress_data.items()):
+                if prog.get('status') not in ('copying', 'queued'):
+                    continue
                 active_progress[t_hash] = {
                     "type": "copying",
                     "progress": prog.get('percent', 0) / 100.0, # Normalise to 0-1
@@ -217,6 +242,11 @@ async def ws_progress_broadcast_task():
                     try:
                         await asyncio.to_thread(process_torrents, None)
                         await broadcast_movies_update()
+                        # The progress snapshot was collected before the DB
+                        # update. Never send it after a newer final-state snapshot.
+                        last_sent_progress = None
+                        await asyncio.sleep(1)
+                        continue
                     except Exception as sync_err:
                         logger.error(f"Error during post-completion sync: {sync_err}")
             
@@ -275,6 +305,11 @@ async def auto_heal_all_movies_task():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global MOVIES_UPDATE_LOOP, MOVIES_UPDATE_EVENT, MOVIES_BROADCAST_LOCK
+    MOVIES_UPDATE_LOOP = asyncio.get_running_loop()
+    MOVIES_UPDATE_EVENT = asyncio.Event()
+    MOVIES_BROADCAST_LOCK = asyncio.Lock()
+    update_task = asyncio.create_task(movies_update_broadcaster())
     # Startup
     init_db()
     asyncio.create_task(scheduler())
@@ -292,7 +327,17 @@ async def lifespan(app: FastAPI):
     # Start background auto-heal for missing images
     asyncio.create_task(auto_heal_all_movies_task())
     
-    yield
+    try:
+        yield
+    finally:
+        MOVIES_UPDATE_LOOP = None
+        MOVIES_UPDATE_EVENT = None
+        update_task.cancel()
+        try:
+            await update_task
+        except asyncio.CancelledError:
+            pass
+        MOVIES_BROADCAST_LOCK = None
     # Shutdown
 
 
@@ -1101,7 +1146,13 @@ async def websocket_endpoint(websocket: WebSocket):
         api_key = settings.get('tmdb_api_key')
         torrents = await asyncio.to_thread(get_active_torrents, None)
         from logic import get_movie_data
-        data = await asyncio.to_thread(get_movie_data, torrents, api_key)
+        # sync_movies itself signals changes. Suppress only this recursive
+        # notification; updates from real copy workers still reach the event.
+        token = IN_MOVIES_BROADCAST.set(True)
+        try:
+            data = await asyncio.to_thread(get_movie_data, torrents, api_key)
+        finally:
+            IN_MOVIES_BROADCAST.reset(token)
         
         # Inject copy progress
         progress_data = get_copy_progress()

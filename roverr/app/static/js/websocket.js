@@ -4,6 +4,8 @@ import { getStatusClass, getStatusIconAndLabel, getCopyStatusTooltip } from './t
 
 let socket = null;
 let socketReconnectTimeout = null;
+let previousProgressHashes = new Set();
+let messageQueue = Promise.resolve();
 
 export function connectWebSocket() {
     if (socket) {
@@ -25,7 +27,14 @@ export function connectWebSocket() {
         }
     };
 
-    socket.onmessage = async (event) => {
+    previousProgressHashes = new Set();
+    socket.onmessage = event => {
+        // WebSocket delivers in order, but async imports/fetches otherwise let
+        // older handlers finish after newer final-state messages.
+        messageQueue = messageQueue.then(() => handleSocketMessage(event));
+    };
+
+    async function handleSocketMessage(event) {
         try {
             const data = JSON.parse(event.data);
             console.log('📬 WebSocket message received:', data.type);
@@ -38,13 +47,22 @@ export function connectWebSocket() {
                 const { updateSeriesNotification, renderMovieCards } = await import('./movies.js');
                 updateSeriesNotification(data.ignored_series || []);
                 renderMovieCards(data.movies || []);
+                const details = document.getElementById('movie-details-content');
+                const current = (data.movies || []).find(movie => movie.torrent_hash === details?.dataset.hash);
+                if (current && details.dataset.status !== current.status) {
+                    const { getCurrentView } = await import('./navigation.js');
+                    if (getCurrentView() === 'movie-details') {
+                        const { showMovieDetails } = await import('./movies.js');
+                        await showMovieDetails(current.torrent_hash);
+                    }
+                }
 
                 if (data.client_status !== undefined) {
                     const { updateTorrentClientAlert } = await import('./ui.js');
                     updateTorrentClientAlert(data.client_status);
                 }
             } else if (data.type === 'progress') {
-                updateRealtimeProgress(data.progress);
+                await updateRealtimeProgress(data.progress);
                 if (data.client_status !== undefined) {
                     const { updateTorrentClientAlert } = await import('./ui.js');
                     updateTorrentClientAlert(data.client_status);
@@ -56,7 +74,7 @@ export function connectWebSocket() {
         } catch (e) {
             console.error('Error handling WebSocket message:', e);
         }
-    };
+    }
 
     socket.onclose = () => {
         console.log('❌ WebSocket disconnected. Retrying in 5s...');
@@ -72,7 +90,24 @@ export function connectWebSocket() {
 
 async function updateRealtimeProgress(progressData) {
     if (!progressData) return;
-    
+    const currentHashes = new Set(Object.keys(progressData));
+    const finished = [...previousProgressHashes].filter(hash => !currentHashes.has(hash));
+    previousProgressHashes = currentHashes;
+    if (finished.some(hash => state.getMovies().some(movie =>
+        movie.torrent_hash === hash && ['copying', 'queued', 'downloading'].includes(movie.status)))) {
+        // A progress message only contains active jobs, so disappearance alone
+        // cannot tell us whether the result was success, cancellation or error.
+        const { fetchMovies } = await import('./movies.js');
+        await fetchMovies(true);
+    }
+    state.setMovies(state.getMovies().map(movie => {
+        const progress = progressData[movie.torrent_hash];
+        if (!progress) return movie;
+        const status = progress.type === 'copying'
+            ? (progress.state === 'queued' ? 'queued' : 'copying') : 'downloading';
+        return { ...movie, status };
+    }));
+
     const { getCurrentView } = await import('./navigation.js');
     const currentView = getCurrentView();
     

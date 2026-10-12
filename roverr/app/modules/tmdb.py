@@ -609,7 +609,7 @@ def sync_movies(torrents, api_key):
                 movie.torrent_name = t['name']
             
             # Check if copying
-            if t['hash'] in COPY_PROGRESS:
+            if COPY_PROGRESS.get(t['hash'], {}).get('status') in ('copying', 'queued'):
                 movie.status = COPY_PROGRESS[t['hash']].get('status', 'copying')
             else:
                 # 1. Check current state (Prioritize active downloading)
@@ -1789,7 +1789,7 @@ def get_movie_details(torrent_hash, api_key):
             
         # Check if copying
         copy_progress = get_copy_progress().get(torrent_hash)
-        if copy_progress:
+        if copy_progress and copy_progress.get('status') in ('copying', 'queued'):
             status = copy_progress.get('status', 'copying')
         
         # Determine source_path display:

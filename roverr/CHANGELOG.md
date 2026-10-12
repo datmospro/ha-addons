@@ -1,3 +1,22 @@
+# 4.5.6
+
+- Refresh completed copies immediately without F5. Notify the server event loop
+  safely from copy worker threads and serialize full movie broadcasts.
+- Export the card/series render functions consumed by WebSocket full updates;
+  those messages previously failed before refreshing any cards.
+- Do not send a progress snapshot captured before completion after publishing
+  the newer final state; exclude terminal copy states from active progress.
+- Process WebSocket messages in order and reconcile jobs missing from progress
+  with their actual success/cancellation/error state. Refresh open movie details
+  when a full update changes their status.
+- Suppress recursive notifications caused by the broadcast's own database sync.
+
+No receptor script change is required for 4.5.6.
+
+Validated with 32 regression tests and a browser simulation of one movie
+finishing while the next starts, including recovery from a missing final-state
+message without reloading the page.
+
 # 4.5.5
 
 - Show **En cola** in movie details, with the current position among waiting

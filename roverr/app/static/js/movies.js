@@ -123,7 +123,8 @@ export async function fetchMovies(isPolling = false) {
     }
 
     const data = await getMovies();
-    const movies = data.movies;
+    const movies = data.movies || [];
+    state.setMovies(movies);
     const ignored = data.ignored_series;
 
     // Update Torrent Client Status Alert
@@ -148,7 +149,7 @@ export async function fetchMovies(isPolling = false) {
 /**
  * Actualiza la notificación de series ignoradas
  */
-function updateSeriesNotification(ignored) {
+export function updateSeriesNotification(ignored) {
     const notificationArea = document.getElementById('series-notification');
     if (!notificationArea) return;
 
@@ -167,7 +168,7 @@ function updateSeriesNotification(ignored) {
 /**
  * Renderiza las tarjetas de películas
  */
-function renderMovieCards(movies) {
+export function renderMovieCards(movies) {
     // Map existing cards
     const existingCards = new Map();
     moviesGrid.querySelectorAll('.movie-card').forEach(card => {
@@ -374,6 +375,7 @@ export async function showMovieDetails(hash) {
  * Renderiza los detalles de una película
  */
 function renderMovieDetails(container, movie, hash) {
+    container.dataset.status = movie.status;
     console.log('renderMovieDetails called with movie:', movie.title, 'country_code:', movie.country_code);
     const runtime = movie.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m` : 'N/A';
     const { icon: statusIcon, label: statusLabel } = getStatusIconAndLabel(movie.status);
@@ -714,6 +716,7 @@ export function updateProgressUI(progress, type) {
 
     const badge = document.querySelector('#movie-details-content .badge.status');
     if (badge && ['copying', 'queued'].includes(type)) {
+        document.getElementById('movie-details-content').dataset.status = type;
         const { icon, label } = getStatusIconAndLabel(type);
         badge.className = `badge status ${getStatusClass(type)}`;
         badge.innerHTML = `${icon} ${label}`;
