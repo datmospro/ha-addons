@@ -1,110 +1,129 @@
-import React, { useState, useEffect } from 'react';
-import GameList from './GameList';
-import ActiveGamesList from './ActiveGamesList';
-import FinishedGamesList from './FinishedGamesList';
-import { PlayCircle, List, History, ChevronLeft, Gamepad2 } from 'lucide-react';
-
-export default function Home({ onSelectGame, onResumeGame, onViewFinishedMatch, initialView = 'menu' }) {
-    const [view, setView] = useState(initialView); // menu, new, active, finished
-
-    // Update view when initialView changes
-    useEffect(() => {
-        setView(initialView);
-    }, [initialView]);
-
-    const MenuButton = ({ onClick, icon: Icon, title, description, color }) => (
-        <button
-            onClick={onClick}
-            className="card animate-in"
-            style={{
-                display: 'flex', alignItems: 'center', gap: '20px', padding: '24px',
-                width: '100%', textAlign: 'left', marginBottom: '16px',
-                borderLeft: `4px solid ${color}`
-            }}
-        >
-            <div style={{
-                background: `${color}20`, padding: '16px', borderRadius: '16px',
-                color: color, display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-                <Icon size={32} />
-            </div>
-            <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                <h3 className="text-xl font-bold">{title}</h3>
-                <p className="text-sm opacity-60">{description}</p>
-            </div>
-        </button>
-    );
-
-    if (view === 'menu') {
-        return (
-            <div className="container animate-in" style={{ paddingBottom: '100px' }}>
-                <div className="header" style={{ display: 'block', textAlign: 'center', marginBottom: '48px' }}>
-                    <h1 className="header-title" style={{ fontSize: '40px', marginBottom: '8px' }}>Rover Counter</h1>
-                    <p className="text-sm tracking-widest opacity-60">SELECCIONA TU OPCIÓN</p>
-                </div>
-
-                <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-                    <MenuButton
-                        onClick={() => setView('new')}
-                        icon={Gamepad2}
-                        title="Nueva Partida"
-                        description="Comienza un nuevo desafío"
-                        color="#3b82f6"
-                    />
-                    <MenuButton
-                        onClick={() => setView('active')}
-                        icon={PlayCircle}
-                        title="Partidas en Curso"
-                        description="Continúa tus batallas"
-                        color="#10b981"
-                    />
-                    <MenuButton
-                        onClick={() => setView('finished')}
-                        icon={History}
-                        title="Partidas Terminadas"
-                        description="Revisa victorias pasadas"
-                        color="#8b5cf6"
-                    />
-                </div>
-            </div>
-        );
-    }
-
-    const BackHeader = ({ title }) => (
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
-            <button
-                onClick={() => setView('menu')}
-                className="btn-icon"
-                style={{ marginRight: '16px', background: 'rgba(255,255,255,0.1)' }}
-            >
-                <ChevronLeft size={24} />
-            </button>
-            <h2 className="text-xl font-bold">{title}</h2>
-        </div>
-    );
-
+import { useEffect, useState } from "react";
+import { ArrowUpRight, Plus, History, Play, Spade, Users } from "lucide-react";
+import { useGame } from "../context/GameContext";
+import { Header } from "./UI";
+import GameList from "./GameList";
+import ActiveGamesList from "./ActiveGamesList";
+import FinishedGamesList from "./FinishedGamesList";
+export default function Home({
+  onSelectGame,
+  onResumeGame,
+  onViewFinishedMatch,
+  onTeams,
+  initialView = "menu",
+}) {
+  const [view, setView] = useState(initialView);
+  const { activeMatches, finishedMatches, teams } = useGame();
+  useEffect(() => setView(initialView), [initialView]);
+  if (view !== "menu")
     return (
-        <div className="container animate-in" style={{ paddingBottom: '100px' }}>
-            {view === 'new' && (
-                <>
-                    <BackHeader title="Nueva Partida" />
-                    <GameList onSelectGame={onSelectGame} />
-                </>
-            )}
-
-            {view === 'active' && (
-                <>
-                    <BackHeader title="Partidas en Curso" />
-                    <ActiveGamesList onResume={onResumeGame} />
-                </>
-            )}
-
-            {view === 'finished' && (
-                <>
-                    <BackHeader title="Partidas Terminadas" />
-                    <FinishedGamesList onViewMatch={onViewFinishedMatch} />
-                </>
-            )}
-        </div>
+      <main className="container animate-in">
+        <Header
+          onBack={() => setView("menu")}
+          title={
+            view === "new"
+              ? "Elige tu juego"
+              : view === "active"
+                ? "En la mesa"
+                : "Partidas terminadas"
+          }
+          subtitle="TU ESPACIO DE JUEGO"
+        />
+        {view === "new" ? (
+          <GameList onSelectGame={onSelectGame} />
+        ) : view === "active" ? (
+          <ActiveGamesList onResume={onResumeGame} />
+        ) : (
+          <FinishedGamesList onViewMatch={onViewFinishedMatch} />
+        )}
+      </main>
     );
+  return (
+    <main className="container home-page animate-in">
+      <div className="brand-bar">
+        <span className="brand-mark">
+          <Spade size={18} fill="currentColor" />
+        </span>
+        <strong>
+          rover<span>counter</span>
+        </strong>
+        <span className="brand-tag">A jugar.</span>
+      </div>
+      <section className="home-hero">
+        <p className="eyebrow">BUENA COMPAÑÍA. BUENAS PARTIDAS.</p>
+        <h1>
+          La mesa está
+          <br />
+          <em>lista.</em>
+        </h1>
+        <p>
+          Tú pones las cartas.
+          <br />
+          Nosotros llevamos la cuenta.
+        </p>
+        <button className="button primary" onClick={() => setView("new")}>
+          <Plus size={20} /> Nueva partida <ArrowUpRight size={19} />
+        </button>
+        <div className="hero-art" aria-hidden="true">
+          <span>
+            ♠<small>A</small>
+          </span>
+          <span>
+            ♦<small>A</small>
+          </span>
+        </div>
+      </section>
+      <div className="home-stats">
+        <button onClick={() => setView("active")}>
+          <strong>{activeMatches.length}</strong>
+          <span>En curso</span>
+        </button>
+        <button onClick={() => setView("finished")}>
+          <strong>{finishedMatches.length}</strong>
+          <span>Terminadas</span>
+        </button>
+        <button onClick={onTeams}>
+          <strong>{teams.length}</strong>
+          <span>Equipos</span>
+        </button>
+      </div>
+      <section className="home-section">
+        <div className="section-heading">
+          <h2>Volver a la mesa</h2>
+          <button className="text-button" onClick={() => setView("active")}>
+            Ver todas <ArrowUpRight size={15} />
+          </button>
+        </div>
+        {activeMatches.length ? (
+          <ActiveGamesList onResume={onResumeGame} limit={2} />
+        ) : (
+          <div className="panel starter">
+            <Play size={25} />
+            <div>
+              <strong>Tu próxima partida empieza aquí</strong>
+              <p>Crea una partida y retómala cuando quieras.</p>
+            </div>
+          </div>
+        )}
+      </section>
+      <div className="home-links">
+        <button className="panel link-card" onClick={() => setView("finished")}>
+          <History size={23} />
+          <span>
+            <strong>El historial</strong>
+            <small>Cada partida cuenta</small>
+          </span>
+          <ArrowUpRight size={18} />
+        </button>
+        <button className="panel link-card" onClick={onTeams}>
+          <Users size={23} />
+          <span>
+            <strong>Los equipos</strong>
+            <small>Reúne a los tuyos</small>
+          </span>
+          <ArrowUpRight size={18} />
+        </button>
+      </div>
+    </main>
+  );
 }

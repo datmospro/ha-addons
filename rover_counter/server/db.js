@@ -1,25 +1,26 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+const Database = require("better-sqlite3");
+const path = require("path");
 
 // Database file location (persistent in /data directory)
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'game_counter.db');
+const DB_PATH =
+  process.env.DB_PATH || path.join(__dirname, "data", "game_counter.db");
 
 // Ensure data directory exists
-const fs = require('fs');
+const fs = require("fs");
 const dataDir = path.dirname(DB_PATH);
 if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+  fs.mkdirSync(dataDir, { recursive: true });
 }
 
 const db = new Database(DB_PATH);
 
 // Enable foreign keys
-db.pragma('foreign_keys = ON');
+db.pragma("foreign_keys = ON");
 
 // Initialize database schema
 // Initialize database schema
 function initDatabase() {
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS teams (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -60,36 +61,50 @@ function initDatabase() {
         );
     `);
 
-    // Migration: Add players column to teams if it doesn't exist
-    try {
-        const tableInfo = db.prepare("PRAGMA table_info(teams)").all();
-        const hasPlayersColumn = tableInfo.some(col => col.name === 'players');
+  // Migration: Add players column to teams if it doesn't exist
+  try {
+    const tableInfo = db.prepare("PRAGMA table_info(teams)").all();
+    const hasPlayersColumn = tableInfo.some((col) => col.name === "players");
 
-        if (!hasPlayersColumn) {
-            console.log('Migrating: Adding players column to teams table');
-            db.exec(`ALTER TABLE teams ADD COLUMN players TEXT DEFAULT '[]'`);
-            // Update existing rows to have empty array
-            db.exec(`UPDATE teams SET players = '[]' WHERE players IS NULL`);
-        }
-    } catch (error) {
-        console.error('Migration error (players column):', error);
+    if (!hasPlayersColumn) {
+      console.log("Migrating: Adding players column to teams table");
+      db.exec(`ALTER TABLE teams ADD COLUMN players TEXT DEFAULT '[]'`);
+      // Update existing rows to have empty array
+      db.exec(`UPDATE teams SET players = '[]' WHERE players IS NULL`);
     }
+  } catch (error) {
+    console.error("Migration error (players column):", error);
+  }
 
-    // Migration: Add dealer_index column to match_history if it doesn't exist
-    try {
-        const tableInfo = db.prepare("PRAGMA table_info(match_history)").all();
-        const hasDealerIndexColumn = tableInfo.some(col => col.name === 'dealer_index');
+  // Migration: Add dealer_index column to match_history if it doesn't exist
+  try {
+    const tableInfo = db.prepare("PRAGMA table_info(match_history)").all();
+    const hasDealerIndexColumn = tableInfo.some(
+      (col) => col.name === "dealer_index",
+    );
 
-        if (!hasDealerIndexColumn) {
-            console.log('Migrating: Adding dealer_index column to match_history table');
-            db.exec(`ALTER TABLE match_history ADD COLUMN dealer_index INTEGER`);
-        }
-    } catch (error) {
-        console.error('Migration error (dealer_index column):', error);
+    if (!hasDealerIndexColumn) {
+      console.log(
+        "Migrating: Adding dealer_index column to match_history table",
+      );
+      db.exec(`ALTER TABLE match_history ADD COLUMN dealer_index INTEGER`);
     }
+  } catch (error) {
+    console.error("Migration error (dealer_index column):", error);
+  }
 }
 
 initDatabase();
+// Additive migration preserves all existing scores and history.
+if (
+  !db
+    .prepare("PRAGMA table_info(match_history)")
+    .all()
+    .some((col) => col.name === "skipped")
+) {
+  db.exec(
+    "ALTER TABLE match_history ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0",
+  );
+}
 
 module.exports = db;
-

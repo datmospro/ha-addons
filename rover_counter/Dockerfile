@@ -1,16 +1,16 @@
 # Build frontend
 FROM node:18-alpine as frontend-build
 WORKDIR /app
-COPY web/package.json ./
-RUN npm install
+COPY web/package*.json ./
+RUN npm ci
 COPY web/ ./
 RUN npm run build
 
 # Build backend dependencies
 FROM node:18-alpine as backend-build
 WORKDIR /app
-COPY server/package.json ./
-RUN npm install --production
+COPY server/package*.json ./
+RUN npm ci --omit=dev
 
 # Production stage
 FROM node:18-alpine
