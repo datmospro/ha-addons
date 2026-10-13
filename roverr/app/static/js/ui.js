@@ -108,8 +108,8 @@ export function showRedirectOverlay() {
     overlay.innerHTML = `
         <div style="text-align: center; color: white;">
             <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 3rem; color: var(--primary); margin-bottom: 1.5rem;"></i>
-            <h2 style="font-size: 1.8rem; margin-bottom: 0.5rem;">Torrent Added Successfully</h2>
-            <p style="font-size: 1.2rem; color: #ccc;">Redirecting to movie details...</p>
+            <h2 style="font-size: 1.8rem; margin-bottom: 0.5rem;">Torrent añadido correctamente</h2>
+            <p style="font-size: 1.2rem; color: #ccc;">Abriendo la ficha de la película…</p>
         </div>
     `;
 

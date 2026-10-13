@@ -897,6 +897,8 @@ def search_tmdb(q: str):
                 'vote_average': movie.get('vote_average', 0)
             })
         
+        from modules.search_downloads import annotate_ignored
+        annotate_ignored(results)
         return {"success": True, "results": results, "count": len(results)}
         
     except Exception as e:
@@ -904,7 +906,7 @@ def search_tmdb(q: str):
         return {"success": False, "message": str(e), "results": []}
 
 @app.get("/api/search")
-def search_movies(q: str, tmdb_id: int = None):
+def search_movies(q: str, tmdb_id: int = None, movie_title: str = "", movie_year: str = "", original_title: str = ""):
     """Search for movies using configured indexers with optional intelligent multi-language search"""
     from logic import search_indexers, load_settings
     
@@ -915,7 +917,14 @@ def search_movies(q: str, tmdb_id: int = None):
         settings = load_settings()
         logger.info(f"Search request: q='{q}', tmdb_id={tmdb_id}")
         results = search_indexers(q.strip(), settings, tmdb_id=tmdb_id)
-        return {"success": True, "results": results, "count": len(results)}
+        from modules.search_downloads import ignored_matches
+        from modules.mover import clean_torrent_name
+        ignored = bool(ignored_matches(movie_title, movie_year, tmdb_id, original_title))
+        if isinstance(results, list):
+            for result in results:
+                title, year = clean_torrent_name(result.get('title') or '')
+                result['ignored'] = ignored or bool(ignored_matches(title, year, tmdb_id))
+        return {"success": True, "results": results, "count": len(results), "ignored": ignored}
     except Exception as e:
         logger.error(f"Search error: {e}")
         return {"success": False, "message": str(e), "results": []}
@@ -924,53 +933,21 @@ def search_movies(q: str, tmdb_id: int = None):
 def add_torrent_from_url(payload: dict):
     """Add torrent to download client from URL"""
     from logic import get_qb_client, load_settings, MANUAL_SEARCH_TAG
-    import time
-    
-    url = payload.get('url')
-    title = payload.get('title', 'Unknown')
-    
-    if not url:
+    from modules.search_downloads import download_requested
+    from modules.config import trigger_movies_update_callback
+
+    if not payload.get('url'):
         return {"success": False, "message": "Falta la URL del torrent"}
-    
     try:
         settings = load_settings()
-        auto_copy_manual = settings.get('auto_copy_manual_search', False)
-        qb = get_qb_client(settings)
-        qb.auth_log_in()
-        
-        # Add torrent from URL with tag if auto-copy is enabled
-        if auto_copy_manual:
-            logger.info(f"Adding manual search torrent with auto-copy tag: {MANUAL_SEARCH_TAG}")
-            qb.torrents_add(urls=url, tags=MANUAL_SEARCH_TAG)
-        else:
-            qb.torrents_add(urls=url)
-        
-        # Poll for the new torrent (try for up to 5 seconds)
-        torrent_hash = None
-        for i in range(5):
-            time.sleep(1) # Wait 1 second between checks
-            
-            # Get the most recently added torrent
-            recent_torrents = qb.torrents_info(sort='added_on', reverse=True, limit=1)
-            
-            if recent_torrents:
-                added_on = recent_torrents[0].get('added_on', 0)
-                now = time.time()
-                
-                # Debug logging
-                logger.info(f"Attempt {i+1}: Recent torrent added_on={added_on}, now={now}, diff={now-added_on}")
-                
-                if now - added_on < 20: # 20 seconds buffer
-                    torrent_hash = recent_torrents[0].get('hash')
-                    logger.info(f"Found hash for new torrent: {torrent_hash}")
-                    break
-        
-        logger.info(f"Added torrent to download client: {title}")
-        return {"success": True, "message": f"Torrent añadido: {title}", "hash": torrent_hash}
-        
+        data = download_requested(payload, get_qb_client(settings),
+                                  settings.get('auto_copy_manual_search', False), MANUAL_SEARCH_TAG)
+        if data.get('restored'):
+            trigger_movies_update_callback()
+        return data
     except Exception as e:
         logger.error(f"Error al añadir el torrent: {e}")
-        return {"success": False, "message": str(e)}
+        return {"success": False, "message": "No se pudo añadir o confirmar el torrent. Revisa la conexión con qBittorrent y vuelve a intentarlo."}
 
 @app.post("/api/test_rss_feed")
 def test_rss_feed_endpoint(payload: dict):

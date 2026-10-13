@@ -204,12 +204,12 @@ export async function markAsMoved(hash) {
  * Adds a torrent to torrent client
  * Líneas 524-582 de app.js
  */
-export async function addTorrent(url, title) {
+export async function addTorrent(url, title, movie = {}) {
     try {
         const res = await fetch(`${API_BASE}/add_torrent`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, title })
+            body: JSON.stringify({ url, title, ...movie })
         });
         return await res.json();
     } catch (e) {
@@ -347,7 +347,7 @@ export async function searchTMDB(query) {
  * Búsqueda en indexers
  * Líneas 429-461 de app.js
  */
-export async function searchIndexers(query, tmdbId = null, signal = null) {
+export async function searchIndexers(query, tmdbId = null, signal = null, movie = {}) {
     try {
         let url = `${API_BASE}/search?q=${encodeURIComponent(query)}`;
 
@@ -356,6 +356,9 @@ export async function searchIndexers(query, tmdbId = null, signal = null) {
             url += `&tmdb_id=${tmdbId}`;
         }
 
+        for (const key of ['movie_title','movie_year','original_title']) {
+            if(movie[key]) url += `&${key}=${encodeURIComponent(movie[key])}`;
+        }
         const options = {};
         if (signal) {
             options.signal = signal;

@@ -1,3 +1,25 @@
+# 4.5.16
+
+- El buscador identifica las películas ignoradas en los resultados de TMDB y
+  avisa al consultar sus torrents. Ofrece «Restaurar y descargar» en el buscador
+  principal y en la búsqueda manual de descargas.
+- Requiere una acción explícita para restaurar. Si el estado cambia después de
+  buscar, el servidor devuelve el aviso y el botón pide la nueva acción.
+- Restaura las versiones ignoradas de la película identificada por TMDB, o por
+  título y año cuando no hay identificación, después de aceptar la descarga.
+  Conserva metadatos, historial y decisiones independientes de pausa/conflicto.
+- Reutiliza el torrent solicitado cuando ya existe y respeta la configuración
+  de copia automática de búsquedas manuales. No identifica la descarga por el
+  último torrent añadido; informa cuando queda pendiente de confirmación.
+- Abrir una ficha deja de quitar incidentalmente el estado de ignorada. Los
+  mensajes del flujo de búsqueda están en español y los botones se adaptan al
+  móvil. No requiere actualizar el receptor.
+
+Validado con 13 regresiones nuevas de identidad, restauración explícita,
+fallos del cliente, versiones, historial, confirmación y configuración de copia;
+y prueba de navegador del aviso, botones, errores, cambios posteriores a la
+búsqueda, títulos con comillas, actualización del panel y vista móvil.
+
 # 4.5.15
 
 - Panel con búsqueda por título, año y nombre del torrent; filtros por estado,

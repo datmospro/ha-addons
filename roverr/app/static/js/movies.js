@@ -986,7 +986,7 @@ async function handleManualSearch(hash) {
     };
 
     // Perform initial search with title and optionally tmdb_id for intelligent multi-language search
-    const data = await searchIndexers(movie.title, movie.tmdb_id);
+    const data = await searchIndexers(movie.title, movie.tmdb_id, null, {movie_title:movie.title,movie_year:movie.year});
     loadingEl.style.display = 'none';
 
     if (!data.success) {
@@ -1003,7 +1003,7 @@ async function handleManualSearch(hash) {
         return;
     }
 
-    renderManualSearchResults(resultsEl, data.results, movie.title, hash);
+    renderManualSearchResults(resultsEl, data.results, movie.title, hash, {movie_title:movie.title,movie_year:movie.year,tmdb_id:movie.tmdb_id});
 }
 
 async function performCustomSearch() {
@@ -1042,12 +1042,13 @@ async function performCustomSearch() {
     renderManualSearchResults(resultsEl, data.results, manualSearchContext.title, manualSearchContext.hash);
 }
 
-function renderManualSearchResults(container, results, movieTitle, originalHash) {
+function renderManualSearchResults(container, results, movieTitle, originalHash, movie = {}) {
     container.innerHTML = `
+        ${results.some(result=>result.ignored) ? '<div class="search-ignored-banner">Hay películas en la lista de ignorados. «Restaurar y descargar» las devuelve al panel y sigue la configuración de copia automática.</div>' : ''}
         <div style="display: grid; gap: 1rem;">
             ${results.map(result => `
                 <div class="content-card" style="padding: 1.25rem; transition: all 0.2s ease;">
-                    <div style="display: flex; justify-content: space-between; align-items: start; gap: 1.5rem;">
+                    <div class="search-release-row" style="display: flex; justify-content: space-between; align-items: start; gap: 1.5rem;">
                         <div style="flex: 1; min-width: 0;">
                             <h4 style="margin: 0 0 0.75rem 0; font-size: 1.1rem; font-weight: 600; line-height: 1.4;">${escapeHtml(result.title)}</h4>
                             <div style="display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.9rem; color: var(--text-muted);">
@@ -1058,8 +1059,8 @@ function renderManualSearchResults(container, results, movieTitle, originalHash)
                                 ${result.leechers !== undefined ? `<span style="display: flex; align-items: center; gap: 0.3rem; color: var(--warning);"><i class="fa-solid fa-arrow-down" style="font-size: 0.8rem;"></i>${result.leechers}</span>` : ''}
                             </div>
                         </div>
-                        <button class="btn primary download-manual-btn" data-url="${escapeHtml(result.download_url)}" data-title="${escapeHtml(movieTitle)}" style="white-space: nowrap; flex-shrink: 0;">
-                            <i class="fa-solid fa-download"></i> Descargar
+                        <button class="btn primary download-manual-btn" data-url="${escapeHtml(result.download_url)}" data-title="${escapeHtml(result.title)}" data-ignored="${Boolean(result.ignored)}" style="white-space: nowrap; flex-shrink: 0;">
+                            <i class="fa-solid fa-download"></i> ${result.ignored ? 'Restaurar y descargar' : 'Descargar'}
                         </button>
                     </div>
                 </div>
@@ -1074,16 +1075,16 @@ function renderManualSearchResults(container, results, movieTitle, originalHash)
 
             // Disable button to prevent double clicks
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Adding...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Añadiendo…';
 
             showToast(`Añadiendo torrent para ${title}...`, 'info');
-            const res = await addTorrent(url, title);
+            const res = await addTorrent(url, title, {...movie,restore_ignored:btn.dataset.ignored==='true'});
 
             if (res.success) {
                 showToast('Torrent añadido correctamente.', 'success');
 
                 // Update button state to success
-                btn.innerHTML = '<i class="fa-solid fa-check"></i> Added';
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> Añadida';
                 btn.classList.remove('primary');
                 btn.classList.add('success');
 
@@ -1112,7 +1113,8 @@ function renderManualSearchResults(container, results, movieTitle, originalHash)
             } else {
                 showToast(res.message || 'Error al añadir el torrent', 'error');
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-download"></i> Download';
+                if(res.status==='ignored') btn.dataset.ignored='true';
+                btn.innerHTML = `<i class="fa-solid fa-download"></i> ${btn.dataset.ignored==='true' ? 'Restaurar y descargar' : 'Descargar'}`;
             }
         });
     });

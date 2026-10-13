@@ -1,0 +1,4 @@
+.search-ignored-label { display:inline-block; margin-bottom:.5rem; padding:.25rem .6rem; border:1px solid #eab308; color:#eab308; border-radius:6px; font-size:.8rem; }
+.search-ignored-banner { padding:.8rem 1rem; margin:0 0 1rem; border:1px solid rgba(234,179,8,.5); border-radius:8px; background:rgba(234,179,8,.08); color:var(--text-primary); overflow-wrap:anywhere; }
+.search-ignored-banner strong { display:block; margin-bottom:.3rem; }
+@media(max-width:700px) { .search-release-row { flex-direction:column; } .search-release-row .download-torrent-btn { width:100%; white-space:normal !important; } }

@@ -43,14 +43,14 @@ async function handleSearch() {
     const query = searchInput.value.trim();
     if (!query) return;
 
-    searchResults.innerHTML = '<div style="text-align: center; padding: 2rem;"><i class="fa-solid fa-spinner fa-spin"></i> Searching TMDB...</div>';
+    searchResults.innerHTML = '<div style="text-align: center; padding: 2rem;"><i class="fa-solid fa-spinner fa-spin"></i> Buscando películas…</div>';
 
     const data = await searchTMDB(query);
 
     if (data.success && data.results) {
         renderTMDBResults(data.results);
     } else {
-        searchResults.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--error);">${data.message || 'Search failed'}</div>`;
+        searchResults.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--error);">${escapeHtml(data.message || 'No se pudo completar la búsqueda')}</div>`;
     }
 }
 
@@ -63,15 +63,15 @@ function renderTMDBResults(results) {
         searchResults.innerHTML = `
             <div style="grid-column: 1 / -1; text-align: center; padding: 4rem 2rem; color: var(--text-muted);">
                 <i class="fa-solid fa-film" style="font-size: 3rem; opacity: 0.3; margin-bottom: 1rem;"></i>
-                <p style="font-size: 1.1rem;">No results found</p>
+                <p style="font-size: 1.1rem;">No se encontraron películas</p>
             </div>
         `;
         return;
     }
 
-    const resultsHTML = results.map(movie => `
+    const resultsHTML = results.map((movie,index) => `
         <div class="content-card" style="padding: 0; overflow: hidden; cursor: pointer; transition: all 0.3s ease; border-radius: 12px;" 
-             onclick="searchIndexersForMovie('${escapeHtml(movie.title)}', '${escapeHtml(movie.original_title || '')}', '${movie.year || ''}', ${movie.tmdb_id})"
+             data-movie-index="${index}" role="button" tabindex="0"
              onmouseenter="this.style.transform='translateY(-8px)'; this.style.boxShadow='0 12px 24px rgba(0,0,0,0.3)'"
              onmouseleave="this.style.transform='translateY(0)'; this.style.boxShadow=''">
             <div style="position: relative; width: 100%; padding-top: 150%; overflow: hidden; background: var(--bg-secondary);">
@@ -91,24 +91,31 @@ function renderTMDBResults(results) {
                 ` : ''}
             </div>
             <div style="padding: 1.25rem;">
+                ${movie.ignored ? '<span class="search-ignored-label">Ignorada</span>' : ''}
                 <h4 style="margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.6em;">
                     ${escapeHtml(movie.title)}
                 </h4>
                 <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-                    ${movie.year ? `<span style="display: flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-calendar" style="font-size: 0.75rem;"></i>${movie.year}</span>` : '<span>Year unknown</span>'}
+                    ${movie.year ? `<span style="display: flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-calendar" style="font-size: 0.75rem;"></i>${movie.year}</span>` : '<span>Año desconocido</span>'}
                 </div>
                 <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0 0 1rem 0; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; min-height: 3.75em;">
-                    ${movie.overview || 'No description available.'}
+                    ${escapeHtml(movie.overview || 'Sin descripción disponible.')}
                 </p>
                 <button class="btn primary" style="width: 100%; border-radius: 8px; font-weight: 600;" 
-                        onclick="event.stopPropagation(); searchIndexersForMovie('${escapeHtml(movie.title)}', '${escapeHtml(movie.original_title || '')}', '${movie.year || ''}', ${movie.tmdb_id})">
-                    <i class="fa-solid fa-download"></i> Search Torrents
+                        >
+                    <i class="fa-solid fa-download"></i> Buscar torrents
                 </button>
             </div>
         </div>
     `).join('');
 
     searchResults.innerHTML = resultsHTML;
+    searchResults.querySelectorAll('[data-movie-index]').forEach(card=> {
+        const movie=results[Number(card.dataset.movieIndex)];
+        const search=()=>window.searchIndexersForMovie(movie.title,movie.original_title || '',movie.year,movie.tmdb_id);
+        card.addEventListener('click',search);
+        card.addEventListener('keydown',event=> {if(event.target===card && ['Enter',' '].includes(event.key)){event.preventDefault();search();}});
+    });
 }
 
 /**
@@ -129,9 +136,9 @@ window.searchIndexersForMovie = async function (title, originalTitle, year, tmdb
     searchResults.innerHTML = `
         <div style="grid-column: 1 / -1; max-width: 1200px; margin: 0 auto; width: 100%; text-align: center; padding: 4rem 2rem;">
             <i class="fa-solid fa-spinner fa-spin" style="font-size: 2.5rem; color: var(--primary); margin-bottom: 1.5rem;"></i>
-            <p style="font-size: 1.25rem; color: var(--text); margin-bottom: 1.5rem;">Searching indexers for "${title}"...</p>
+            <p style="font-size: 1.25rem; color: var(--text); margin-bottom: 1.5rem;">Buscando torrents para "${escapeHtml(title)}"…</p>
             <button id="cancel-indexer-search-btn" class="btn danger" style="padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 600;">
-                <i class="fa-solid fa-circle-xmark"></i> Cancel Search
+                <i class="fa-solid fa-circle-xmark"></i> Cancelar búsqueda
             </button>
         </div>
     `;
@@ -154,7 +161,8 @@ window.searchIndexersForMovie = async function (title, originalTitle, year, tmdb
         }
 
         const query = queries.join(' | ');
-        const data = await searchIndexers(query, tmdbId, signal);
+        const movie={movie_title:title,movie_year:year,original_title:originalTitle,tmdb_id:tmdbId};
+        const data = await searchIndexers(query, tmdbId, signal, movie);
 
         if (data.aborted) {
             return;
@@ -163,12 +171,12 @@ window.searchIndexersForMovie = async function (title, originalTitle, year, tmdb
         currentSearchController = null;
 
         if (data.success && data.results) {
-            renderIndexerResults(data.results, title, year);
+            renderIndexerResults(data.results, title, year, {...movie,ignored:data.ignored});
         } else {
             searchResults.innerHTML = `
                 <div style="grid-column: 1 / -1; max-width: 1200px; margin: 0 auto; width: 100%;">
                     <button class="btn secondary" onclick="location.reload()" style="margin-bottom: 2rem;">
-                        <i class="fa-solid fa-arrow-left"></i> Back to Search
+                        <i class="fa-solid fa-arrow-left"></i> Volver a buscar
                     </button>
                     <div style="text-align: center; padding: 4rem 2rem; color: var(--error);">
                         <i class="fa-solid fa-circle-exclamation" style="font-size: 3rem; margin-bottom: 1rem;"></i>
@@ -186,11 +194,11 @@ window.searchIndexersForMovie = async function (title, originalTitle, year, tmdb
         searchResults.innerHTML = `
             <div style="grid-column: 1 / -1; max-width: 1200px; margin: 0 auto; width: 100%;">
                 <button class="btn secondary" onclick="location.reload()" style="margin-bottom: 2rem;">
-                    <i class="fa-solid fa-arrow-left"></i> Back to Search
+                    <i class="fa-solid fa-arrow-left"></i> Volver a buscar
                 </button>
                 <div style="text-align: center; padding: 4rem 2rem; color: var(--error);">
                     <i class="fa-solid fa-circle-exclamation" style="font-size: 3rem; margin-bottom: 1rem;"></i>
-                    <p style="font-size: 1.1rem;">Error searching indexers</p>
+                    <p style="font-size: 1.1rem;">Error al buscar torrents</p>
                 </div>
             </div>
         `;
@@ -201,16 +209,16 @@ window.searchIndexersForMovie = async function (title, originalTitle, year, tmdb
  * Renderiza resultados de indexers
  * Líneas 463-514 de app.js
  */
-function renderIndexerResults(results, movieTitle, movieYear) {
+function renderIndexerResults(results, movieTitle, movieYear, movie = {}) {
     if (!results || results.length === 0) {
         searchResults.innerHTML = `
             <div style="grid-column: 1 / -1; max-width: 1200px; margin: 0 auto; width: 100%;">
                 <button class="btn secondary" onclick="location.reload()" style="margin-bottom: 2rem;">
-                    <i class="fa-solid fa-arrow-left"></i> Back to Search
+                    <i class="fa-solid fa-arrow-left"></i> Volver a buscar
                 </button>
                 <div style="text-align: center; padding: 4rem 2rem; color: var(--text-muted);">
                     <i class="fa-solid fa-circle-xmark" style="font-size: 3rem; opacity: 0.3; margin-bottom: 1rem;"></i>
-                    <p style="font-size: 1.1rem;">No se encontraron torrents for "${movieTitle}"</p>
+                    <p style="font-size: 1.1rem;">No se encontraron torrents para "${escapeHtml(movieTitle)}"</p>
                 </div>
             </div>
         `;
@@ -220,28 +228,29 @@ function renderIndexerResults(results, movieTitle, movieYear) {
     const resultsHTML = `
         <div style="grid-column: 1 / -1; max-width: 1200px; margin: 0 auto; width: 100%;">
             <button class="btn secondary" onclick="location.reload()" style="margin-bottom: 2rem;">
-                <i class="fa-solid fa-arrow-left"></i> Back to Search
+                <i class="fa-solid fa-arrow-left"></i> Volver a buscar
             </button>
             <div style="margin-bottom: 2rem;">
-                <h3 style="margin-bottom: 0.5rem; font-size: 1.5rem;">Torrents for "${movieTitle}"${movieYear ? ` (${movieYear})` : ''}</h3>
-                <p style="color: var(--text-muted); font-size: 0.95rem;"><i class="fa-solid fa-circle-check" style="color: var(--success);"></i> ${results.length} result(s) found</p>
+                <h3 style="margin-bottom: 0.5rem; font-size: 1.5rem;">Torrents para "${escapeHtml(movieTitle)}"${movieYear ? ` (${movieYear})` : ''}</h3>
+                <p style="color: var(--text-muted); font-size: 0.95rem;"><i class="fa-solid fa-circle-check" style="color: var(--success);"></i> ${results.length} resultados encontrados</p>
             </div>
+            ${movie.ignored || results.some(result=>result.ignored) ? ignoredNotice() : ''}
             <div style="display: grid; gap: 1rem;">
                 ${results.map(result => `
                     <div class="content-card" style="padding: 1.25rem; transition: all 0.2s ease;">
-                        <div style="display: flex; justify-content: space-between; align-items: start; gap: 1.5rem;">
+                        <div class="search-release-row" style="display: flex; justify-content: space-between; align-items: start; gap: 1.5rem;">
                             <div style="flex: 1; min-width: 0;">
-                                <h4 style="margin: 0 0 0.75rem 0; font-size: 1.1rem; font-weight: 600; line-height: 1.4;">${result.title || 'Unknown'}</h4>
+                                <h4 style="margin: 0 0 0.75rem 0; font-size: 1.1rem; font-weight: 600; line-height: 1.4;">${escapeHtml(result.title || 'Sin título')}</h4>
                                 <div style="display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.9rem; color: var(--text-muted);">
-                                    ${result.indexer ? `<span style="display: flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-server" style="font-size: 0.8rem;"></i>${result.indexer}</span>` : ''}
+                                    ${result.indexer ? `<span style="display: flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-server" style="font-size: 0.8rem;"></i>${escapeHtml(result.indexer)}</span>` : ''}
                                     ${result.size ? `<span style="display: flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-hard-drive" style="font-size: 0.8rem;"></i>${formatBytes(result.size)}</span>` : ''}
                                     ${result.year ? `<span style="display: flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-calendar" style="font-size: 0.8rem;"></i>${result.year}</span>` : ''}
                                     ${result.seeders !== undefined ? `<span style="display: flex; align-items: center; gap: 0.3rem; color: var(--success);"><i class="fa-solid fa-arrow-up" style="font-size: 0.8rem;"></i>${result.seeders}</span>` : ''}
                                     ${result.leechers !== undefined ? `<span style="display: flex; align-items: center; gap: 0.3rem; color: var(--warning);"><i class="fa-solid fa-arrow-down" style="font-size: 0.8rem;"></i>${result.leechers}</span>` : ''}
                                 </div>
                             </div>
-                            <button class="btn primary download-torrent-btn" data-url="${escapeHtml(result.download_url)}" data-title="${escapeHtml(result.title)}" style="white-space: nowrap; flex-shrink: 0;">
-                                <i class="fa-solid fa-download"></i> Descargar
+                            <button class="btn primary download-torrent-btn" data-url="${escapeHtml(result.download_url)}" data-title="${escapeHtml(result.title)}" data-ignored="${Boolean(movie.ignored || result.ignored)}" style="white-space: nowrap; flex-shrink: 0;">
+                                <i class="fa-solid fa-download"></i> ${movie.ignored || result.ignored ? 'Restaurar y descargar' : 'Descargar'}
                             </button>
                         </div>
                     </div>
@@ -253,18 +262,18 @@ function renderIndexerResults(results, movieTitle, movieYear) {
     searchResults.innerHTML = resultsHTML;
 
     // Attach event listeners to download buttons
-    attachDownloadListeners();
+    attachDownloadListeners(movie);
 }
 
 /**
  * Adjunta event listeners a botones de descarga
  */
-function attachDownloadListeners() {
+function attachDownloadListeners(movie) {
     searchResults.querySelectorAll('.download-torrent-btn').forEach(btn => {
         btn.addEventListener('click', async function () {
             const url = this.dataset.url;
             const title = this.dataset.title;
-            await downloadTorrent(url, title, this);
+            await downloadTorrent(url, title, this, {...movie,restore_ignored:this.dataset.ignored==='true'});
         });
     });
 }
@@ -273,17 +282,21 @@ function attachDownloadListeners() {
  * Descarga un torrent
  * Líneas 524-582 de app.js
  */
-async function downloadTorrent(url, title, btnElement) {
+function ignoredNotice() {
+    return '<div class="search-ignored-banner" role="status"><strong>Esta película está en la lista de ignorados.</strong> Si eliges «Restaurar y descargar», se quitará de esa lista y volverá al panel. La copia automática seguirá tu configuración.</div>';
+}
+
+async function downloadTorrent(url, title, btnElement, movie) {
     const originalContent = btnElement.innerHTML;
     btnElement.disabled = true;
-    btnElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Adding...';
+    btnElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Añadiendo…';
 
-    const data = await addTorrent(url, title);
+    const data = await addTorrent(url, title, movie);
 
     if (data.success) {
         showToast(data.message || 'Torrent añadido al cliente de descargas', 'success');
 
-        btnElement.innerHTML = '<i class="fa-solid fa-check"></i> Added';
+        btnElement.innerHTML = '<i class="fa-solid fa-check"></i> Añadida';
         btnElement.classList.remove('primary');
         btnElement.classList.add('success');
 
@@ -291,15 +304,24 @@ async function downloadTorrent(url, title, btnElement) {
         if (data.hash) {
             showRedirectOverlay();
             setTimeout(async () => {
-                const { showMovieDetails } = await import('./movies.js');
+                const { showMovieDetails, fetchMovies } = await import('./movies.js');
+                await fetchMovies(true);
                 showMovieDetails(data.hash);
                 removeRedirectOverlay();
             }, 2500);
         } else {
-            setTimeout(() => {
+            setTimeout(async () => {
+                const { fetchMovies } = await import('./movies.js');
+                await fetchMovies(true);
                 switchView('dashboard');
             }, 1000);
         }
+    } else if (data.status === 'ignored') {
+        if (!searchResults.querySelector('.search-ignored-banner')) searchResults.insertAdjacentHTML('afterbegin',ignoredNotice());
+        btnElement.dataset.ignored='true';
+        btnElement.disabled=false;
+        btnElement.innerHTML='<i class="fa-solid fa-download"></i> Restaurar y descargar';
+        showToast(data.message,'info');
     } else {
         showToast(data.message || 'No se pudo añadir el torrent', 'error');
         btnElement.disabled = false;
