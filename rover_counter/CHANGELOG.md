@@ -1,3 +1,9 @@
+# 2.3.1
+
+- Pantalla de Tute compacta: marcador, repartidor, subasta y botón Nadie subasta juntos en el móvil.
+- Ajuste adicional para pantallas bajas sin reducir los controles principales por debajo de 44 px.
+- Historial debajo de la mesa; partidas finalizadas mantienen su vista de consulta.
+
 # 2.3.0
 
 - Nueva interfaz móvil: inicio, equipos, preparación, partidas e historial.

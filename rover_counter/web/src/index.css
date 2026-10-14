@@ -1291,3 +1291,221 @@ legend {
     scroll-behavior: auto !important;
   }
 }
+
+/* Keep the whole live Tute desk together; only the history needs scrolling. */
+.tute-game:not(.read-only) {
+  padding-top: 14px;
+}
+.tute-game:not(.read-only) .page-header {
+  margin-bottom: 10px;
+}
+.tute-game:not(.read-only) .page-header h1 {
+  font-size: 22px;
+}
+.tute-game:not(.read-only) .save-status.idle {
+  display: none;
+}
+.tute-game:not(.read-only) .save-status {
+  margin-bottom: 6px;
+  font-size: 10px;
+}
+.tute-game:not(.read-only) .score-grid {
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.tute-game:not(.read-only) .score-card {
+  padding: 12px 14px;
+  border-radius: 15px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 8px;
+  align-items: center;
+}
+.tute-game:not(.read-only) .team-label {
+  font-size: 8px;
+}
+.tute-game:not(.read-only) .score-card h2 {
+  margin: 0;
+  font-size: 15px;
+  grid-column: 1;
+}
+.tute-game:not(.read-only) .players-label {
+  grid-column: 1;
+  font-size: 9px;
+  min-height: 0;
+  line-height: 1.3;
+}
+.tute-game:not(.read-only) .score-number {
+  grid-column: 2;
+  grid-row: 1 / 4;
+  font-size: 38px;
+  letter-spacing: -2px;
+  margin: 0;
+}
+.tute-game:not(.read-only) .score-track {
+  grid-column: 1 / -1;
+  margin: 5px 0 0;
+  height: 3px;
+}
+.tute-game:not(.read-only) .score-card small {
+  grid-column: 1 / -1;
+  font-size: 9px;
+}
+.tute-game:not(.read-only) .dealer-strip {
+  padding: 8px 0;
+  margin-bottom: 2px;
+  gap: 10px;
+}
+.tute-game:not(.read-only) .dealer-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+.tute-game:not(.read-only) .dealer-strip strong {
+  font-size: 13px;
+}
+.tute-game:not(.read-only) .dealer-strip small {
+  margin-top: 2px;
+  font-size: 10px;
+}
+.tute-game:not(.read-only) .dealer-strip .eyebrow {
+  font-size: 8px;
+  margin-bottom: 0;
+}
+.tute-game:not(.read-only) .auction-panel {
+  padding: 14px;
+  margin-bottom: 0;
+  border-radius: 16px;
+}
+.tute-game:not(.read-only) .auction-panel .section-heading {
+  margin-bottom: 8px;
+}
+.tute-game:not(.read-only) .auction-panel h2 {
+  font-size: 16px;
+}
+.tute-game:not(.read-only) .auction-panel fieldset {
+  margin: 10px 0;
+}
+.tute-game:not(.read-only) .auction-panel legend {
+  font-size: 11px;
+  margin-bottom: 5px;
+}
+.tute-game:not(.read-only) .auction-panel fieldset:nth-of-type(2) legend,
+.tute-game:not(.read-only) .auction-panel fieldset:nth-of-type(3) legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.tute-game:not(.read-only) .choice {
+  min-height: 44px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.tute-game:not(.read-only) .bid-stepper {
+  padding: 5px 8px;
+  gap: 8px;
+}
+.tute-game:not(.read-only) .bid-stepper > button {
+  width: 44px;
+  height: 44px;
+  font-size: 24px;
+}
+.tute-game:not(.read-only) .bid-stepper label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.tute-game:not(.read-only) .bid-stepper select {
+  font-size: 29px;
+  min-height: 44px;
+}
+.tute-game:not(.read-only) .quick-bids {
+  margin-top: 6px;
+  gap: 6px;
+}
+.tute-game:not(.read-only) .quick-bids button {
+  min-height: 44px;
+}
+.tute-game:not(.read-only) .suit {
+  flex-direction: row;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 3px;
+  min-height: 44px;
+  font-size: 10px;
+  border-radius: 10px;
+}
+.tute-game:not(.read-only) .suit > span {
+  font-size: 19px;
+}
+.tute-game:not(.read-only) .auction-panel .full {
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 9px 8px;
+  font-size: 12px;
+}
+.tute-game:not(.read-only) .auction-summary {
+  padding: 14px;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.tute-game:not(.read-only) .result-button {
+  padding: 14px 10px;
+  gap: 8px;
+}
+.tute-game:not(.read-only) .history-section {
+  margin-top: 26px;
+}
+@media (max-width: 520px) {
+  .tute-game:not(.read-only) {
+    padding: 12px 14px 30px;
+  }
+  .tute-game:not(.read-only) .page-header .eyebrow {
+    font-size: 8px;
+    letter-spacing: 1px;
+    margin-bottom: 3px;
+  }
+  .tute-game:not(.read-only) .score-card {
+    padding: 10px 11px;
+  }
+  .tute-game:not(.read-only) .score-number {
+    font-size: 34px;
+  }
+  .tute-game:not(.read-only) .score-card h2 {
+    font-size: 13px;
+  }
+}
+@media (max-height: 760px) and (max-width: 520px) {
+  .tute-game:not(.read-only) .quick-bids {
+    display: none;
+  }
+  .tute-game:not(.read-only) .auction-panel fieldset {
+    margin: 8px 0;
+  }
+}
+@media (max-width: 350px) {
+  .tute-game:not(.read-only) .score-card {
+    grid-template-columns: 1fr;
+  }
+  .tute-game:not(.read-only) .score-number {
+    grid-column: 1;
+    grid-row: auto;
+    font-size: 30px;
+  }
+  .tute-game:not(.read-only) .players-label {
+    display: none;
+  }
+  .tute-game:not(.read-only) .score-card small {
+    font-size: 8px;
+  }
+  .tute-game:not(.read-only) .suit {
+    flex-direction: column;
+    gap: 2px;
+    font-size: 9px;
+  }
+}

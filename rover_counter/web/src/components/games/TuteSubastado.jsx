@@ -191,7 +191,9 @@ export default function TuteSubastado({ matchId, onBack, isReadOnly = false }) {
       setNotice("Reparto corregido. Marcador actualizado.");
     });
   return (
-    <main className="container game-page animate-in">
+    <main
+      className={`container game-page tute-game ${isReadOnly ? "read-only" : ""} animate-in`}
+    >
       <Header
         title="Tute subastado"
         subtitle={
@@ -215,7 +217,10 @@ export default function TuteSubastado({ matchId, onBack, isReadOnly = false }) {
           No se ha podido guardar: {error}
         </div>
       )}
-      <div className="save-status" role="status">
+      <div
+        className={`save-status ${!busy && !notice ? "idle" : ""}`}
+        role="status"
+      >
         {busy
           ? "Guardando…"
           : notice ||
