@@ -779,3 +779,70 @@
   font-size: 7px;
   letter-spacing: 0.5px;
 }
+
+/* Resolution uses explicit ink/background pairs rather than inheriting theme ink. */
+.auction-summary {
+  color: #f2f0e9;
+}
+.auction-summary small {
+  color: #c9d5cc;
+}
+.summary-suit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+.summary-suit .suit-emoji {
+  font-size: 26px;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .auction-summary {
+  background: var(--paper);
+  color: #2c2010;
+  border: 2px solid #a17d42;
+  box-shadow:
+    inset 0 0 0 2px #fff4d26b,
+    0 2px 4px #50301130;
+  font-family: Georgia, serif;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .auction-summary
+  small {
+  color: #624823;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .result-button.success {
+  background: linear-gradient(#21573e, #103b29);
+  color: #fff6df;
+  border: 2px solid #b8944f;
+  box-shadow:
+    inset 0 0 0 2px #fff4d21a,
+    0 2px 4px #50301140;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .result-button.failure {
+  background: linear-gradient(#8c382d, #57221e);
+  color: #fff3de;
+  border: 2px solid #b8944f;
+  box-shadow:
+    inset 0 0 0 2px #fff4d21a,
+    0 2px 4px #50301140;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .result-button
+  small {
+  color: #fff0d4;
+}
+:root[data-theme="fantasy"] .tute-game .auction-summary {
+  border-style: ridge;
+  border-width: 3px;
+}
+:root[data-theme="fantasy"] .tute-game .result-button {
+  border-style: ridge;
+}

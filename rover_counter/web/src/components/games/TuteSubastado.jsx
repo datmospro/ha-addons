@@ -319,8 +319,11 @@ export default function TuteSubastado({ matchId, onBack, isReadOnly = false }) {
                     {auction.bid}
                     <small> puntos</small>
                   </strong>
-                  <span>
-                    {suits.find((s) => s.id === auction.suit)?.emoji}{" "}
+                  <span className="summary-suit">
+                    <SuitIcon
+                      suit={auction.suit}
+                      emoji={suits.find((s) => s.id === auction.suit)?.emoji}
+                    />
                     {suits.find((s) => s.id === auction.suit)?.name}
                   </span>
                 </div>

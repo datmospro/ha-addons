@@ -1,3 +1,8 @@
+# 2.4.1
+
+- Contraste corregido en el resumen y las acciones de resultado para los tres estilos.
+- El palo del resumen usa la misma ilustración que la subasta en los temas de mesa y fantasía.
+
 # 2.4.0
 
 - Selector de estilos: Actual, Mesa de cartas y Taberna de fantasía.

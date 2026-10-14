@@ -1,5 +1,5 @@
 name: "Rover Counter"
-version: "2.4.0"
+version: "2.4.1"
 slug: "rover_counter"
 description: "A tool to track scores for various board games."
 url: "https://github.com/datmospro/ha-addons/tree/main/rover_counter"
