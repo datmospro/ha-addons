@@ -9,7 +9,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useGame } from "../../context/GameContext";
-import { Header, Modal, Scores, Empty } from "../UI";
+import { Header, Modal, Scores, Empty, SuitIcon } from "../UI";
 import {
   suits,
   playersFor,
@@ -99,7 +99,7 @@ function AuctionFields({ match, value, onChange }) {
               aria-pressed={value.suit === s.id}
               onClick={() => onChange({ ...value, suit: s.id })}
             >
-              <span>{s.emoji}</span>
+              <SuitIcon suit={s.id} emoji={s.emoji} />
               {s.name}
             </button>
           ))}

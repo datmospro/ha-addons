@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowUpRight, Plus, History, Play, Spade, Users } from "lucide-react";
 import { useGame } from "../context/GameContext";
-import { Header } from "./UI";
+import { Header, ThemePicker } from "./UI";
 import GameList from "./GameList";
 import ActiveGamesList from "./ActiveGamesList";
 import FinishedGamesList from "./FinishedGamesList";
@@ -48,6 +48,7 @@ export default function Home({
           rover<span>counter</span>
         </strong>
         <span className="brand-tag">A jugar.</span>
+        <ThemePicker />
       </div>
       <section className="home-hero">
         <p className="eyebrow">BUENA COMPAÑÍA. BUENAS PARTIDAS.</p>

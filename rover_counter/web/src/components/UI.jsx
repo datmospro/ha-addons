@@ -1,6 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useTheme } from "../context/ThemeContext";
+import { themes } from "../utils/theme.mjs";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, X } from "lucide-react";
+import { ArrowLeft, X, Palette, Check } from "lucide-react";
 export function Header({ title, subtitle, onBack, action }) {
   return (
     <header className="page-header">
@@ -13,6 +15,7 @@ export function Header({ title, subtitle, onBack, action }) {
         <p className="eyebrow">{subtitle || "ROVER COUNTER"}</p>
         <h1>{title}</h1>
       </div>
+      <ThemePicker />
       {action}
     </header>
   );
@@ -124,5 +127,72 @@ export function Scores({ teams, target }) {
         </section>
       ))}
     </div>
+  );
+}
+
+export function ThemePicker() {
+  const { theme, selectTheme, persisted } = useTheme();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        className="icon-button theme-trigger"
+        aria-label="Cambiar estilo"
+        title="Cambiar estilo"
+        onClick={() => setOpen(true)}
+      >
+        <Palette size={19} />
+      </button>
+      {open && (
+        <Modal title="Elige tu estilo" onClose={() => setOpen(false)}>
+          <p>
+            Cambia el aspecto sin salir de la partida. La elección se guarda
+            solo en este navegador.
+          </p>
+          <div className="theme-options">
+            {themes.map((option) => (
+              <button
+                className={`theme-option ${theme === option.id ? "chosen" : ""}`}
+                key={option.id}
+                aria-pressed={theme === option.id}
+                onClick={() => selectTheme(option.id)}
+              >
+                <span
+                  className={`theme-preview preview-${option.id}`}
+                  aria-hidden="true"
+                >
+                  <span>420</span>
+                  <span>350</span>
+                </span>
+                <span className="theme-option-copy">
+                  <strong>{option.name}</strong>
+                  <small>{option.description}</small>
+                </span>
+                {theme === option.id && <Check size={19} />}
+              </button>
+            ))}
+          </div>
+          {!persisted && (
+            <p className="message error" role="status">
+              Tu navegador no permite guardar preferencias. El estilo seguirá
+              activo mientras mantengas abierta la aplicación.
+            </p>
+          )}
+          <button
+            className="button primary full"
+            onClick={() => setOpen(false)}
+          >
+            Listo
+          </button>
+        </Modal>
+      )}
+    </>
+  );
+}
+export function SuitIcon({ suit, emoji }) {
+  return (
+    <span className={`suit-art suit-art-${suit}`} aria-hidden="true">
+      <span className="suit-emoji">{emoji}</span>
+    </span>
   );
 }

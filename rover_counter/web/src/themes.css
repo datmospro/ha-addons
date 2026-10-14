@@ -1,0 +1,781 @@
+/* Appearance preferences are local to this browser; current theme remains the default. */
+.theme-trigger {
+  flex-shrink: 0;
+}
+.theme-options {
+  display: grid;
+  gap: 12px;
+}
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  text-align: left;
+  color: var(--text);
+  min-height: 88px;
+}
+.theme-option.chosen {
+  outline: 2px solid var(--mint);
+  outline-offset: 1px;
+}
+.theme-option-copy {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+.theme-option-copy small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.theme-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 88px;
+  height: 65px;
+  padding: 9px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: #111817;
+}
+.theme-preview span {
+  display: grid;
+  place-items: center;
+  background: #c6eccd;
+  color: #173224;
+  width: 30px;
+  height: 35px;
+  border-radius: 5px;
+  font:
+    bold 15px Georgia,
+    serif;
+}
+.theme-preview span + span {
+  background: #f3b69b;
+}
+.preview-board {
+  background: #06442a url("/themes/mesa-v1.webp") center/100% 100%;
+}
+.preview-board span {
+  background: #f3e3bf;
+  border: 1px solid #b59a69;
+  color: #163452;
+}
+.preview-board span + span {
+  background: #f3e3bf;
+  color: #68191c;
+}
+.preview-fantasy {
+  background: #302216 url("/themes/taberna-v1.webp") center/100% 100%;
+}
+.preview-fantasy span {
+  background: #123965;
+  color: #ffdd87;
+  border: 1px solid #d19b40;
+}
+.preview-fantasy span + span {
+  background: #751e18;
+}
+.suit-art {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) {
+  --paper:
+    radial-gradient(ellipse at 30% 20%, #fff9e244, #7c491c12),
+    linear-gradient(100deg, #eedabd, #f5e9cc 48%, #dfc5a0);
+  --bg: #143422;
+  --panel: #efdfbb;
+  --line: #b59b6b;
+  --muted: #624a2e;
+  --mint: #dabd71;
+  --coral: #8d2930;
+  --text: #2c2416;
+  color: var(--text);
+  color-scheme: light;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) body {
+  background: #161815;
+  color: var(--text);
+  isolation: isolate;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100%, 800px);
+  z-index: -1;
+  background: #063923 url("/themes/mesa-v1.webp") center/100% 100%;
+  pointer-events: none;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) h1,
+:root:is([data-theme="board"], [data-theme="fantasy"]) h2,
+:root:is([data-theme="board"], [data-theme="fantasy"]) h3,
+:root:is([data-theme="board"], [data-theme="fantasy"]) .button,
+:root:is([data-theme="board"], [data-theme="fantasy"]) .choice {
+  font-family: Georgia, "Times New Roman", serif;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .container {
+  padding-left: 7%;
+  padding-right: 7%;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .page-header {
+  color: #fff3dc;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .page-header .eyebrow {
+  color: #ebdcb7;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .page-header
+  .icon-button,
+:root:is([data-theme="board"], [data-theme="fantasy"]) .page-header .button {
+  color: #fff1d0;
+  background: linear-gradient(#1b6440, #04351f);
+  border-color: #d4b36b;
+  box-shadow:
+    inset 0 0 0 2px #163426,
+    0 2px 4px #0008;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .panel,
+:root:is([data-theme="board"], [data-theme="fantasy"]) .match-card,
+:root:is([data-theme="board"], [data-theme="fantasy"]) .modal-sheet {
+  background: var(--paper);
+  border: 1px solid #bb995e;
+  box-shadow:
+    inset 0 0 0 3px #fff3d55c,
+    inset 0 0 24px #82531f20,
+    0 4px 9px #0006;
+  color: #241d12;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .primary {
+  background: linear-gradient(#216545, #04402a 52%, #0b3327);
+  color: #fff8e7;
+  border: 1px solid #e9c779;
+  box-shadow:
+    inset 0 0 0 2px #314b37,
+    inset 0 2px 5px #fff4,
+    0 2px 4px #0006;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .secondary,
+:root:is([data-theme="board"], [data-theme="fantasy"]) .subtle,
+:root:is([data-theme="board"], [data-theme="fantasy"]) .choice,
+:root:is([data-theme="board"], [data-theme="fantasy"]) .icon-button {
+  background: var(--paper);
+  color: #302415;
+  border-color: #ab8c57;
+  box-shadow:
+    inset 0 0 0 2px #fff3d04a,
+    0 2px 3px #38200e40;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .selected {
+  background: linear-gradient(#194f7c, #092841) !important;
+  color: #fff3d5 !important;
+  border-color: #d7ad56 !important;
+  box-shadow:
+    inset 0 0 0 2px #223d56,
+    0 0 0 1px #644014;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .field-label,
+:root:is([data-theme="board"], [data-theme="fantasy"]) legend {
+  color: #654823;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) input,
+:root:is([data-theme="board"], [data-theme="fantasy"]) select {
+  background: #f3e7c9;
+  color: #241b0e;
+  border-color: #b49a6e;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .pill {
+  color: #624824;
+  border-color: #b9995d;
+  background: #f7e9c5;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .save-status {
+  color: #f7e8c9;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .history-section {
+  padding: 16px;
+  background: var(--paper);
+  border: 2px solid #b19053;
+  border-radius: 12px;
+  box-shadow:
+    inset 0 0 0 2px #fff2d35c,
+    0 4px 8px #0006;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .history-section
+  .eyebrow {
+  display: none;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .history-row {
+  border-color: #bba47a;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .history-copy p,
+:root:is([data-theme="board"], [data-theme="fantasy"]) .history-copy small {
+  color: #664b2b;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .empty-state {
+  border-color: #b0986f;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .empty-state h3 {
+  color: #382817;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .team-option,
+:root:is([data-theme="board"], [data-theme="fantasy"]) .seat-row {
+  background: #eddfbc;
+  color: #362913;
+  border-color: #b89f70;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .modal-sheet > p {
+  color: #594025;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .modal-sheet
+  .theme-option {
+  background: #f4e6c5;
+  color: #3d2b15;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .theme-option.chosen {
+  outline-color: #987033;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .bottom-nav {
+  background: linear-gradient(#53341d, #2b190e);
+  border-color: #cba45e;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .nav-item {
+  color: #e9d8b3;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .nav-item.active {
+  background: var(--paper);
+  color: #432c12;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .brand-bar {
+  color: #ffefcf;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .brand-tag,
+:root:is([data-theme="board"], [data-theme="fantasy"]) .brand-bar strong span {
+  color: #dfcc9d;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .home-hero {
+  background: var(--paper);
+  color: #332615;
+  border: 2px solid #c8a76a;
+  box-shadow:
+    inset 0 0 0 3px #fff3d06a,
+    0 3px 9px #0007;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .home-hero h1 em {
+  color: #165236;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .home-hero
+  > p:not(.eyebrow),
+:root:is([data-theme="board"], [data-theme="fantasy"]) .home-hero .eyebrow {
+  color: #765733;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .home-stats button {
+  background: var(--paper);
+  color: #342615;
+  border-color: #c6a360;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .home-section
+  > .section-heading,
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .home-section
+  > .section-heading
+  .text-button {
+  color: #f4e3bb;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .game-tile {
+  background: var(--paper);
+  color: #3c2912;
+  border-color: #c39c56;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .game-tile > svg,
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .link-card
+  > svg:first-child {
+  color: #947031;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .game-tile > span {
+  color: #2a5338;
+}
+/* Card faces and parchment auction match the original concept, with live HTML text. */
+:root:is([data-theme="board"], [data-theme="fantasy"]) .tute-game .score-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  text-align: center;
+  background: var(--paper);
+  border: 1px solid #b79867;
+  padding: 12px 8px;
+  border-radius: 10px;
+  color: #102d49;
+  position: relative;
+  box-shadow:
+    inset 0 0 0 4px #ffffff26,
+    0 3px 5px #0006;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .score-card::before {
+  content: "♣";
+  font-size: 20px;
+  line-height: 1;
+  margin-bottom: 3px;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .score-card::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1px solid currentColor;
+  opacity: 0.32;
+  border-radius: 8px;
+  pointer-events: none;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .score-card.team-1 {
+  color: #641b1f;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .score-card.team-1::before {
+  content: "♛";
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .tute-game .team-label,
+:root:is([data-theme="board"], [data-theme="fantasy"]) .tute-game .score-track,
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .score-card
+  > small {
+  display: none;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .score-card
+  h2 {
+  order: 1;
+  font:
+    bold 17px Georgia,
+    serif;
+  margin: 0;
+  line-height: 1.1;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .score-number {
+  order: 2;
+  font:
+    bold 58px/0.95 Georgia,
+    serif;
+  letter-spacing: -2px;
+  margin: 2px 0;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .players-label {
+  order: 3;
+  display: block;
+  font:
+    bold 10px/1.1 Georgia,
+    serif;
+  opacity: 1;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .dealer-strip {
+  background: var(--paper);
+  border: 1px solid #b89b66;
+  padding: 8px 10px;
+  margin: 9px 0;
+  border-radius: 10px;
+  color: #231b0d;
+  box-shadow:
+    inset 0 0 0 2px #fff6d83c,
+    0 3px 5px #0005;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .tute-game .dealer-icon {
+  background: none;
+  color: #624623;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .dealer-strip
+  .eyebrow {
+  color: #513414;
+  font-weight: bold;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .dealer-strip
+  small {
+  color: #624c2f;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .dealer-strip
+  .pill {
+  display: none;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .auction-panel {
+  border-radius: 12px;
+  padding: 12px;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .auction-panel
+  > .section-heading {
+  justify-content: center;
+  gap: 10px;
+  border-bottom: 1px solid #af8d5955;
+  padding-bottom: 7px;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .auction-panel
+  > .section-heading::before,
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .auction-panel
+  > .section-heading::after {
+  content: "◇";
+  color: #a1804a;
+  font-size: 15px;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .auction-panel
+  > .section-heading
+  > .muted {
+  display: none;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .auction-panel
+  h2 {
+  font-size: 22px;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .auction-panel
+  fieldset {
+  margin: 8px 0;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .auction-panel
+  legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .tute-game .bid-stepper {
+  background: none;
+  border: 0;
+  padding: 0;
+  gap: 8px;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .bid-stepper
+  > button {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(#1e506e, #071d31);
+  border: 2px solid #dfbd73;
+  color: #fff5d6;
+  box-shadow:
+    inset 0 0 0 2px #ffffff3b,
+    0 2px 3px #47331e;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .bid-stepper
+  label {
+  background: var(--paper);
+  border: 1px solid #b09866;
+  border-radius: 7px;
+  justify-content: center;
+  flex: 1;
+  gap: 0;
+  padding: 0 4px;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .bid-stepper
+  select {
+  font:
+    bold 30px Georgia,
+    serif;
+  background: none;
+  color: #20170c;
+  width: auto;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .bid-stepper
+  label
+  > span {
+  color: #352611;
+  font:
+    bold 12px Georgia,
+    serif;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .tute-game .quick-bids {
+  display: none;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .tute-game .suit {
+  background: var(--paper);
+  border: 1px solid #aa8b56;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 70px;
+  padding: 5px 2px;
+  font:
+    bold 12px Georgia,
+    serif;
+  color: #261b0c;
+  box-shadow:
+    inset 0 0 0 2px #fff3d35c,
+    0 2px 3px #77552450;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .suit-art {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  background-image: url("/themes/palos-v1.webp");
+  background-size: 200% 200%;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"]) .suit-emoji {
+  display: none;
+}
+.suit-art-oros {
+  background-position: 0 0;
+}
+.suit-art-copas {
+  background-position: 100% 0;
+}
+.suit-art-espadas {
+  background-position: 0 100%;
+}
+.suit-art-bastos {
+  background-position: 100% 100%;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .auction-panel
+  .primary {
+  font-size: 17px;
+  font-weight: bold;
+  border-radius: 11px;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .auction-panel
+  .secondary {
+  font-size: 12px;
+  font-weight: bold;
+}
+:root[data-theme="fantasy"] {
+  --paper:
+    radial-gradient(ellipse at 45% 25%, #ffedb750, #8d4b1815),
+    linear-gradient(110deg, #d3a15b, #f3d498 45%, #c79550);
+  --panel: #e3b970;
+  --line: #b68135;
+}
+:root[data-theme="fantasy"] body::before {
+  background-image: url("/themes/taberna-v1.webp");
+  background-color: #302418;
+}
+:root[data-theme="fantasy"] .page-header {
+  padding: 8px 6px;
+  border: 2px solid #9a6228;
+  border-radius: 9px;
+  background: linear-gradient(#744621, #39200f 48%, #694022);
+  box-shadow:
+    inset 0 0 0 2px #dda75866,
+    0 3px 5px #000a;
+}
+:root[data-theme="fantasy"] .page-header h1 {
+  color: #ffe5a0;
+  text-shadow:
+    0 2px 1px #130904,
+    1px 0 #201006;
+}
+:root[data-theme="fantasy"] .page-header .icon-button {
+  background: linear-gradient(#76512a, #3b2512);
+  border-color: #c59c51;
+}
+:root[data-theme="fantasy"] .page-header .button {
+  background: linear-gradient(#ac3525, #6a100e);
+  border-color: #ebbc65;
+}
+:root[data-theme="fantasy"] .panel,
+:root[data-theme="fantasy"] .history-section,
+:root[data-theme="fantasy"] .modal-sheet {
+  border: 3px ridge #ba873c;
+  box-shadow:
+    inset 0 0 0 2px #7c421f44,
+    inset 0 0 20px #64300b26,
+    0 4px 8px #0009;
+}
+:root[data-theme="fantasy"] .primary,
+:root[data-theme="fantasy"] .selected {
+  background: linear-gradient(#1069c0, #005aec 50%, #064290) !important;
+  color: #fff2d8 !important;
+  border: 2px solid #e3b14f !important;
+  box-shadow:
+    inset 0 0 0 2px #102c5b,
+    inset 0 2px 7px #7cc5ff,
+    0 0 5px #f3ca7855;
+  text-shadow: 0 1px 2px #071430;
+}
+:root[data-theme="fantasy"] .secondary {
+  background: linear-gradient(#685341, #3b2d24);
+  color: #f3e1c1;
+  border: 2px ridge #bc9250;
+}
+:root[data-theme="fantasy"] .tute-game .score-card {
+  color: #ffda80;
+  background: radial-gradient(ellipse at center, #285681, #143359 65%, #071a31);
+  border: 3px ridge #d19b40;
+  border-radius: 15px 15px 8px 8px;
+  box-shadow:
+    inset 0 0 15px #0008,
+    0 3px 7px #000a;
+}
+:root[data-theme="fantasy"] .tute-game .score-card.team-1 {
+  color: #ffda80;
+  background: radial-gradient(ellipse at center, #972f29, #641318 70%, #370b10);
+}
+:root[data-theme="fantasy"] .tute-game .score-card::before {
+  content: "⚜";
+  color: #edbf5f;
+  text-shadow: 0 2px #4b280a;
+}
+:root[data-theme="fantasy"] .tute-game .score-card.team-1::before {
+  content: "♛";
+}
+:root[data-theme="fantasy"] .tute-game .score-card h2,
+:root[data-theme="fantasy"] .tute-game .players-label {
+  color: #fff0d5;
+  text-shadow: 0 2px 1px #000;
+}
+:root[data-theme="fantasy"] .tute-game .score-number {
+  color: #ffe19a;
+  text-shadow:
+    0 2px 0 #9c6020,
+    0 3px 1px #391500,
+    1px 0 #593409;
+}
+:root[data-theme="fantasy"] .tute-game .dealer-strip {
+  border: 2px ridge #c1934c;
+}
+:root[data-theme="fantasy"] .tute-game .bid-stepper > button {
+  background: radial-gradient(circle at 40% 25%, #2c9af9, #0642a1 65%, #041437);
+}
+:root[data-theme="fantasy"] .tute-game .suit {
+  border: 2px ridge #af8138;
+  border-radius: 6px;
+}
+:root[data-theme="fantasy"] .tute-game .auction-panel .primary {
+  border-radius: 6px;
+}
+@media (min-width: 521px) {
+  :root:is([data-theme="board"], [data-theme="fantasy"]) .container {
+    padding-left: 48px;
+    padding-right: 48px;
+  }
+}
+@media (max-width: 350px) {
+  :root:is([data-theme="board"], [data-theme="fantasy"])
+    .tute-game
+    .score-number {
+    font-size: 46px;
+  }
+  :root:is([data-theme="board"], [data-theme="fantasy"])
+    .tute-game
+    .score-card
+    h2 {
+    font-size: 14px;
+  }
+  :root:is([data-theme="board"], [data-theme="fantasy"]) .tute-game .suit {
+    font-size: 10px;
+    min-height: 62px;
+  }
+  :root:is([data-theme="board"], [data-theme="fantasy"]) .suit-art {
+    width: 34px;
+    height: 34px;
+  }
+  .theme-preview {
+    width: 64px;
+  }
+}
+@media (max-height: 680px) and (max-width: 520px) {
+  :root:is([data-theme="board"], [data-theme="fantasy"])
+    .tute-game
+    .score-card {
+    padding: 8px 6px;
+  }
+  :root:is([data-theme="board"], [data-theme="fantasy"])
+    .tute-game
+    .score-card::before {
+    font-size: 15px;
+  }
+  :root:is([data-theme="board"], [data-theme="fantasy"])
+    .tute-game
+    .score-number {
+    font-size: 44px;
+  }
+  :root:is([data-theme="board"], [data-theme="fantasy"]) .tute-game .suit {
+    min-height: 56px;
+  }
+  :root:is([data-theme="board"], [data-theme="fantasy"]) .suit-art {
+    width: 30px;
+    height: 30px;
+  }
+  :root:is([data-theme="board"], [data-theme="fantasy"])
+    .tute-game
+    .dealer-strip {
+    margin: 5px 0;
+    padding: 5px 8px;
+  }
+}
+
+:root:is([data-theme="board"], [data-theme="fantasy"]) .tute-game .page-header {
+  gap: 6px;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .page-header
+  h1 {
+  font-size: clamp(14px, 4.5vw, 20px);
+  white-space: normal;
+}
+:root:is([data-theme="board"], [data-theme="fantasy"])
+  .tute-game
+  .page-header
+  .eyebrow {
+  font-size: 7px;
+  letter-spacing: 0.5px;
+}

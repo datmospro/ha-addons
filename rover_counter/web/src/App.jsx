@@ -1,3 +1,4 @@
+import { ThemeProvider } from "./context/ThemeContext";
 import { useState } from "react";
 import { GameProvider, useGame } from "./context/GameContext";
 import Home from "./components/Home";
@@ -107,8 +108,10 @@ function GameRouter() {
 }
 export default function App() {
   return (
-    <GameProvider>
-      <GameRouter />
-    </GameProvider>
+    <ThemeProvider>
+      <GameProvider>
+        <GameRouter />
+      </GameProvider>
+    </ThemeProvider>
   );
 }

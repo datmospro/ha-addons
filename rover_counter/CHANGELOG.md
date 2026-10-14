@@ -1,3 +1,10 @@
+# 2.4.0
+
+- Selector de estilos: Actual, Mesa de cartas y Taberna de fantasía.
+- Fondos y palos ilustrados originales inspirados en los bocetos, con textos y controles reales.
+- Preferencia por navegador, persistente al recargar y sincronizada entre sus pestañas.
+- Cambiar de estilo conserva la partida y la subasta abierta; Actual sigue siendo el estilo inicial.
+
 # 2.3.2
 
 - Números del marcador del Tute más grandes, conservando la vista compacta.

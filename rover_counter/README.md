@@ -23,3 +23,9 @@ El guardado debe confirmarse por el servidor antes de mostrarlo como completado.
 - `cd server && npm ci`: dependencias del servidor. Usa `PORT=3109` y un `DB_PATH` de prueba antes de ejecutar `node index.js`.
 - `node --test tests/*.test.*`: puntuación, rotación, migración desde el esquema anterior, persistencia, guardado atómico y protección de partidas finalizadas.
 - `cd web && npm run lint && npm run build`: análisis de hooks y compilación.
+
+## Estilos
+
+Pulsa el icono de paleta en el inicio o en la cabecera de una pantalla para elegir **Actual**, **Mesa de cartas** o **Taberna de fantasía**. El cambio es inmediato y conserva los campos de la subasta preparada. La preferencia se guarda en este navegador; cada dispositivo puede elegir un estilo diferente. Si el navegador bloquea el almacenamiento, el estilo puede usarse durante la sesión y se informa de que no se pudo guardar. El estilo Actual continúa siendo el predeterminado.
+
+Los temas ilustrados recrean los bocetos con recursos decorativos locales y controles reales. El diseño se adapta a pantalla, nombres y puntuaciones; no es una captura fija.
