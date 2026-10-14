@@ -1,3 +1,7 @@
+# 2.3.2
+
+- Números del marcador del Tute más grandes, conservando la vista compacta.
+
 # 2.3.1
 
 - Pantalla de Tute compacta: marcador, repartidor, subasta y botón Nadie subasta juntos en el móvil.

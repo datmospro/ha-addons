@@ -1338,7 +1338,7 @@ legend {
 .tute-game:not(.read-only) .score-number {
   grid-column: 2;
   grid-row: 1 / 4;
-  font-size: 38px;
+  font-size: 46px;
   letter-spacing: -2px;
   margin: 0;
 }
@@ -1474,7 +1474,7 @@ legend {
     padding: 10px 11px;
   }
   .tute-game:not(.read-only) .score-number {
-    font-size: 34px;
+    font-size: 42px;
   }
   .tute-game:not(.read-only) .score-card h2 {
     font-size: 13px;
@@ -1495,7 +1495,7 @@ legend {
   .tute-game:not(.read-only) .score-number {
     grid-column: 1;
     grid-row: auto;
-    font-size: 30px;
+    font-size: 38px;
   }
   .tute-game:not(.read-only) .players-label {
     display: none;
