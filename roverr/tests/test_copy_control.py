@@ -86,6 +86,22 @@ class CopyControlTests(unittest.TestCase):
                 self.fail('Timed out waiting for copy worker')
             time.sleep(0.01)
 
+    def test_unidentified_torrent_visible_with_legacy_required_ratings(self):
+        sql=self.db.execute_sql("SELECT sql FROM sqlite_master WHERE name='movie'").fetchone()[0]
+        self.assertIn('"vote_average" REAL',sql)
+        self.db.drop_tables([database.Movie])
+        sql=sql.replace('"vote_average" REAL','"vote_average" REAL NOT NULL').replace('"vote_count" INTEGER','"vote_count" INTEGER NOT NULL')
+        self.db.execute_sql(sql)
+        torrent=self.torrent(hash='bad-apples')
+        torrent['name']='Malas manzanas (2026).mkv'
+        with patch.object(tmdb,'fetch_complete_movie_metadata',return_value=None), patch.object(automation,'queue_completed_movies'):
+            data=tmdb.get_movie_data([torrent],None)
+        self.assertEqual(len(data['movies']),1)
+        self.assertEqual(data['movies'][0]['torrent_hash'],'bad-apples')
+        movie=database.Movie.get(database.Movie.torrent_hash=='bad-apples')
+        self.assertEqual(movie.vote_average,0)
+        self.assertEqual(movie.vote_count,0)
+
     def test_completion_without_websocket_clients(self):
         qb = Mock()
         first = SimpleNamespace(hash='a', progress=.5, state='downloading',

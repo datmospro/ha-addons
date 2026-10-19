@@ -103,4 +103,27 @@ class SearchDownloadsTests(unittest.TestCase):
         self.assertTrue(result['ignored']);self.assertTrue(result['results'][0]['ignored'])
         self.assertTrue(Movie.get_by_id(self.movie.id).ignored)
 
+
+    def test_confirmed_download_keeps_selected_identity_even_when_release_title_differs(self):
+        self.movie.delete_instance()
+        torrent = {'hash':HASH,'name':'Malas manzanas (2026).mkv','progress':1,'state':'stalledUP','size':80}
+        self.qb.torrents_info.side_effect=[[],[torrent]]
+        result=self.run_download(movie_title='Bad Apples',movie_year='2026',tmdb_id=1198654)
+        self.assertTrue(result['success'])
+        movie=Movie.get(Movie.torrent_hash==HASH)
+        self.assertEqual(movie.tmdb_id,1198654)
+        self.assertEqual(movie.title,'Bad Apples')
+        self.assertEqual(movie.status,'pending')
+        self.assertEqual(movie.vote_average,0)
+        self.assertFalse(movie.ignored)
+
+    def test_confirmed_download_preserves_existing_identity_and_clears_watchlist(self):
+        self.movie.ignored=False;self.movie.watchlist=True;self.movie.save()
+        self.qb.torrents_info.return_value=[{'hash':HASH,'name':RELEASE}]
+        self.run_download(tmdb_id=99)
+        movie=Movie.get_by_id(self.movie.id)
+        self.assertEqual(movie.tmdb_id,42)
+        self.assertFalse(movie.watchlist)
+        self.assertTrue(movie.copy_paused)
+
 if __name__=='__main__':unittest.main()

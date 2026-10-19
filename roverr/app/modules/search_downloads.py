@@ -114,6 +114,30 @@ def download_requested(payload, qb, auto_copy, manual_tag):
                 restored += Movie.update(ignored=False, ignored_at=None).where(
                     Movie.torrent_hash.in_([m.torrent_hash for m in late_matches]), Movie.ignored == True).execute()
 
+    if torrent:
+        # Keep the identity selected by the user; release names may be translated
+        # or absent from TMDB search. Admission must not depend on metadata lookup.
+        progress = torrent.get('progress', 0) or 0
+        state = torrent.get('state') or 'metaDL'
+        initial_status = 'pending' if progress >= 1 else ('downloading' if state in
+            ('downloading', 'forceDL', 'stalledDL', 'pausedDL') else 'new')
+        with Movie._meta.database.atomic():
+            movie, created = Movie.get_or_create(torrent_hash=torrent['hash'], defaults={
+                'title': identity['title'] or parsed_title or release,
+                'year': identity['year'], 'tmdb_id': identity['tmdb_id'],
+                'torrent_name': torrent.get('name') or release,
+                'progress': progress, 'state': state, 'size': torrent.get('size', 0) or 0,
+                'status': initial_status, 'vote_average': 0, 'vote_count': 0,
+            })
+            if not created:
+                # An explicit download leaves monitoring, but keeps copy holds,
+                # prior results and any identity already confirmed by the user.
+                changes = {'watchlist': False, 'watchlist_expiry': None}
+                if not movie.tmdb_id and identity['tmdb_id']:
+                    changes.update(tmdb_id=identity['tmdb_id'], title=identity['title'] or movie.title,
+                                   year=identity['year'] or movie.year)
+                Movie.update(**changes).where(Movie.id == movie.id).execute()
+
     message = f'Película restaurada. Torrent añadido: {release}' if restored else f'Torrent añadido: {release}'
     if not torrent:
         message += '. Pendiente de confirmación del cliente; aparecerá cuando se detecte el torrent.'

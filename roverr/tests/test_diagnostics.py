@@ -57,7 +57,7 @@ class DiagnosticsTests(unittest.TestCase):
         self.assertEqual((self.destination/'keep.nfo').read_bytes(),b'keep')
         self.assertEqual((self.source/'sample.mkv').read_bytes(),b'source')
         self.assertEqual(self.check(report,'receptor')['status'],'skipped')
-        self.assertEqual(report['addon_version'],'4.5.16')
+        self.assertEqual(report['addon_version'],'4.5.17')
 
     def test_missing_destination_is_not_created_by_diagnostics(self):
         missing=self.destination/'not-mounted'

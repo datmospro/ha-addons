@@ -767,8 +767,8 @@ def sync_movies(torrents, api_key):
                             status=initial_status,  # Use intelligent status based on torrent state
                             cast=metadata.get('cast'), # Already JSON string
                             crew=metadata.get('crew'), # Already JSON string
-                            vote_average=metadata.get('vote_average'),
-                            vote_count=metadata.get('vote_count'),
+                            vote_average=metadata.get('vote_average') or 0,
+                            vote_count=metadata.get('vote_count') or 0,
                             imdb_id=metadata.get('imdb_id'),
                             imdb_rating=metadata.get('imdb_rating'),
                             imdb_votes=metadata.get('imdb_votes'),

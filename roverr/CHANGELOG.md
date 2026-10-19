@@ -1,3 +1,9 @@
+## 4.5.17
+
+- Conserva la ficha TMDB elegida al descargar desde el buscador, aunque el torrent use otro idioma.
+- Los torrents sin metadatos aparecen en el panel incluso con bases antiguas que exigen valoraciones no nulas.
+- Una descarga manual confirmada sale de seguimiento sin perder historial ni decisiones de copia.
+
 # 4.5.16
 
 - El buscador identifica las películas ignoradas en los resultados de TMDB y
