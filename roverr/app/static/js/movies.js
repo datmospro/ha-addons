@@ -8,7 +8,7 @@ import { initDashboardFilters, updateDashboardFilters } from './dashboard-filter
 import { groupMovies, getMovieVersions } from './movie-groups.js';
 import { state } from './state.js';
 import {
-    getMovies, getMovieDetails, identifyMovie as apiIdentifyMovie,
+    getMovies, getMovieDetails, getMovieRatings, identifyMovie as apiIdentifyMovie,
     batchStopCopies, batchCopyMovies, batchDeleteMovies, stopCopy as apiStopCopy,
     searchIndexers, addTorrent
 } from './api.js';
@@ -519,13 +519,13 @@ function renderMovieDetails(container, movie, hash) {
                         <div class="rating-badge tmdb ${movie.tmdb_id ? 'clickable' : ''}" ${movie.tmdb_id ? `data-url="https://www.themoviedb.org/movie/${movie.tmdb_id}"` : ''} title="${movie.tmdb_id ? 'Ver en TMDB' : ''}">
                             <div class="rating-source">TMDB</div>
                             <div class="rating-value">${movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A'}</div>
-                            <div class="rating-count">${movie.vote_count ? `${movie.vote_count} votes` : ''}</div>
+                            <div class="rating-count">${movie.vote_count ? `${movie.vote_count} votos` : ''}</div>
                         </div>
                         ${movie.imdb_id ? `
                         <div class="rating-badge imdb clickable" data-url="https://www.imdb.com/title/${movie.imdb_id}" title="Ver en IMDb">
                             <div class="rating-source">IMDb</div>
-                            <div class="rating-value">${movie.imdb_rating || 'N/A'}</div>
-                            <div class="rating-count">${movie.imdb_votes ? `${movie.imdb_votes} votes` : ''}</div>
+                            <div class="rating-value">${movie.imdb_rating || 'Consultando…'}</div>
+                            <div class="rating-count">${movie.imdb_votes ? `${movie.imdb_votes} votos` : ''}</div>
                         </div>` : ''}
                     </div>
                 </div>
@@ -568,13 +568,13 @@ function renderMovieDetails(container, movie, hash) {
     `;
 
     // Attach event listeners
-    setupMovieDetailsListeners(hash);
+    setupMovieDetailsListeners(hash, movie);
 }
 
 /**
  * Configura los event listeners de la vista de detalles
  */
-function setupMovieDetailsListeners(hash) {
+function setupMovieDetailsListeners(hash, movie) {
     const container = document.getElementById('movie-details-content');
 
     const backBtn = container.querySelector('.back-to-dashboard');
@@ -661,6 +661,21 @@ function setupMovieDetailsListeners(hash) {
             }
         });
     });
+
+    // Load IMDb independently: the movie detail view never waits for the daily dataset.
+    const imdbBadge = container.querySelector('.rating-badge.imdb');
+    if (imdbBadge && movie.imdb_id) {
+        const requestedId = movie.imdb_id;
+        getMovieRatings(hash).then(result => {
+            if (!imdbBadge.isConnected || container.getAttribute('data-hash') !== hash || (result.imdb_id && result.imdb_id !== requestedId)) return;
+            imdbBadge.querySelector('.rating-value').textContent = result.rating || movie.imdb_rating || '—';
+            const votes = result.votes || movie.imdb_votes;
+            imdbBadge.querySelector('.rating-count').textContent = votes
+                ? new Intl.NumberFormat('es-ES').format(Number(votes)) + ' votos'
+                : result.status === 'unrated' ? 'Todavía sin votos publicados' : 'No se pudo consultar IMDb';
+            imdbBadge.title = 'Ver en IMDb · Datos oficiales diarios' + (result.status === 'cached' ? ' · Última copia disponible' : '');
+        });
+    }
 
     // Clickable rating badges (TMDB/IMDB links)
     const ratingBadges = container.querySelectorAll('.rating-badge.clickable[data-url]');

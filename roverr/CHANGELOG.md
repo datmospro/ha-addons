@@ -1,3 +1,10 @@
+## 4.5.19
+
+- Sustituye la lectura del HTML de IMDb (bloqueada por HTTP 403) por su conjunto oficial diario de notas y votos, sin claves adicionales.
+- Carga IMDb por separado al abrir una ficha, también para películas ya guardadas; no bloquea la visualización de la película.
+- Conserva la última caché si falla la actualización y distingue entre títulos sin votos y un fallo de consulta.
+- Traduce los recuentos de votos y muestra su fuente en la ficha.
+
 ## 4.5.18
 
 - Guarda inmediatamente en el servidor los cambios al añadir o editar una fuente RSS, incluido el año mínimo; si falla el guardado, mantiene el formulario.

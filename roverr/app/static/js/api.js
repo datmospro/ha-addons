@@ -486,3 +486,13 @@ export async function resetIgnoredMovies() {
         return { success: false, message: 'Error al restaurar la lista de ignoradas' };
     }
 }
+
+export async function getMovieRatings(hash) {
+    try {
+        const response = await fetch(`${API_BASE}/movie/${encodeURIComponent(hash)}/ratings`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+    } catch (_) {
+        return {status: 'unavailable'};
+    }
+}

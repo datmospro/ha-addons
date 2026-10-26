@@ -511,6 +511,23 @@ def get_movie_details_endpoint(torrent_hash: str):
             
     return details
 
+@app.get("/api/movie/{torrent_hash}/ratings")
+def movie_ratings(torrent_hash: str):
+    from database import Movie
+    from modules.imdb_ratings import get_rating
+    from fastapi import HTTPException
+    movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
+    if not movie:
+        raise HTTPException(status_code=404, detail="Película no encontrada")
+    result = get_rating(movie.imdb_id)
+    if result['rating'] is not None:
+        Movie.update(imdb_rating=result['rating'], imdb_votes=result['votes']).where(
+            (Movie.id == movie.id) & (Movie.imdb_id == movie.imdb_id)).execute()
+    elif result['status'] == 'unavailable' and movie.imdb_rating:
+        result.update(rating=movie.imdb_rating, votes=movie.imdb_votes, status='cached')
+    return {**result, 'imdb_id': movie.imdb_id, 'source': 'IMDb · conjunto oficial diario'}
+
+
 @app.get("/api/movie/{torrent_hash}/trailer")
 def get_movie_trailer_endpoint(torrent_hash: str):
     """Get trailer information for a movie"""

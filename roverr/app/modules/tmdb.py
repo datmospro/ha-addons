@@ -137,25 +137,10 @@ def is_series(name):
     return False
 
 def scrape_imdb_rating(imdb_id):
-    """
-    Scrapes IMDb rating directly from the movie page.
-    Fallback since OMDb requires a paid key and free APIs are unreliable.
-    """
-    try:
-        url = f"https://www.imdb.com/title/{imdb_id}/"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        }
-        res = requests.get(url, headers=headers, timeout=5)
-        if res.status_code == 200:
-            # Regex to find rating in JSON-LD
-            # Pattern: "AggregateRating","ratingCount":12345,"bestRating":10,"worstRating":1,"ratingValue":8.7
-            match = re.search(r'AggregateRating","ratingCount":(\d+),"bestRating":10,"worstRating":1,"ratingValue":(\d+(\.\d+)?)', res.text)
-            if match:
-                return match.group(2), match.group(1)
-    except Exception as e:
-        logger.error(f"Error scraping IMDb for {imdb_id}: {e}")
-    return None, None
+    """Compatibility wrapper: read official IMDb ratings from the local cache."""
+    from .imdb_ratings import cached_rating
+    return cached_rating(imdb_id)
+
 
 def fetch_complete_movie_metadata(title, year, api_key, images_only=False, tmdb_id=None):
     """
