@@ -1,3 +1,4 @@
+import { updateDashboardInterest } from './dashboard-interest.js';
 import { initDashboardFilters, updateDashboardFilters } from './dashboard-filters.js';
 /**
  * Módulo de Películas para Roverr
@@ -204,6 +205,7 @@ export function renderMovieCards(movies) {
         }
         // Appending existing nodes applies the current ordering without recreating cards.
         moviesGrid.appendChild(card);
+        updateDashboardInterest(card, movie);
     });
 
     // Remove stale cards

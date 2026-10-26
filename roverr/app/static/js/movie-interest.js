@@ -1,5 +1,7 @@
 import { escapeHtml } from './ui.js';
 
+export const HIGH_INTEREST_MIN = 50;
+
 const number = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 const count = value => new Intl.NumberFormat('es-ES', {maximumFractionDigits: 1}).format(value);
 const money = value => new Intl.NumberFormat('es-ES', {style:'currency', currency:'USD', notation:'compact', maximumFractionDigits:1}).format(value);
@@ -7,7 +9,7 @@ const money = value => new Intl.NumberFormat('es-ES', {style:'currency', currenc
 export function interestSignals(data) {
     const popularity=number(data.popularity), votes=number(data.votes), budget=number(data.budget), revenue=number(data.revenue);
     return [
-        {icon:'fire', label:'Interés actual', value:popularity === null ? 'Sin datos' : popularity >= 50 ? 'Muy popular' : popularity >= 10 ? 'Interés moderado' : 'Interés discreto',
+        {icon:'fire', label:'Interés actual', value:popularity === null ? 'Sin datos' : popularity >= HIGH_INTEREST_MIN ? 'Muy popular' : popularity >= 10 ? 'Interés moderado' : 'Interés discreto',
          detail:popularity === null ? 'Popularidad no disponible' : `Índice TMDB: ${count(popularity)}`,
          help:'Orientativo de Roverr: discreto < 10, moderado entre 10 y 50, muy popular desde 50. TMDB combina visitas, favoritos, seguimiento y votos. No mide la expectación antes del estreno.'},
         {icon:'users', label:'Alcance del público', value:votes === null ? 'Sin datos' : votes >= 10000 ? 'Muy conocida' : votes >= 1000 ? 'Conocida' : votes > 0 ? 'Pocos votos' : 'Aún sin votos',

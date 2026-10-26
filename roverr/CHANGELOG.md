@@ -1,3 +1,9 @@
+## 4.5.21
+
+- Destaca en el panel las películas con popularidad TMDB de 50 o más mediante un marco dorado fino y un pequeño icono de fuego con explicación.
+- Funciona sin abrir las fichas, con consultas limitadas a tres simultáneas y caché de seis horas. No bloquea la carga de carátulas ni altera la selección o los estados de copia.
+- Descarta respuestas de tarjetas retiradas o que hayan cambiado de película y elimina el marco si el interés deja de ser alto.
+
 ## 4.5.20
 
 - Añade a las fichas un bloque compacto «Interés y alcance»: popularidad actual, número de votos y presupuesto/taquilla de TMDB.
