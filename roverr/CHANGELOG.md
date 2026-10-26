@@ -1,3 +1,9 @@
+## 4.5.22
+
+- Integra las notas y votos de TMDB e IMDb en la tarjeta central de alcance del público; elimina el bloque independiente de valoraciones para ahorrar espacio.
+- Mantiene enlaces a las fuentes, carga independiente de IMDb y diseño compacto adaptable a móvil.
+- Conserva los nodos de valoración al actualizar el interés para evitar que una respuesta tardía borre una nota ya cargada, incluso si falla TMDB.
+
 ## 4.5.21
 
 - Destaca en el panel las películas con popularidad TMDB de 50 o más mediante un marco dorado fino y un pequeño icono de fuego con explicación.

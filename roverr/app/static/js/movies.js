@@ -6,7 +6,7 @@ import { initDashboardFilters, updateDashboardFilters } from './dashboard-filter
  * Extraído de app.js - líneas 1056-1237, 1239-1567, 1587-1838
  */
 
-import { renderInterest } from './movie-interest.js';
+import { renderInterest, renderRatings } from './movie-interest.js';
 import { groupMovies, getMovieVersions } from './movie-groups.js';
 import { state } from './state.js';
 import {
@@ -516,24 +516,7 @@ function renderMovieDetails(container, movie, hash) {
                     </div>
                 </div>
                 
-                <div class="ratings-section">
-                    <h3>Valoraciones</h3>
-                    <div class="ratings-grid">
-                        <div class="rating-badge tmdb ${movie.tmdb_id ? 'clickable' : ''}" ${movie.tmdb_id ? `data-url="https://www.themoviedb.org/movie/${movie.tmdb_id}"` : ''} title="${movie.tmdb_id ? 'Ver en TMDB' : ''}">
-                            <div class="rating-source">TMDB</div>
-                            <div class="rating-value">${movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A'}</div>
-                            <div class="rating-count">${movie.vote_count ? `${movie.vote_count} votos` : ''}</div>
-                        </div>
-                        ${movie.imdb_id ? `
-                        <div class="rating-badge imdb clickable" data-url="https://www.imdb.com/title/${movie.imdb_id}" title="Ver en IMDb">
-                            <div class="rating-source">IMDb</div>
-                            <div class="rating-value">${movie.imdb_rating || 'Consultando…'}</div>
-                            <div class="rating-count">${movie.imdb_votes ? `${movie.imdb_votes} votos` : ''}</div>
-                        </div>` : ''}
-                    </div>
-                </div>
-                
-                ${movie.tmdb_id ? `<section class="movie-interest" aria-label="Interés y alcance"><h3>Interés y alcance</h3><div class="movie-interest-content" aria-live="polite"><p class="movie-interest-note">Consultando datos de TMDB…</p></div></section>` : ''}
+                <section class="movie-interest" aria-label="Valoraciones, interés y alcance"><h3>Valoraciones, interés y alcance</h3><div class="movie-interest-content" aria-live="polite">${renderInterest({status:movie.tmdb_id?'loading':'unidentified',votes:movie.vote_count},renderRatings(movie))}</div></section>
                 <div class="paths-box">
                     <div class="path-item">
                         <label>Ubicación actual:</label>
@@ -670,7 +653,10 @@ function setupMovieDetailsListeners(hash, movie) {
     if (interest && movie.tmdb_id) {
         getMovieInterest(hash).then(data => {
             if (!interest.isConnected || container.getAttribute('data-hash') !== hash || (data.tmdb_id && String(data.tmdb_id) !== String(movie.tmdb_id))) return;
+            // Preserve the rating nodes: IMDb and TMDB requests may finish in either order.
+            const ratings = interest.querySelector('.movie-interest-ratings');
             interest.innerHTML = renderInterest(data);
+            if (ratings) interest.querySelector('.movie-interest-ratings-slot').appendChild(ratings);
         });
     }
 
