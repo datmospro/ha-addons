@@ -1016,6 +1016,8 @@ def get_movie_data(torrents, api_key):
             "added_at": m.added_at.isoformat() if m.added_at else None,
             "rss_feed_name": m.rss_feed_name,
             "tmdb_id": m.tmdb_id,
+            "tmdb_popularity": m.tmdb_popularity,
+            "interest_updated_at": m.interest_updated_at.timestamp() if m.interest_updated_at else None,
             "torrent_name": m.torrent_name,
             "copy_paused": m.copy_paused,
             "copy_pause_reason": m.copy_pause_reason,
@@ -1040,6 +1042,8 @@ def get_movie_data(torrents, api_key):
         if is_series(t['name']) and not Movie.select().where(Movie.torrent_hash == t['hash']).exists():
             ignored_series.append(t['name'])
             
+    from .movie_interest import schedule_interest_updates
+    schedule_interest_updates(movies, api_key)
     return {"movies": movies, "ignored_series": ignored_series, "client_status": get_torrent_client_status()}
 
 def identify_movie(torrent_hash, tmdb_id, api_key):

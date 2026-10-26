@@ -68,6 +68,8 @@ class Movie(BaseModel):
     imdb_id = CharField(null=True) # IMDb ID
     imdb_rating = CharField(null=True) # IMDb rating
     imdb_votes = CharField(null=True) # IMDb vote count
+    tmdb_popularity = FloatField(null=True)
+    interest_updated_at = DateTimeField(null=True)
     tmdb_id = IntegerField(null=True) # TMDB movie ID for unique identification
     metadata_updated_at = DateTimeField(null=True) # Last metadata update
     country_code = CharField(null=True, max_length=2) # ISO 3166-1 country code (e.g., 'US', 'ES')
@@ -105,6 +107,8 @@ def migrate_db():
         ('imdb_rating', 'TEXT'),
         ('imdb_votes', 'TEXT'),
         ('tmdb_id', 'INTEGER'),
+        ('tmdb_popularity', 'REAL'),
+        ('interest_updated_at', 'DATETIME'),
         ('metadata_updated_at', 'DATETIME'),
         ('country_code', 'TEXT'),
         ('ignored', 'BOOLEAN'),

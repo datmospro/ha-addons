@@ -531,12 +531,14 @@ def movie_ratings(torrent_hash: str):
 @app.get("/api/movie/{torrent_hash}/interest")
 def movie_interest(torrent_hash: str):
     from database import Movie
-    from modules.movie_interest import get_interest
+    from modules.movie_interest import get_interest, save_interest
     from fastapi import HTTPException
     movie = Movie.get_or_none(Movie.torrent_hash == torrent_hash)
     if not movie:
         raise HTTPException(status_code=404, detail="Película no encontrada")
-    return get_interest(movie.tmdb_id, load_settings().get('tmdb_api_key'))
+    result = get_interest(movie.tmdb_id, load_settings().get('tmdb_api_key'))
+    save_interest(movie.tmdb_id, result)
+    return result
 
 
 @app.get("/api/movie/{torrent_hash}/trailer")

@@ -23,7 +23,11 @@ export function groupMovies(movies) {
     }
     return [...groups.entries()].map(([movie_id, versions]) => {
         const ordered = [...versions].sort((a,b) => rank(a)-rank(b) || (b.progress || 0)-(a.progress || 0) || String(a.torrent_hash).localeCompare(String(b.torrent_hash)));
-        return {...ordered[0], movie_id, versions: ordered};
+        const identified = ordered.find(version => version.tmdb_id);
+        return {...ordered[0], tmdb_id:ordered[0].tmdb_id || identified?.tmdb_id,
+            tmdb_popularity:ordered[0].tmdb_popularity ?? identified?.tmdb_popularity,
+            interest_updated_at:ordered[0].interest_updated_at ?? identified?.interest_updated_at,
+            movie_id, versions: ordered};
     });
 }
 export function getMovieVersions(movies, hash) {

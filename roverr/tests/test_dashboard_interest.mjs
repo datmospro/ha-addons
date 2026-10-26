@@ -19,3 +19,9 @@ while(waiting.length){waiting.splice(0).forEach(f=>f());await tick();}
 assert.equal(maxRunning,3);assert.equal(calls,10);assert(!cards[0].classes.has('movie-high-interest'));assert(cards[1].classes.has('movie-high-interest'));
 cards.slice(1).forEach((c,i)=>context.updateDashboardInterest(c,{tmdb_id:i+2,torrent_hash:String(i+1)}));await tick();assert.equal(calls,10);
 console.log('Dashboard gold frame: threshold, removal, missing data, cache, concurrency and recycled cards passed');
+// A known group keeps its identity even when its selected torrent lacks metadata.
+const {groupMovies}=await import('../app/static/js/movie-groups.js');
+const grouped=groupMovies([{torrent_hash:'a',title:'Film',year:2026,status:'moved'},{torrent_hash:'b',title:'Film',year:2026,status:'new',tmdb_id:42,tmdb_popularity:100}])[0];
+assert.equal(grouped.tmdb_id,42);assert.equal(grouped.tmdb_popularity,100);
+// Persistent values immediately highlight a card without any detail request.
+const saved=card('saved');context.updateDashboardInterest(saved,{torrent_hash:'saved',tmdb_id:99,tmdb_popularity:100.1});assert(saved.classes.has('movie-high-interest'));assert.equal(calls,10);

@@ -42,6 +42,7 @@ def get_interest(tmdb_id, api_key):
             result = {'status': 'ok', 'tmdb_id': movie_id,
                       'popularity': number(data.get('popularity')),
                       'votes': number(data.get('vote_count'), True),
+                      'vote_average': number(data.get('vote_average')),
                       'budget': number(data.get('budget'), True) or None,
                       'revenue': number(data.get('revenue'), True) or None,
                       'updated_at': int(time.time())}
@@ -53,3 +54,67 @@ def get_interest(tmdb_id, api_key):
             del _cache[next(iter(_cache))]
         _cache[movie_id] = (time.time(), result, ttl)
         return dict(result)
+
+
+_worker_lock = threading.Lock()
+_worker_running = False
+_retry_after = {}
+
+
+def save_interest(movie_id, data):
+    from datetime import datetime
+    from database import Movie
+    if data.get('status') != 'ok' or data.get('popularity') is None:
+        return False
+    changes = {'tmdb_popularity': data['popularity'], 'interest_updated_at': datetime.fromtimestamp(data.get('updated_at') or time.time())}
+    if data.get('votes') is not None:
+        changes['vote_count'] = data['votes']
+    if data.get('vote_average') is not None:
+        changes['vote_average'] = data['vote_average']
+    Movie.update(**changes).where(Movie.tmdb_id == movie_id).execute()
+    return True
+
+
+def _update_movies(ids, api_key):
+    global _worker_running
+    from .config import trigger_movies_update_callback, logger
+    changed = False
+    try:
+        for movie_id in ids:
+            try:
+                data = get_interest(movie_id, api_key)
+                changed = save_interest(movie_id, data) or changed
+                _retry_after[movie_id] = (data.get('updated_at', time.time()) + TTL) if data.get('status') == 'ok' else time.time() + 60
+            except Exception:
+                _retry_after[movie_id] = time.time() + 60
+                logger.warning('No se pudo actualizar el interés de una película; se reintentará')
+    finally:
+        with _worker_lock:
+            _worker_running = False
+        if changed:
+            trigger_movies_update_callback()
+
+
+def schedule_interest_updates(movies, api_key):
+    """Warm and persist dashboard data without waiting for movie details."""
+    global _worker_running
+    if not api_key:
+        return
+    now = time.time()
+    ids = []
+    for movie in movies:
+        movie_id = movie.get('tmdb_id')
+        updated = movie.get('interest_updated_at')
+        if not movie_id or (updated and now - updated < TTL) or _retry_after.get(movie_id, 0) > now:
+            continue
+        if movie_id not in ids:
+            ids.append(movie_id)
+        if len(ids) == 20:
+            break
+    if not ids:
+        return
+    with _worker_lock:
+        if _worker_running:
+            return
+        _worker_running = True
+    threading.Thread(target=_update_movies, args=(ids, api_key), daemon=True).start()

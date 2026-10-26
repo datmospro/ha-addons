@@ -9,12 +9,12 @@ const money = value => new Intl.NumberFormat('es-ES', {style:'currency', currenc
 export function interestSignals(data) {
     const popularity=number(data.popularity), votes=number(data.votes), budget=number(data.budget), revenue=number(data.revenue);
     return [
-        {icon:'fire', label:'Interés actual', value:popularity === null ? 'Sin datos' : popularity >= HIGH_INTEREST_MIN ? 'Muy popular' : popularity >= 10 ? 'Interés moderado' : 'Interés discreto',
+        {icon:'fire', label:'Interés actual', value:popularity === null ? 'Sin datos' : popularity >= HIGH_INTEREST_MIN ? 'Interés alto ahora' : popularity >= 10 ? 'Interés moderado' : 'Interés discreto',
          detail:popularity === null ? 'Popularidad no disponible' : `Índice TMDB: ${count(popularity)}`,
-         help:'Orientativo de Roverr: discreto < 10, moderado entre 10 y 50, muy popular desde 50. TMDB combina visitas, favoritos, seguimiento y votos. No mide la expectación antes del estreno.'},
+         help:'Orientativo de Roverr: discreto < 10, moderado entre 10 y 50, alto desde 50. TMDB combina visitas, favoritos, seguimiento y votos. No mide la expectación antes del estreno.'},
         {icon:'users', label:'Alcance del público', value:votes === null ? 'Sin datos' : votes >= 10000 ? 'Muy conocida' : votes >= 1000 ? 'Conocida' : votes > 0 ? 'Pocos votos' : 'Aún sin votos',
          detail:votes === null ? 'Recuento no disponible' : `${count(votes)} votos en TMDB`,
-         help:'Orientativo de Roverr: conocida desde 1.000 votos y muy conocida desde 10.000. Los estrenos recientes pueden tener pocos votos. No representa espectadores ni calidad.'},
+         help:'Orientativo de Roverr: conocida desde 1.000 votos y muy conocida desde 10.000. Puede haber mucho interés actual y pocos votos, sobre todo en estrenos recientes. No representa espectadores ni calidad.'},
         {icon:'coins', label:'Presupuesto', value:budget ? money(budget) : 'No publicado',
          detail:revenue ? `Taquilla: ${money(revenue)}` : 'Importes declarados en dólares',
          help:'Presupuesto y recaudación publicados en TMDB, sin ajustar por inflación. Cero significa que no hay dato; no indica una producción barata.'}

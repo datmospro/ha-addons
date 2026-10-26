@@ -656,7 +656,12 @@ function setupMovieDetailsListeners(hash, movie) {
             // Preserve the rating nodes: IMDb and TMDB requests may finish in either order.
             const ratings = interest.querySelector('.movie-interest-ratings');
             interest.innerHTML = renderInterest(data);
-            if (ratings) interest.querySelector('.movie-interest-ratings-slot').appendChild(ratings);
+            if (ratings) {
+                const tmdb = ratings.querySelector('.rating-badge.tmdb');
+                if (tmdb && typeof data.vote_average === 'number') tmdb.querySelector('.rating-value').textContent = data.vote_average > 0 ? data.vote_average.toFixed(1) : '—';
+                if (tmdb && typeof data.votes === 'number') tmdb.querySelector('.rating-count').textContent = data.votes > 0 ? new Intl.NumberFormat('es-ES').format(data.votes) + ' votos' : 'Sin votos publicados';
+                interest.querySelector('.movie-interest-ratings-slot').appendChild(ratings);
+            }
         });
     }
 

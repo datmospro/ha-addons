@@ -32,3 +32,32 @@ class MovieInterestTests(unittest.TestCase):
     def test_invalid_numbers_are_not_low_interest(self):
         for value in (None,'bad',float('nan'),float('inf'),-1):
             self.assertIsNone(interest.number(value))
+import datetime
+from peewee import SqliteDatabase
+from database import Movie
+
+class PersistentInterestTests(unittest.TestCase):
+    def setUp(self):
+        interest._retry_after.clear()
+        self.db=SqliteDatabase(':memory:')
+        self.binding=self.db.bind_ctx([Movie]);self.binding.__enter__();self.db.create_tables([Movie])
+        self.movie=Movie.create(torrent_hash='a'*40,title='Film',tmdb_id=42,vote_average=0,vote_count=0)
+    def tearDown(self):
+        self.binding.__exit__(None,None,None);self.db.close()
+    def test_worker_updates_dashboard_without_opening_details(self):
+        snapshot={'status':'ok','popularity':100.1,'vote_average':6.2,'votes':27,'updated_at':int(interest.time.time())}
+        with patch.object(interest,'get_interest',return_value=snapshot),patch('modules.config.trigger_movies_update_callback') as notify:
+            interest._update_movies([42],'key')
+            notify.assert_called_once()
+        current=Movie.get_by_id(self.movie.id)
+        self.assertEqual(current.tmdb_popularity,100.1);self.assertEqual(current.vote_count,27);self.assertEqual(current.vote_average,6.2)
+        self.assertIsNotNone(current.interest_updated_at)
+    def test_failed_lookup_preserves_saved_signal(self):
+        self.movie.tmdb_popularity=100.1;self.movie.save()
+        self.assertFalse(interest.save_interest(42,{'status':'unavailable'}))
+        self.assertEqual(Movie.get_by_id(self.movie.id).tmdb_popularity,100.1)
+    def test_dashboard_schedules_without_network_on_request_thread(self):
+        with patch.object(interest.threading,'Thread') as thread:
+            interest.schedule_interest_updates([{'tmdb_id':42}], 'key')
+            thread.assert_called_once();thread.return_value.start.assert_called_once()
+        interest._worker_running=False

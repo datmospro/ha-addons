@@ -1,3 +1,9 @@
+## 4.5.23
+
+- Prepara el interés en segundo plano al cargar el panel, lo guarda en la base de datos y notifica al dashboard: el marco dorado no depende de abrir la ficha y se conserva tras reiniciar.
+- Actualiza los votos y la nota de TMDB junto al índice de interés para no combinar datos actuales con valoraciones antiguas.
+- Sustituye «Muy popular» por «Interés alto ahora» y aclara que mucha actividad puede coexistir con pocos votos.
+
 ## 4.5.22
 
 - Integra las notas y votos de TMDB e IMDb en la tarjeta central de alcance del público; elimina el bloque independiente de valoraciones para ahorrar espacio.

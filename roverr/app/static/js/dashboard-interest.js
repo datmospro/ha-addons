@@ -18,7 +18,7 @@ export function applyInterestFrame(card, data) {
         indicator.tabIndex = 0;
         card.appendChild(indicator);
     }
-    indicator.title = `Interés alto · Popularidad TMDB: ${new Intl.NumberFormat('es-ES', {maximumFractionDigits:1}).format(data.popularity)} (desde ${HIGH_INTEREST_MIN})${data.status==='cached'?' · Último dato disponible':''}`;
+    indicator.title = `Interés alto ahora · Índice de actividad TMDB: ${new Intl.NumberFormat('es-ES', {maximumFractionDigits:1}).format(data.popularity)} (desde ${HIGH_INTEREST_MIN})${data.status==='cached'?' · Último dato disponible':''}`;
     indicator.setAttribute('aria-label', indicator.title);
 }
 
@@ -40,6 +40,11 @@ export function updateDashboardInterest(card, movie) {
     const id = String(movie.tmdb_id || '');
     card.dataset.interestTmdb = id;
     if (!id) { applyInterestFrame(card, null); return; }
+    const saved = movie.tmdb_popularity;
+    if (typeof saved === 'number' && Number.isFinite(saved)) {
+        applyInterestFrame(card, {status:'ok', popularity:saved});
+        return;
+    }
     const cached = cache.get(id);
     if (cached && Date.now() < cached.until) { applyInterestFrame(card, cached.data); return; }
     if (card.dataset.interestPending === id) return;
