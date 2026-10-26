@@ -492,7 +492,7 @@ async function handleTestQBittorrent() {
  * Añade un RSS feed
  * LÃ­neas 869-913 de app.js
  */
-function addRSSFeed() {
+async function addRSSFeed() {
     const nameInput = document.getElementById('rss-name');
     const enabledInput = document.getElementById('rss-enabled');
     const autoAddInput = document.getElementById('rss-auto-add');
@@ -525,7 +525,7 @@ function addRSSFeed() {
         return;
     }
 
-    const settings = state.getSettings();
+    const settings = structuredClone(state.getSettings());
     if (!settings.rss_feeds) settings.rss_feeds = [];
     settings.rss_feeds.push({
         name,
@@ -539,6 +539,9 @@ function addRSSFeed() {
         max_size: maxSize,
         min_year: minYear
     });
+
+    const result = await apiSaveSettings(settings);
+    if (!result.success) return;
 
     nameInput.value = '';
     enabledInput.checked = true;
@@ -887,7 +890,7 @@ async function saveEditedRSS() {
         return;
     }
 
-    const settings = state.getSettings();
+    const settings = structuredClone(state.getSettings());
     settings.rss_feeds[currentEditIndex] = {
         name,
         enabled,
@@ -900,6 +903,9 @@ async function saveEditedRSS() {
         max_size: maxSize,
         min_year: minYear
     };
+
+    const result = await apiSaveSettings(settings);
+    if (!result.success) return;
 
     state.setSettings(settings);
     renderRSSFeedsList();

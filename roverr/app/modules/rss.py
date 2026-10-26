@@ -133,12 +133,25 @@ def is_duplicate_movie(title, year, tmdb_id, existing_movies):
             
     return False
 
+def rss_year_allowed(year, feed):
+    """With a minimum year configured, never auto-download an unknown year."""
+    minimum = (feed or {}).get('min_year')
+    if minimum in (None, ''):
+        return True
+    try:
+        return int(minimum) > 0 and bool(year) and int(year) >= int(minimum)
+    except (TypeError, ValueError):
+        return False
+
+
 def retry_rss_confirmation(movie, feed):
     """Retry only uncertain additions, reusing a torrent if it already exists."""
     reason = movie.status_reason or ''
     if movie.state != 'rss' or movie.ignored or movie.copy_paused or not feed:
         return False
     if not feed.get('enabled', True) or not feed.get('auto_add'):
+        return False
+    if not rss_year_allowed(movie.year, feed):
         return False
     if reason != 'Torrent client did not respond' and not reason.startswith('Pendiente de confirmación'):
         return False
@@ -184,9 +197,6 @@ def fetch_rss_movies(limit=30):
         logger.warning("ÔÜá´©Å  [RSS] No hay fuentes RSS configuradas")
         return {"success": False, "message": "No hay fuentes RSS configuradas"}
         
-    # Create map for easy config lookup
-    feed_map = {f.get('name'): f for f in feeds}
-    
     import feedparser
     all_entries = []
     
@@ -195,7 +205,7 @@ def fetch_rss_movies(limit=30):
     for feed_config in feeds:
         url = feed_config.get('url')
         feed_name = feed_config.get('name', 'Unknown')
-        if not url: continue
+        if not url or not feed_config.get('enabled', True): continue
         
         try:
             logger.debug(f"­ƒöº [RSS] Fetching feed: {feed_name}")
@@ -231,6 +241,7 @@ def fetch_rss_movies(limit=30):
                     'link': link,
                     'published': published,
                     'feed_name': feed_config.get('name', 'Unknown'),
+                    'feed_config': feed_config,
                     'tmdb_id': tmdb_id  # Include TMDB ID if found
                 })
                 
@@ -293,34 +304,17 @@ def fetch_rss_movies(limit=30):
             # Check if exists by hash first (exact same RSS entry)
             if Movie.select().where(Movie.torrent_hash == pseudo_hash).exists():
                 retry_rss_confirmation(Movie.get(Movie.torrent_hash == pseudo_hash),
-                                       feed_map.get(entry['feed_name']))
+                                       entry['feed_config'])
                 logger.info(f"RSS movie '{title}' ({year}) already exists with exact hash {pseudo_hash[:8]}..., skipping")
                 continue
 
             # Year filtering check (only for RSS entry)
-            feed_config = feed_map.get(entry['feed_name'])
-            min_year = feed_config.get('min_year') if feed_config else None
-            if min_year:
-                try:
-                    min_year_val = int(min_year)
-                    if year and int(year) < min_year_val:
-                        logger.info(f"Skipping RSS movie '{title}' ({year}) as it is older than minimum year filter {min_year_val}. Auto-ignoring in DB.")
-                        # Save in DB as ignored to avoid duplicate checks in future
-                        Movie.create(
-                            torrent_hash=pseudo_hash,
-                            title=title,
-                            year=year,
-                            ignored=True,
-                            ignored_at=datetime.now(),
-                            state='rss',
-                            status='new',
-                            torrent_name=entry['title'],
-                            overview=f"Auto-ignored: released before {min_year_val}"
-                        )
-                        continue
-                except ValueError:
-                    pass
-            
+            feed_config = entry['feed_config']
+            if not rss_year_allowed(year, feed_config):
+                minimum = feed_config.get('min_year')
+                logger.info(f"Skipping RSS movie '{title}' ({year}): minimum year {minimum}")
+                continue
+
             # First check if movie is ignored (skip completely - no RSS entry, no auto-download)
             if is_movie_ignored(title, year, entry.get('tmdb_id'), ignored_movies):
                 logger.info(f"Movie '{title}' ({year}) is in ignored list. Skipping RSS entry.")
@@ -342,7 +336,7 @@ def fetch_rss_movies(limit=30):
                     logger.info(f"Movie '{title}' ({year}) is in watchlist. Checking for acceptable size...")
                     
                     # Get feed config for size preferences
-                    feed_config = feed_map.get(entry['feed_name'])
+                    feed_config = entry['feed_config']
                     if feed_config:
                         preferred_size = int(feed_config.get('preferred_size', 0))
                         max_size = int(feed_config.get('max_size', 0))
@@ -375,7 +369,7 @@ def fetch_rss_movies(limit=30):
                 continue
             
             # CHECK FOR AUTO-DOWNLOAD (only for new, non-ignored movies)
-            feed_config = feed_map.get(entry['feed_name'])
+            feed_config = entry['feed_config']
             if feed_config and feed_config.get('auto_add'):
                 preferred_size = int(feed_config.get('preferred_size', 0))
                 max_size = int(feed_config.get('max_size', 0))

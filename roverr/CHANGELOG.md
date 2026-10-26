@@ -1,3 +1,10 @@
+## 4.5.18
+
+- Guarda inmediatamente en el servidor los cambios al añadir o editar una fuente RSS, incluido el año mínimo; si falla el guardado, mantiene el formulario.
+- Aplica el año mínimo también a los reintentos de descarga automática y bloquea las entradas sin año cuando hay un mínimo configurado.
+- Las entradas excluidas por año no se añaden permanentemente a ignorados, para que un cambio posterior del límite pueda aplicarse.
+- Cada entrada utiliza la configuración de su fuente original, incluso si varias fuentes comparten nombre; no procesa fuentes desactivadas.
+
 ## 4.5.17
 
 - Conserva la ficha TMDB elegida al descargar desde el buscador, aunque el torrent use otro idioma.
