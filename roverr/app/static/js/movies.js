@@ -5,10 +5,11 @@ import { initDashboardFilters, updateDashboardFilters } from './dashboard-filter
  * Extraído de app.js - líneas 1056-1237, 1239-1567, 1587-1838
  */
 
+import { renderInterest } from './movie-interest.js';
 import { groupMovies, getMovieVersions } from './movie-groups.js';
 import { state } from './state.js';
 import {
-    getMovies, getMovieDetails, getMovieRatings, identifyMovie as apiIdentifyMovie,
+    getMovies, getMovieDetails, getMovieRatings, getMovieInterest, identifyMovie as apiIdentifyMovie,
     batchStopCopies, batchCopyMovies, batchDeleteMovies, stopCopy as apiStopCopy,
     searchIndexers, addTorrent
 } from './api.js';
@@ -530,6 +531,7 @@ function renderMovieDetails(container, movie, hash) {
                     </div>
                 </div>
                 
+                ${movie.tmdb_id ? `<section class="movie-interest" aria-label="Interés y alcance"><h3>Interés y alcance</h3><div class="movie-interest-content" aria-live="polite"><p class="movie-interest-note">Consultando datos de TMDB…</p></div></section>` : ''}
                 <div class="paths-box">
                     <div class="path-item">
                         <label>Ubicación actual:</label>
@@ -661,6 +663,14 @@ function setupMovieDetailsListeners(hash, movie) {
             }
         });
     });
+
+    const interest = container.querySelector('.movie-interest-content');
+    if (interest && movie.tmdb_id) {
+        getMovieInterest(hash).then(data => {
+            if (!interest.isConnected || container.getAttribute('data-hash') !== hash || (data.tmdb_id && String(data.tmdb_id) !== String(movie.tmdb_id))) return;
+            interest.innerHTML = renderInterest(data);
+        });
+    }
 
     // Load IMDb independently: the movie detail view never waits for the daily dataset.
     const imdbBadge = container.querySelector('.rating-badge.imdb');

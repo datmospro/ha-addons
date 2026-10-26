@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {interestSignals,renderInterest} from '../app/static/js/movie-interest.js';
+globalThis.document={createElement:()=>({set textContent(value){this.innerHTML=String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll(String.fromCharCode(34),'&quot;');}})};
+let signals=interestSignals({popularity:50,votes:10000,budget:50000000});
+assert.equal(signals[0].value,'Muy popular');assert.equal(signals[1].value,'Muy conocida');assert.notEqual(signals[2].value,'No publicado');
+signals=interestSignals({popularity:0,votes:0,budget:0});
+assert.equal(signals[0].value,'Interés discreto');assert.equal(signals[1].value,'Aún sin votos');assert.equal(signals[2].value,'No publicado');
+assert.equal(interestSignals({})[0].value,'Sin datos');
+assert.equal(interestSignals({popularity:10,votes:1000})[0].value,'Interés moderado');
+assert.equal(interestSignals({votes:1000})[1].value,'Conocida');
+assert.match(renderInterest({status:'cached'}),/Últimos datos disponibles/);
+assert.match(renderInterest({status:'unavailable'}),/no disponible/);
+assert.match(renderInterest({status:'ok',popularity:2,votes:3}),/no son una nota de calidad/);
+console.log('Movie interest: thresholds, missing values, stale state and explanations passed');

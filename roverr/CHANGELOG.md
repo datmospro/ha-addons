@@ -1,3 +1,9 @@
+## 4.5.20
+
+- Añade a las fichas un bloque compacto «Interés y alcance»: popularidad actual, número de votos y presupuesto/taquilla de TMDB.
+- Incluye iconos, explicación de los umbrales orientativos y datos ausentes; no confunde popularidad o presupuesto con calidad ni expectación histórica.
+- Consulta independiente con caché de seis horas y conservación del último dato ante fallos, sin bloquear la ficha ni requerir claves adicionales.
+
 ## 4.5.19
 
 - Sustituye la lectura del HTML de IMDb (bloqueada por HTTP 403) por su conjunto oficial diario de notas y votos, sin claves adicionales.

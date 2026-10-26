@@ -496,3 +496,11 @@ export async function getMovieRatings(hash) {
         return {status: 'unavailable'};
     }
 }
+
+export async function getMovieInterest(hash) {
+    try {
+        const response = await fetch(`${API_BASE}/movie/${encodeURIComponent(hash)}/interest`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+    } catch (_) { return {status: 'unavailable'}; }
+}
