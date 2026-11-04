@@ -282,7 +282,36 @@ function media(url, video = false) {
     : `<img src="${esc(url)}" alt="Preparación del paso" loading="lazy">`;
 }
 function stepCard(r, s, i) {
-  return `<article class="step"><span class="step-number">${i + 1}</span><p>${esc(stepText(r, s, servings))}</p>${s.image ? media(s.image) : ""}${s.video ? media(s.video, true) : ""}${s.parallel ? `<div class="parallel"><strong class="small accent">Mientras tanto</strong><p>${esc(s.parallel)}</p></div>` : ""}${s.timer_minutes ? btn(`${icon("clock")} Iniciar · ${n(s.timer_minutes)} min`, "start-timer", "primary", `data-minutes="${s.timer_minutes}" data-label="${esc(r.title)} · Paso ${i + 1}"`) : ""}</article>`;
+  return `<article class="step"><span class="step-number">${i + 1}</span><p>${esc(stepText(r, s, servings))}</p>${s.image ? media(s.image) : ""}${s.video ? media(s.video, true) : ""}${s.parallel ? `<div class="parallel"><strong class="small accent">Mientras tanto</strong><p>${esc(s.parallel)}</p></div>` : ""}${stepTimers(r, s, i, servings)}</article>`;
+}
+function stepTimers(r, step, index, count) {
+  const context = `data-recipe-id="${esc(r.id)}" data-step-index="${index}" data-servings="${count}"`;
+  return `<div class="step-timers">${step.timer_minutes ? btn(`${icon("clock")} Iniciar · ${n(step.timer_minutes)} min`, "start-timer", "primary", `${context} data-minutes="${step.timer_minutes}"`) : ""}${btn(`${icon("plus")} Otro tiempo`, "custom-timer", "", `${context} aria-label="Temporizador personalizado del paso ${index + 1}"`)}</div>`;
+}
+function customTimerDialog(id, index, count) {
+  const r = recipe(id);
+  if (!r?.steps[index]) return toast("Este paso ya no está disponible");
+  openModal(
+    "Temporizador personalizado",
+    `<form id="custom-timer-form" data-recipe-id="${esc(id)}" data-step-index="${index}" data-servings="${count}"><p class="muted small">${esc(r.title)} · Paso ${index + 1} · ${n(count)} raciones</p><p class="small">Inicia un contador adicional para este paso. Los demás temporizadores siguen en marcha.</p><div class="flex wrap gap">${[1, 2, 5, 10].map((minutes) => btn(`+${minutes} min`, "preset-timer", "", `data-minutes="${minutes}"`)).join("")}</div><div class="form-grid gap">${field("Minutos", "minutes", 2, 'min="0" max="1440" step="1" required', "number")}${field("Segundos", "seconds", 0, 'min="0" max="59" step="1" required', "number")}</div><div class="dialog-foot"><button class="primary" type="submit">${icon("play")} Iniciar temporizador</button></div></form>`,
+  );
+}
+function timerDestination(t) {
+  let r = recipe(t.recipe_id),
+    index = t.step_index;
+  // Compatibilidad con los contadores creados antes de guardar su origen.
+  if (!r && !t.recipe_id) {
+    const match = t.label.match(/^(.*) · Paso (\d+)$/);
+    if (match) {
+      r = state.recipes.find((r) => r.title === match[1]);
+      index = Number(match[2]) - 1;
+    }
+  }
+  if (!r) return null;
+  if (t.step_text && r.steps[index]?.text !== t.step_text) {
+    index = r.steps.findIndex((step) => step.text === t.step_text);
+  }
+  return { r, index: r.steps[index] ? index : -1 };
 }
 function renderCook() {
   const r = recipe(currentRecipe);
@@ -433,7 +462,7 @@ function renderBatch() {
       : `<div class="batch-head gap"><section class="panel"><h2>Lo que vas a preparar</h2>${rows.map(({ r, portions }) => `<div class="flex between small" style="padding:8px 0"><span>${esc(r.title)}${r.freezable ? " ❄" : ""}</span><strong class="accent">${n(portions)} raciones</strong></div>`).join("")}<p class="muted small gap">Se suman las raciones de todas las apariciones de cada plato. Comprueba que tu equipo admite estas cantidades; divide la preparación si es necesario.</p></section><section class="panel"><h2>Antes de empezar</h2><ul class="summary-list"><li>Ten a mano los ingredientes de la lista de compra.</li><li>Organiza recipientes y etiquetas para las raciones.</li><li>Los tiempos son los de la receta base: verifica el punto de cocción al ampliar cantidades.</li><li>El orden conserva los pasos de cada receta. Avanza manualmente cuando una tarea haya terminado o pueda continuar sola.</li></ul>${btn(`${icon("cart")} Ver ingredientes`, "go-shopping")}${btn(`${icon("snow")} Registrar lo cocinado`, "new-stock", "ghost gap")}</section></div><section class="panel"><h2>Tu sesión de cocina</h2>${tasks
           .map((t) => {
             const key = `${week}-${t.r.id}-${t.index}`;
-            return `<div class="batch-task ${batchDone.has(key) ? "done" : ""}"><input type="checkbox" data-batch-key="${esc(key)}" aria-label="Marcar tarea completada" ${batchDone.has(key) ? "checked" : ""}><div class="grow"><span class="task-recipe">${esc(t.r.title)} · ${n(t.portions)} raciones · Paso ${t.index + 1}</span><p>${esc(stepText(t.r, t.step, t.portions))}</p>${t.step.parallel ? `<p class="muted small">Mientras tanto: ${esc(t.step.parallel)}</p>` : ""}${t.step.timer_minutes ? btn(`${icon("clock")} ${n(t.step.timer_minutes)} min`, "start-timer", "", `data-minutes="${t.step.timer_minutes}" data-label="${esc(t.r.title)} · Paso ${t.index + 1}"`) : ""}</div></div>`;
+            return `<div class="batch-task ${batchDone.has(key) ? "done" : ""}"><input type="checkbox" data-batch-key="${esc(key)}" aria-label="Marcar tarea completada" ${batchDone.has(key) ? "checked" : ""}><div class="grow"><span class="task-recipe">${esc(t.r.title)} · ${n(t.portions)} raciones · Paso ${t.index + 1}</span><p>${esc(stepText(t.r, t.step, t.portions))}</p>${t.step.parallel ? `<p class="muted small">Mientras tanto: ${esc(t.step.parallel)}</p>` : ""}${stepTimers(t.r, t.step, t.index, t.portions)}</div></div>`;
           })
           .join("")}</section>`
   }`;
@@ -689,23 +718,55 @@ function beep() {
   navigator.vibrate?.([200, 100, 200]);
 }
 const sounded = new Set();
+let timerMarkupKey = "";
 function renderTimers() {
   if (!state) return;
   const timers = state.timers.filter((t) => t.status !== "dismissed");
-  $("#timer-tray").innerHTML = timers
-    .map((t) => {
-      const seconds = Math.max(
-          0,
-          Math.ceil((t.ends_at - Date.now() - clockOffset) / 1000),
-        ),
-        done = t.status === "finished" || seconds === 0;
-      if (done && !sounded.has(t.id)) {
-        sounded.add(t.id);
-        beep();
-      }
-      return `<div class="timer-pill ${done ? "finished" : ""}">${icon("clock")}<div class="grow"><div class="timer-name">${esc(t.label)}</div><strong>${done ? "¡Listo!" : `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`}</strong>${t.notification === "failed" ? `<div class="timer-error">${esc(t.error)}</div>` : ""}${done && t.notification === "pending" ? '<div class="small muted">Enviando aviso…</div>' : ""}</div>${btn(icon("close"), "dismiss-timer", "icon ghost", `data-id="${esc(t.id)}" aria-label="${done ? "Cerrar" : "Cancelar"} temporizador"`)}</div>`;
-    })
-    .join("");
+  const views = timers.map((t) => {
+    const seconds = Math.max(
+        0,
+        Math.ceil((t.ends_at - Date.now() - clockOffset) / 1000),
+      ),
+      done = t.status === "finished" || seconds === 0;
+    if (done && !sounded.has(t.id)) {
+      sounded.add(t.id);
+      beep();
+    }
+    return {
+      t,
+      done,
+      destination: timerDestination(t),
+      text: done
+        ? "¡Listo!"
+        : `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`,
+    };
+  });
+  const key = JSON.stringify(
+    views.map(({ t, done, destination }) => [
+      t.id,
+      t.label,
+      done,
+      t.notification,
+      t.error,
+      destination?.r.id,
+      destination?.index,
+    ]),
+  );
+  if (key !== timerMarkupKey) {
+    $("#timer-tray").innerHTML = views
+      .map(
+        ({ t, done, destination, text }) =>
+          `<div class="timer-pill ${done ? "finished" : ""}"><button class="timer-open" data-action="open-timer" data-id="${esc(t.id)}" aria-label="${esc(destination ? (destination.index >= 0 ? `Abrir ${destination.r.title}, paso ${destination.index + 1}` : `Revisar ${destination.r.title}`) : `Abrir origen de ${t.label}`)}">${icon("clock")}<span class="grow"><span class="timer-name">${esc(destination?.r.title || t.label)}</span>${destination ? `<span class="timer-step">${destination.index >= 0 ? `Paso ${destination.index + 1}${t.custom ? " · Extra" : ""}` : "Revisar receta"}</span>` : ""}<strong data-countdown="${esc(t.id)}">${text}</strong></span></button>${t.notification === "failed" ? `<div class="timer-error">${esc(t.error)}</div>` : ""}${done && t.notification === "pending" ? '<span class="small muted">Enviando aviso…</span>' : ""}${btn(icon("close"), "dismiss-timer", "icon ghost", `data-id="${esc(t.id)}" aria-label="${done ? "Cerrar" : "Cancelar"} temporizador"`)}</div>`,
+      )
+      .join("");
+    timerMarkupKey = key;
+  } else {
+    const countdowns = $$("[data-countdown]", $("#timer-tray"));
+    for (const { t, text } of views) {
+      const el = countdowns.find((el) => el.dataset.countdown === t.id);
+      if (el) el.textContent = text;
+    }
+  }
 }
 function go(id) {
   location.hash = id;
@@ -773,10 +834,44 @@ async function runAction(action, el) {
       return;
     case "start-timer":
       enableAudio();
-      await api("timer", { label: d.label, seconds: Number(d.minutes) * 60 });
+      await api("timer", {
+        recipe_id: d.recipeId,
+        step_index: Number(d.stepIndex),
+        servings: Number(d.servings),
+        seconds: Number(d.minutes) * 60,
+      });
       await refresh(false);
       toast("Temporizador en marcha");
       return;
+    case "custom-timer":
+      customTimerDialog(d.recipeId, Number(d.stepIndex), Number(d.servings));
+      return;
+    case "preset-timer":
+      $('#custom-timer-form [name="minutes"]').value = d.minutes;
+      $('#custom-timer-form [name="seconds"]').value = 0;
+      return;
+    case "open-timer": {
+      const t = state.timers.find((t) => t.id === d.id),
+        destination = t && timerDestination(t);
+      if (!destination)
+        return toast("La receta de este contador ya no está disponible.");
+      if (modal.open) modal.close();
+      currentRecipe = destination.r.id;
+      servings = t.servings || state.settings.servings;
+      if (destination.index < 0) {
+        go(`detail/${encodeURIComponent(currentRecipe)}`);
+        return toast("El paso ha cambiado. Revisa la receta para continuar.");
+      }
+      cookIndex = destination.index;
+      sessionStorage.setItem(`mesa-step-${currentRecipe}`, cookIndex);
+      const target = `cook/${encodeURIComponent(currentRecipe)}/${cookIndex}`;
+      if (location.hash === `#${target}`) {
+        route = "cook";
+        render();
+        window.scrollTo(0, 0);
+      } else go(target);
+      return;
+    }
     case "dismiss-timer":
       await api("timer/dismiss", { id: d.id });
       await refresh(false);
@@ -983,6 +1078,31 @@ document.addEventListener("submit", async (e) => {
   if (submit) submit.disabled = true;
   try {
     const f = new FormData(form);
+    if (form.id === "custom-timer-form") {
+      const minutes = Number(f.get("minutes")),
+        seconds = Number(f.get("seconds"));
+      if (
+        !Number.isInteger(minutes) ||
+        !Number.isInteger(seconds) ||
+        minutes < 0 ||
+        seconds < 0 ||
+        seconds > 59 ||
+        minutes * 60 + seconds < 1 ||
+        minutes * 60 + seconds > 86400
+      )
+        throw new Error("Indica un tiempo entre 1 segundo y 24 horas.");
+      enableAudio();
+      await api("timer", {
+        recipe_id: form.dataset.recipeId,
+        step_index: Number(form.dataset.stepIndex),
+        servings: Number(form.dataset.servings),
+        seconds: minutes * 60 + seconds,
+        custom: true,
+      });
+      modal.close();
+      await refresh(false);
+      toast("Temporizador adicional en marcha");
+    }
     if (form.id === "settings-form") {
       await api("settings", readSettings(form));
       await refresh();
@@ -1163,9 +1283,10 @@ document.addEventListener("change", async (e) => {
   }
 });
 function readRoute() {
-  const [name, id] = location.hash.slice(1).split("/");
+  const [name, id, step] = location.hash.slice(1).split("/");
   route = name || "recipes";
   if (id) currentRecipe = decodeURIComponent(id);
+  if (name === "cook" && /^\d+$/.test(step || "")) cookIndex = Number(step);
   render();
   window.scrollTo(0, 0);
 }

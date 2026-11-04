@@ -661,6 +661,12 @@ progress::-webkit-progress-value {
 .cook-actions button {
   min-height: 54px;
 }
+.step-timers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
 .cook .step-number {
   margin-top: 16px;
 }
@@ -1001,6 +1007,7 @@ dialog::backdrop {
   font-variant-numeric: tabular-nums;
 }
 .timer-pill .timer-name {
+  display: block;
   font-size: 11px;
   max-width: 170px;
   overflow: hidden;
@@ -1011,6 +1018,25 @@ dialog::backdrop {
   min-height: 32px;
   min-width: 32px;
   padding: 5px;
+}
+.timer-pill .timer-open {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  padding: 2px;
+  text-align: left;
+  justify-content: flex-start;
+  font-weight: 400;
+}
+.timer-open strong {
+  display: block;
+}
+.timer-step {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
 }
 .timer-pill.finished {
   border-color: var(--accent);

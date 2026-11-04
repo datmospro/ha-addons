@@ -230,7 +230,7 @@ export function createApp({
     try {
       const path = new URL(req.url, "http://mesa.local").pathname;
       if (path === "/health" && req.method === "GET")
-        return send(res, 200, { ok: true, version: "1.0.0" });
+        return send(res, 200, { ok: true, version: "1.0.1" });
       if (
         ingressOnly &&
         !["172.30.32.2", "::ffff:172.30.32.2"].includes(
@@ -487,10 +487,33 @@ export function createApp({
             }),
           );
         if (path === "/api/timer") {
+          let context = {};
+          if (
+            b.recipe_id != null ||
+            b.step_index != null ||
+            b.servings != null
+          ) {
+            const r = get("recipe", b.recipe_id);
+            if (!r) throw new Error("La receta del temporizador ya no existe");
+            const index = num(b.step_index, 0, r.steps.length - 1);
+            if (!Number.isInteger(index)) throw new Error("Paso no válido");
+            context = {
+              recipe_id: r.id,
+              step_index: index,
+              step_text: r.steps[index].text,
+              servings: num(b.servings, 1, 10000),
+            };
+          }
+          const seconds = num(b.seconds, 1, 86400);
           const t = {
             id: randomUUID(),
-            label: String(b.label || "Temporizador").slice(0, 180),
-            ends_at: Date.now() + num(b.seconds, 1, 86400) * 1000,
+            ...context,
+            label: context.recipe_id
+              ? `${get("recipe", context.recipe_id).title} · Paso ${context.step_index + 1}${b.custom ? " · Extra" : ""}`
+              : String(b.label || "Temporizador").slice(0, 180),
+            duration_seconds: seconds,
+            custom: !!b.custom,
+            ends_at: Date.now() + seconds * 1000,
             status: "running",
             targets: settings().notify_services,
             notification: "waiting",
@@ -643,7 +666,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   app.server.listen(
     port,
     process.env.INGRESS_ONLY === "true" ? "0.0.0.0" : "127.0.0.1",
-    () => console.log(`Mesa · Recetas 1.0.0 en puerto ${port}`),
+    () => console.log(`Mesa · Recetas 1.0.1 en puerto ${port}`),
   );
   const stop = () => {
     app.close();

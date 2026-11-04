@@ -8,6 +8,88 @@ test.afterEach(async ({ request }) => {
     data: { ...baseline, confirm: "RESTAURAR" },
   });
 });
+
+test("Contadores abren su paso y permiten un tiempo adicional personalizado", async ({
+  page,
+  request,
+}, info) => {
+  await page.goto("/#detail/bowl");
+  await page.locator("#servings").fill("5");
+  await page.locator("#servings").press("Tab");
+  await page.getByRole("button", { name: "Empezar a cocinar" }).click();
+  await page.getByRole("button", { name: "Iniciar · 15 min" }).click();
+  await page.getByRole("button", { name: "Siguiente paso" }).click();
+  await page
+    .getByRole("button", { name: "Temporizador personalizado del paso 2" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Temporizador personalizado" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "+2 min", exact: true }).click();
+  await page.locator('#custom-timer-form [name="seconds"]').fill("30");
+  await page
+    .getByRole("button", { name: "Iniciar temporizador", exact: true })
+    .click();
+  await expect(page.locator(".timer-pill")).toHaveCount(2);
+  const state = await (await request.get("/api/state")).json();
+  const extra = state.timers.find((t) => t.custom);
+  expect(extra.duration_seconds).toBe(150);
+  expect(extra.step_index).toBe(1);
+  expect(extra.servings).toBe(5);
+  await page.goto("/#recipes");
+  await page
+    .getByRole("button", {
+      name: "Abrir Bowl de pollo y quinoa, paso 1",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator(".cook")).toContainText("Paso 1 de 3");
+  await expect(page.locator(".cook")).toContainText("350 g de quinoa");
+  await page
+    .getByRole("button", {
+      name: "Abrir Bowl de pollo y quinoa, paso 2",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator(".cook")).toContainText("Paso 2 de 3");
+  await expect(page.locator(".cook")).toContainText(
+    "750 g de pechuga de pollo",
+  );
+  // El hash no cambia al avanzar; tocar otra vez el mismo contador debe volver al paso 2.
+  await page.getByRole("button", { name: "Siguiente paso" }).click();
+  await page
+    .getByRole("button", {
+      name: "Abrir Bowl de pollo y quinoa, paso 2",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator(".cook")).toContainText("Paso 2 de 3");
+  await page.screenshot({
+    path: `test-results/${info.project.name}-temporizador-extra.png`,
+    fullPage: true,
+  });
+  await page.reload();
+  await page
+    .getByRole("button", {
+      name: "Abrir Bowl de pollo y quinoa, paso 2",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator(".cook")).toContainText("5 raciones");
+  await expect(page.locator(".cook")).toContainText("Paso 2 de 3");
+  // Los contadores antiguos se identifican por el nombre original.
+  await request.post("/api/timer", {
+    data: { label: "Bowl de pollo y quinoa · Paso 3", seconds: 120 },
+  });
+  await page.reload();
+  await page
+    .getByRole("button", {
+      name: "Abrir Bowl de pollo y quinoa, paso 3",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator(".cook")).toContainText("Paso 3 de 3");
+});
 test("Recorrido completo: recetas, raciones, cocina, plan, compra, congelador y ajustes", async ({
   page,
   request,

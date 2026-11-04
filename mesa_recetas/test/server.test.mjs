@@ -163,6 +163,49 @@ test("API: fallo Android queda visible y no se marca como enviado", async (t) =>
   assert.equal(actual.notification, "pending");
   assert.match(actual.error, /móviles/);
 });
+test("API: temporizadores conservan su receta, paso y raciones; los extras son independientes", async (t) => {
+  const { request } = await fixture(t);
+  const normal = await request("timer", {
+    recipe_id: "bowl",
+    step_index: 0,
+    servings: 5,
+    seconds: 900,
+  });
+  assert.equal(normal.status, 201);
+  assert.equal(normal.body.recipe_id, "bowl");
+  assert.equal(normal.body.step_index, 0);
+  assert.equal(normal.body.servings, 5);
+  assert.equal(
+    normal.body.step_text,
+    (await request("state")).body.recipes.find((r) => r.id === "bowl").steps[0]
+      .text,
+  );
+  const extra = await request("timer", {
+    recipe_id: "bowl",
+    step_index: 0,
+    servings: 5,
+    seconds: 150,
+    custom: true,
+  });
+  assert.equal(extra.status, 201);
+  assert.equal(extra.body.duration_seconds, 150);
+  assert.match(extra.body.label, /Paso 1 · Extra$/);
+  const timers = (await request("state")).body.timers;
+  assert.equal(timers.length, 2);
+  assert.equal(
+    timers.find((t) => t.id === normal.body.id).ends_at,
+    normal.body.ends_at,
+  );
+  for (const body of [
+    { recipe_id: "inexistente", step_index: 0, servings: 3, seconds: 120 },
+    { recipe_id: "bowl", step_index: 100, servings: 3, seconds: 120 },
+    { recipe_id: "bowl", step_index: 0.5, servings: 3, seconds: 120 },
+    { recipe_id: "bowl", step_index: 0, servings: 0, seconds: 120 },
+    { recipe_id: "bowl", step_index: 0, servings: 3, seconds: 0 },
+    { recipe_id: "bowl", step_index: 0, servings: 3, seconds: 86401 },
+  ])
+    assert.equal((await request("timer", body)).status, 400);
+});
 test("API: ingress cerrado a accesos directos; health disponible", async (t) => {
   const { url } = await fixture(t, { ingressOnly: true });
   assert.equal((await fetch(`${url}/api/state`)).status, 403);

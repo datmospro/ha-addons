@@ -42,6 +42,8 @@ Los plazos de congelación pertenecen a cada receta; no se deducen automáticame
 
 Los temporizadores se guardan con una fecha de vencimiento en el servidor. Siguen funcionando al navegar, cerrar el navegador o reiniciar el add-on. Al vencer se envía un aviso con `priority: high`, `ttl: 0` y `channel: alarm_stream` mediante Home Assistant. Los fallos de entrega a Home Assistant se reintentan y se muestran en la interfaz.
 
+Pulsa el nombre o el tiempo de un contador para abrir el paso que lo inició. Los contadores nuevos conservan también las raciones. Junto al botón de tiempo de cada paso aparece **Otro tiempo**: puedes iniciar un contador adicional de minutos y segundos, con opciones rápidas de +1, +2, +5 y +10 minutos, sin cambiar los contadores en marcha. También está disponible en la vista por tandas y en pasos sin temporizador predefinido. Si has reordenado los pasos, se busca el texto original; si el paso se ha eliminado o reescrito, se abre la receta para revisarla.
+
 **Son avisos de Home Assistant, no alarmas programadas en el reloj nativo de Android.** No se puede garantizar sonido en cualquier estado: necesitan Home Assistant y el add-on encendidos, conexión y permisos correctos. Una respuesta correcta de Home Assistant confirma la aceptación del aviso, no que el teléfono lo haya reproducido. La interfaz también emite un sonido si está abierta y el navegador permite audio. Debes probarlo en vuestros teléfonos antes de depender de ello mientras cocináis.
 
 Referencia: [notificaciones críticas y Alarm Stream de Home Assistant Companion](https://companion.home-assistant.io/docs/notifications/critical-notifications/).
