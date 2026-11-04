@@ -1,85 +1,140 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 let baseline;
-test.beforeEach(async ({ request }) => { baseline = await (await request.get('/api/export')).json(); });
-test.afterEach(async ({ request }) => { await request.post('/api/restore', { data: { ...baseline, confirm: 'RESTAURAR' } }); });
-test('Recorrido completo: recetas, raciones, cocina, plan, compra, congelador y ajustes', async ({ page, request }, info) => {
-  const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto('/');
-  await expect(page.getByRole('heading', { name: '¿Qué cocinamos?' })).toBeVisible();
-  await expect(page.locator('.recipe-card')).toHaveCount(12);
-  await page.screenshot({ path: `test-results/${info.project.name}-recetario.png`, fullPage: true });
-  await page.getByRole('searchbox').fill('Bowl de pollo');
-  await expect(page.locator('.recipe-card')).toHaveCount(1);
-  await page.locator('.recipe-card .title').click();
-  await expect(page.getByRole('heading', { name: 'Bowl de pollo y quinoa' })).toBeVisible();
-  await page.locator('#servings').fill('5'); await page.locator('#servings').press('Tab');
-  await expect(page.locator('.ingredients')).toContainText('350 g');
-  await expect(page.locator('.step').first()).toContainText('350 g de quinoa');
-  await page.getByRole('button', { name: 'Empezar a cocinar' }).click();
-  await expect(page.locator('.cook')).toContainText('Paso 1 de 3');
-  await page.getByRole('button', { name: 'Iniciar · 15 min' }).click();
-  await page.getByRole('button', { name: 'Siguiente paso' }).click();
-  await page.getByRole('button', { name: 'Iniciar · 8 min' }).click();
-  await expect(page.locator('.timer-pill')).toHaveCount(2);
-  await page.screenshot({ path: `test-results/${info.project.name}-cocina.png`, fullPage: true });
-  await page.goto('/#week');
-  await page.getByRole('button', { name: 'Generar menú' }).click();
-  await page.locator('#generate-form [name="kcal_max"]').fill('1800');
-  await page.locator('#generate-form [name="excluded"]').fill('salmón');
-  await page.getByRole('button', { name: 'Crear propuesta' }).click();
-  await expect(page.getByRole('heading', { name: 'Tu propuesta semanal' })).toBeVisible();
-  await page.getByRole('button', { name: 'Guardar esta semana' }).click();
-  await expect(page.locator('dialog')).not.toBeVisible();
-  const state = await (await request.get('/api/state')).json(); const p = state.plans[0];
-  expect(p.entries).toHaveLength(28); expect(p.entries.some(e => e.recipe_id === 'salmon')).toBeFalsy();
-  await page.screenshot({ path: `test-results/${info.project.name}-semana.png`, fullPage: true });
-  await page.goto('/#shopping');
-  await expect(page.getByRole('heading', { name: 'Tu lista', exact: true })).toBeVisible();
-  const check = page.locator('[data-shop-key]').first(); await check.check();
-  await expect(page.locator('.shop-item.checked')).toHaveCount(1);
-  await page.locator('#extra-form [name="name"]').fill('Papel de cocina');
+test.beforeEach(async ({ request }) => {
+  baseline = await (await request.get("/api/export")).json();
+});
+test.afterEach(async ({ request }) => {
+  await request.post("/api/restore", {
+    data: { ...baseline, confirm: "RESTAURAR" },
+  });
+});
+test("Recorrido completo: recetas, raciones, cocina, plan, compra, congelador y ajustes", async ({
+  page,
+  request,
+}, info) => {
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "¿Qué cocinamos?" }),
+  ).toBeVisible();
+  await expect(page.locator(".recipe-card")).toHaveCount(12);
+  await page.screenshot({
+    path: `test-results/${info.project.name}-recetario.png`,
+    fullPage: true,
+  });
+  await page.getByRole("searchbox").fill("Bowl de pollo");
+  await expect(page.locator(".recipe-card")).toHaveCount(1);
+  await page.locator(".recipe-card .title").click();
+  await expect(
+    page.getByRole("heading", { name: "Bowl de pollo y quinoa" }),
+  ).toBeVisible();
+  await page.locator("#servings").fill("5");
+  await page.locator("#servings").press("Tab");
+  await expect(page.locator(".ingredients")).toContainText("350 g");
+  await expect(page.locator(".step").first()).toContainText("350 g de quinoa");
+  await page.getByRole("button", { name: "Empezar a cocinar" }).click();
+  await expect(page.locator(".cook")).toContainText("Paso 1 de 3");
+  await page.getByRole("button", { name: "Iniciar · 15 min" }).click();
+  await page.getByRole("button", { name: "Siguiente paso" }).click();
+  await page.getByRole("button", { name: "Iniciar · 8 min" }).click();
+  await expect(page.locator(".timer-pill")).toHaveCount(2);
+  await page.screenshot({
+    path: `test-results/${info.project.name}-cocina.png`,
+    fullPage: true,
+  });
+  await page.goto("/#week");
+  await page.getByRole("button", { name: "Generar menú" }).click();
+  await page.locator('#generate-form [name="kcal_max"]').fill("1800");
+  await page.locator('#generate-form [name="excluded"]').fill("salmón");
+  await page.getByRole("button", { name: "Crear propuesta" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Tu propuesta semanal" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Guardar esta semana" }).click();
+  await expect(page.locator("dialog")).not.toBeVisible();
+  const state = await (await request.get("/api/state")).json();
+  const p = state.plans[0];
+  expect(p.entries).toHaveLength(28);
+  expect(p.entries.some((e) => e.recipe_id === "salmon")).toBeFalsy();
+  await page.screenshot({
+    path: `test-results/${info.project.name}-semana.png`,
+    fullPage: true,
+  });
+  await page.goto("/#shopping");
+  await expect(
+    page.getByRole("heading", { name: "Tu lista", exact: true }),
+  ).toBeVisible();
+  const check = page.locator("[data-shop-key]").first();
+  await check.check();
+  await expect(page.locator(".shop-item.checked")).toHaveCount(1);
+  await page.locator('#extra-form [name="name"]').fill("Papel de cocina");
   await page.locator('#extra-form button[type="submit"]').click();
-  await expect(page.locator('.shop-item')).toContainText(['Papel de cocina']);
-  await page.goto('/#freezer');
-  await page.getByRole('button', { name: 'Añadir lote' }).click();
-  await page.locator('#stock-form [name="recipe_id"]').selectOption('bowl');
-  await page.locator('#stock-form [name="portions"]').fill('6');
-  await page.getByRole('button', { name: 'Guardar lote' }).click();
-  await expect(page.locator('.stock-card')).toHaveCount(1);
-  await page.goto('/#settings');
-  await page.getByRole('button', { name: 'Acento #38d5cb' }).click();
-  await page.getByRole('button', { name: 'Guardar ajustes' }).click();
-  expect((await (await request.get('/api/state')).json()).settings.accent).toBe('#38d5cb');
-  await page.screenshot({ path: `test-results/${info.project.name}-ajustes.png`, fullPage: true });
-  for (const hash of ['recipes', 'week', 'shopping', 'freezer', 'batch', 'settings']) {
-    await page.goto('/#' + hash);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBeTruthy();
+  await expect(page.locator(".shop-item")).toContainText(["Papel de cocina"]);
+  await page.goto("/#freezer");
+  await page.getByRole("button", { name: "Añadir lote" }).click();
+  await page.locator('#stock-form [name="recipe_id"]').selectOption("bowl");
+  await page.locator('#stock-form [name="portions"]').fill("6");
+  await page.getByRole("button", { name: "Guardar lote" }).click();
+  await expect(page.locator(".stock-card")).toHaveCount(1);
+  await page.goto("/#settings");
+  await page.getByRole("button", { name: "Acento #38d5cb" }).click();
+  await page.getByRole("button", { name: "Guardar ajustes" }).click();
+  expect((await (await request.get("/api/state")).json()).settings.accent).toBe(
+    "#38d5cb",
+  );
+  await page.screenshot({
+    path: `test-results/${info.project.name}-ajustes.png`,
+    fullPage: true,
+  });
+  for (const hash of [
+    "recipes",
+    "week",
+    "shopping",
+    "freezer",
+    "batch",
+    "settings",
+  ]) {
+    await page.goto("/#" + hash);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+    ).toBeTruthy();
   }
   expect(errors).toEqual([]);
 });
-test('Editor, inserción de cantidades e importación de JSON', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Nueva receta' }).click();
-  const form = page.locator('#recipe-form');
-  await form.locator('[name="title"]').fill('Leche templada de prueba');
-  await form.locator('[name="servings"]').fill('1');
-  await form.locator('[name="nutrition_kcal"]').fill('100');
-  await form.locator('[name="nutrition_protein"]').fill('5');
-  await form.locator('[name="nutrition_carbs"]').fill('10');
-  await form.locator('[name="nutrition_fat"]').fill('4');
-  await form.locator('[data-ingredient] [data-key="name"]').fill('leche');
-  await form.locator('[data-ingredient] [data-key="quantity"]').fill('200');
-  await form.locator('[data-ingredient] [data-key="unit"]').fill('ml');
-  await form.locator('[data-step] textarea').fill('Calienta ');
-  await form.getByRole('button', { name: '+ i0', exact: true }).click();
-  await form.locator('[data-step] [data-key="timer_minutes"]').fill('2');
-  await form.getByRole('button', { name: 'Guardar receta' }).click();
-  await expect(page.locator('dialog')).not.toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Leche templada de prueba' })).toBeVisible();
-  await expect(page.locator('.step')).toContainText('600 ml de leche');
-  await page.goto('/#recipes');
-  await page.getByRole('button', { name: 'Importar', exact: true }).click();
-  await page.locator('#import-json').fill('{"recipes": [{"title":"incompleta"}]}');
-  await page.getByRole('button', { name: 'Importar recetas', exact: true }).click();
-  await expect(page.locator('#dialog-error')).toBeVisible();
+test("Editor, inserción de cantidades e importación de JSON", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Nueva receta" }).click();
+  const form = page.locator("#recipe-form");
+  await form.locator('[name="title"]').fill("Leche templada de prueba");
+  await form.locator('[name="servings"]').fill("1");
+  await form.locator('[name="nutrition_kcal"]').fill("100");
+  await form.locator('[name="nutrition_protein"]').fill("5");
+  await form.locator('[name="nutrition_carbs"]').fill("10");
+  await form.locator('[name="nutrition_fat"]').fill("4");
+  await form.locator('[data-ingredient] [data-key="name"]').fill("leche");
+  await form.locator('[data-ingredient] [data-key="quantity"]').fill("200");
+  await form.locator('[data-ingredient] [data-key="unit"]').fill("ml");
+  await form.locator("[data-step] textarea").fill("Calienta ");
+  await form.getByRole("button", { name: "+ i0", exact: true }).click();
+  await form.locator('[data-step] [data-key="timer_minutes"]').fill("2");
+  await form.getByRole("button", { name: "Guardar receta" }).click();
+  await expect(page.locator("dialog")).not.toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Leche templada de prueba" }),
+  ).toBeVisible();
+  await expect(page.locator(".step")).toContainText("600 ml de leche");
+  await page.goto("/#recipes");
+  await page.getByRole("button", { name: "Importar", exact: true }).click();
+  await page
+    .locator("#import-json")
+    .fill('{"recipes": [{"title":"incompleta"}]}');
+  await page
+    .getByRole("button", { name: "Importar recetas", exact: true })
+    .click();
+  await expect(page.locator("#dialog-error")).toBeVisible();
 });

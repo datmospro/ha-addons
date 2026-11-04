@@ -57,7 +57,7 @@ Pasa la información al asistente para preparar un JSON siguiendo [`public/recip
 - `timer_minutes` es el temporizador del paso y `parallel` indica qué hacer mientras tanto. Ordena las preparaciones largas al principio; el editor permite mover los pasos.
 - `image`, `video` y las imágenes/vídeos de cada paso admiten HTTPS o archivos subidos. Un enlace a una página de YouTube/Instagram no equivale a un vídeo directo: conserva ese enlace en `source`.
 - `meal_types` admite `Desayuno`, `Comida`, `Merienda`, `Cena`.
-- Usa nombres coherentes para ingredientes y desglosa salsas/mezclas si quieres que las exclusiones detecten sus componentes. La app no puede adivinar ingredientes ocultos dentro de un producto.
+- Usa nombres coherentes para ingredientes. El campo opcional `components` de un ingrediente permite indicar los componentes de salsas o mezclas (por ejemplo `["sésamo", "garbanzos"]`); el editor también permite escribirlos y el generador los tiene en cuenta para las exclusiones. La app no puede adivinar componentes que no se hayan registrado.
 - No marques macros como `verified` sin indicar `nutrition_source`.
 
 La importación valida todo el lote antes de guardar y crea identificadores nuevos para evitar reemplazar recetas por accidente. El editor manual permite añadir y modificar recetas sin usar JSON.
