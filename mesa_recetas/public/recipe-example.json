@@ -1,0 +1,107 @@
+{
+  "recipes": [
+    {
+      "id": "bowl",
+      "title": "Bowl de pollo y quinoa",
+      "description": "Receta de ejemplo para empezar. Revisa las marcas y ajusta los valores nutricionales a tus ingredientes.",
+      "category": "Fit",
+      "tags": [
+        "Fit",
+        "A la plancha",
+        "Pollo"
+      ],
+      "meal_types": [
+        "Comida"
+      ],
+      "servings": 1,
+      "minutes": 25,
+      "image": "photos/pollo.jpg",
+      "video": "",
+      "source": "",
+      "favorite": false,
+      "freezable": true,
+      "freezer_days": 60,
+      "thaw": "Descongela en la nevera desde la noche anterior. Guarda el tomate fresco aparte.",
+      "reheat": "Recalienta pollo y quinoa hasta que estén bien calientes en el centro.",
+      "nutrition_status": "estimated",
+      "nutrition_source": "Estimación orientativa del ejemplo; no calculada con una base de datos nutricional.",
+      "nutrition": {
+        "kcal": 550,
+        "protein": 45,
+        "carbs": 55,
+        "fat": 16
+      },
+      "ingredients": [
+        {
+          "id": "i0",
+          "name": "quinoa",
+          "quantity": 70,
+          "unit": "g",
+          "group": "Cereales"
+        },
+        {
+          "id": "i1",
+          "name": "agua",
+          "quantity": 140,
+          "unit": "ml",
+          "group": "Otros"
+        },
+        {
+          "id": "i2",
+          "name": "pechuga de pollo",
+          "quantity": 150,
+          "unit": "g",
+          "group": "Carne"
+        },
+        {
+          "id": "i3",
+          "name": "tomate",
+          "quantity": 100,
+          "unit": "g",
+          "group": "Verdura"
+        },
+        {
+          "id": "i4",
+          "name": "aceite de oliva",
+          "quantity": 10,
+          "unit": "g",
+          "group": "Despensa"
+        }
+      ],
+      "steps": [
+        {
+          "text": "Enjuaga {{i0}} y ponla a cocer con {{i1}}. Sigue el tiempo indicado en el envase; como referencia, 15 minutos.",
+          "uses": {
+            "i0": 1,
+            "i1": 1
+          },
+          "timer_minutes": 15,
+          "parallel": "Mientras cuece, continúa con el pollo del siguiente paso.",
+          "video": "",
+          "image": ""
+        },
+        {
+          "text": "Corta {{i2}} y cocínala a la plancha con {{i4}} hasta que el centro esté completamente cocinado.",
+          "uses": {
+            "i2": 1,
+            "i4": 1
+          },
+          "timer_minutes": 8,
+          "parallel": "",
+          "video": "",
+          "image": ""
+        },
+        {
+          "text": "Lava y corta {{i3}}. Sirve con la quinoa escurrida y el pollo.",
+          "uses": {
+            "i3": 1
+          },
+          "timer_minutes": 0,
+          "parallel": "",
+          "video": "",
+          "image": ""
+        }
+      ]
+    }
+  ]
+}
