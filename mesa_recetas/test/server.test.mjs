@@ -206,7 +206,7 @@ test("API: temporizadores conservan su receta, paso y raciones; los extras son i
   ])
     assert.equal((await request("timer", body)).status, 400);
 });
-test("API: Reloj Android se solicita al inicio una sola vez y mantiene el aviso final", async (t) => {
+test("API: nunca envía el temporizador nativo a un móvil configurado en versiones antiguas", async (t) => {
   const prev = process.env.SUPERVISOR_TOKEN;
   process.env.SUPERVISOR_TOKEN = "test-token";
   t.after(() => {
@@ -221,76 +221,38 @@ test("API: Reloj Android se solicita al inicio una sola vez y mantiene el aviso 
     },
   });
   const settings = (await request("state")).body.settings;
-  assert.equal(
-    (
-      await request("settings", {
+  app.db
+    .prepare("UPDATE docs SET body=? WHERE kind=? AND id=?")
+    .run(
+      JSON.stringify({
         ...settings,
-        native_timer_service: "../../bad",
-      })
-    ).status,
-    400,
-  );
-  await request("settings", {
-    ...settings,
-    notify_services: ["mobile_app_cook"],
-    native_timer_service: "mobile_app_cook",
-  });
-  const timer = (
-    await request("timer", {
-      label: "Pasta, salsa: crêpe; listo",
-      seconds: 150,
-    })
-  ).body;
-  assert.equal(timer.native_clock.status, "requested");
+        native_timer_service: "mobile_app_old",
+        notify_services: ["mobile_app_backup"],
+      }),
+      "settings",
+      "main",
+    );
+  const timer = (await request("timer", { seconds: 120 })).body;
   assert.equal(timer.status, "running");
-  assert.equal(sent.length, 1);
-  assert.equal(sent[0].body.message, "command_activity");
-  assert.equal(
-    sent[0].body.data.intent_action,
-    "android.intent.action.SET_TIMER",
-  );
-  assert.match(sent[0].body.data.intent_extras, /LENGTH:15[01]:int/);
-  assert.match(
-    sent[0].body.data.intent_extras,
-    /Pasta%2C%20salsa%3A%20cr%C3%AApe%3B%20listo:String.urlencoded/,
-  );
-  assert.match(sent[0].body.data.intent_extras, /SKIP_UI:false:boolean/);
+  assert.equal(timer.native_clock, undefined);
+  assert.equal(sent.length, 0);
+  assert.equal((await request("android/test-clock", {})).status, 410);
+  const locked = (await request("android/test-locked", {})).body;
+  assert.equal(locked.duration_seconds, 60);
+  assert.equal(locked.native_clock, undefined);
+  assert.equal(sent.length, 0);
   app.db
     .prepare("UPDATE docs SET body=? WHERE kind=? AND id=?")
     .run(JSON.stringify({ ...timer, ends_at: 0 }), "timer", timer.id);
   await app.tick();
-  await app.tick();
-  assert.equal(sent.length, 2);
-  assert.equal(sent[1].body.data.channel, "alarm_stream");
-  assert.equal(
-    (await request("android/test-clock", {})).body.status,
-    "requested",
-  );
-  assert.equal(sent.length, 3);
-  await request("timer/dismiss", { id: timer.id });
-  assert.equal(sent.length, 3); // No se promete ni intenta cancelar el Reloj remotamente.
-});
-
-test("API: fallo del Reloj no pierde la cuenta y las pruebas distinguen aviso y Reloj", async (t) => {
-  const { request, app } = await fixture(t);
-  const settings = (await request("state")).body.settings;
-  assert.equal((await request("android/test-clock", {})).status, 400);
-  assert.equal((await request("android/test-locked", {})).status, 400);
-  await request("settings", {
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].body.data.channel, "alarm_stream");
+  assert.ok(sent[0].url.endsWith("mobile_app_backup"));
+  const updated = await request("settings", {
     ...settings,
-    native_timer_service: "mobile_app_cook",
-    notify_services: ["mobile_app_cook"],
+    native_timer_service: "mobile_app_old",
   });
-  const result = await request("timer", { seconds: 120 });
-  assert.equal(result.status, 201);
-  assert.equal(result.body.status, "running");
-  assert.equal(result.body.native_clock.status, "failed");
-  await app.tick();
-  assert.equal((await request("state")).body.timers.length, 1);
-  const locked = (await request("android/test-locked", {})).body;
-  assert.equal(locked.duration_seconds, 60);
-  assert.equal(locked.notification, "waiting");
-  assert.equal(locked.native_clock, undefined);
+  assert.equal(updated.body.native_timer_service, undefined);
 });
 
 test("API: el reintento avisa solo al móvil que falló", async (t) => {

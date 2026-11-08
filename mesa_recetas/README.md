@@ -46,17 +46,17 @@ Las recetas existentes siguen por raciones hasta que las edites. Cambiar de sist
 
 ## Alarmas Android: configuración y límites
 
-### Copia en el Reloj Android (desde 1.2.0)
+### Reloj del propio móvil (desde 1.3.0)
 
-En **Ajustes → Alarmas en Android → Reloj Android al iniciar**, selecciona un móvil y guarda. Está desactivado inicialmente. La selección se comparte entre usuarios: cualquier contador que inicies desde Mesa, incluido desde PC u otro móvil, solicitará una copia únicamente en ese teléfono. El aviso final de Home Assistant se conserva como respaldo para los móviles marcados.
+Al pulsar el temporizador de un paso o crear uno personalizado desde **Home Assistant Companion en Android**, Mesa abre el Reloj de ese mismo teléfono con la duración y el nombre del paso. No se selecciona un móvil y no se envía una notificación para iniciarlo. La selección de destinatario de 1.2.0 deja de utilizarse. Desde PC solo se inicia el contador de Mesa.
 
-Pulsa **Probar Reloj · 1 minuto** con el móvil desbloqueado. Companion puede abrir la pantalla del permiso **Mostrar sobre otras aplicaciones**: debes concederlo manualmente si quieres usar esta función. Comprueba que tu app Reloj muestra e inicia un temporizador de un minuto; confirma si lo solicita y vuelve a Mesa para cocinar. Prueba después su sonido con el móvil bloqueado. La compatibilidad depende de la app Reloj instalada y de las restricciones de Android / HyperOS / MIUI.
+Pulsa **Probar Reloj · 1 minuto** en el móvil para comprobar la apertura directa. Confirma el inicio si el Reloj lo solicita y vuelve a Mesa para seguir cocinando. El enlace usa el esquema Intent de Companion y la acción Android SET_TIMER; no fija marca ni aplicación Reloj. Es una vía diferente del comando remoto de 1.2.0 y debe comprobarse en el teléfono real. Los navegadores externos pueden bloquear este tipo de enlace o no encontrar una actividad compatible; la vía prevista es la app Companion.
 
-La petición usa `command_activity` y `android.intent.action.SET_TIMER`, duración restante en segundos y etiqueta del paso. Se muestra la interfaz del Reloj para comprobar el inicio. **Reloj solicitado** solo indica que Home Assistant aceptó la petición, no que el teléfono creó el temporizador. Si la petición inicial se retrasa, la duración recibida puede desfasarse: compruébala antes de bloquear. No se reintenta automáticamente el comando, porque podría crear duplicados.
+La apertura se solicita en el mismo gesto del botón, antes de esperar la red, para conservar la activación del usuario. El contador de Mesa se guarda en paralelo. Si falla el guardado pero el Reloj ha iniciado su cuenta, la interfaz avisa de que hay que revisarla allí. La apertura local no confirma por sí sola que el Reloj haya iniciado la cuenta: comprueba la duración antes de bloquear. No se reintenta ni se vuelve a abrir automáticamente al regresar a la receta.
 
-Una vez creado en el Reloj, su cuenta y sonido los gestiona el teléfono. **Las copias son independientes:** cerrar/cancelar en Mesa no cancela el Reloj, ni al contrario. Los contadores iniciados antes de activar la opción no se copian retrospectivamente. Si falla la petición, Mesa conserva la cuenta y muestra el error.
+**Las copias son independientes:** cancelar en Mesa no cancela el Reloj y viceversa. Una vez creada allí, la cuenta y el sonido los gestiona el teléfono. Los avisos finales de Home Assistant siguen disponibles como respaldo opcional; sus casillas de móviles no deciden dónde se abre el Reloj. Los contadores antiguos no se copian retrospectivamente.
 
-Referencias: [comandos de Companion](https://companion.home-assistant.io/docs/notifications/notification-commands/#activity) y [temporizadores de Android](https://developer.android.com/guide/components/intents-common#CreateTimer).
+Referencias: [enlaces locales de Companion](https://companion.home-assistant.io/docs/integrations/android-webview/#links) y [temporizadores de Android](https://developer.android.com/guide/components/intents-common#CreateTimer).
 
 ### Avisos de Home Assistant y diagnóstico
 

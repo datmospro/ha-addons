@@ -1,3 +1,9 @@
+# 1.3.0
+
+- Los temporizadores normales y personalizados abren el Reloj en el mismo Android que pulsa el botón, mediante un enlace local de Companion. No hay selector ni destinatario compartido.
+- La prueba de un minuto también se ejecuta en el propio móvil. Desde PC solo se inicia el contador de Mesa.
+- Se retira el envío remoto al Reloj y se ignora el antiguo móvil configurado, evitando crear alarmas en otro teléfono. Los avisos finales opcionales se conservan como respaldo.
+
 # 1.2.0
 
 - Copia opcional en el Reloj Android al iniciar cada contador normal o personalizado. Selección de un móvil en Ajustes, desactivada inicialmente.

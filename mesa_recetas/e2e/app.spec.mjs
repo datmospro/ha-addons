@@ -1,6 +1,17 @@
 import { test, expect } from "@playwright/test";
 let baseline;
-test.beforeEach(async ({ request }) => {
+test.beforeEach(async ({ request, page }) => {
+  await page.addInitScript(() => {
+    window.__mesaClockIntents = [];
+    const click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function (...args) {
+      if (this.href.startsWith("intent:")) {
+        window.__mesaClockIntents.push(this.href);
+        return;
+      }
+      return click.apply(this, args);
+    };
+  });
   baseline = await (await request.get("/api/export")).json();
 });
 test.afterEach(async ({ request }) => {
@@ -9,39 +20,32 @@ test.afterEach(async ({ request }) => {
   });
 });
 
-test("Alarmas: móvil para Reloj, prueba bloqueada y fallo visible sin perder contador", async ({
+test("Alarmas locales: sin selector, Reloj en el propio Android y respaldo separado", async ({
   page,
   request,
 }, info) => {
   await request.post("/api/settings", {
     data: {
       ...baseline.settings,
-      notify_services: ["mobile_app_xiaomi", "mobile_app_lorena"],
+      notify_services: ["mobile_app_backup"],
+      native_timer_service: "mobile_app_old",
     },
   });
   await page.goto("/#settings");
-  await expect(
-    page.getByRole("combobox", {
-      name: "Móvil para crear el temporizador nativo",
-      exact: true,
-    }),
-  ).toHaveValue("");
-  await page
-    .getByRole("combobox", {
-      name: "Móvil para crear el temporizador nativo",
-      exact: true,
-    })
-    .selectOption("mobile_app_xiaomi");
-  await page
-    .getByRole("button", { name: "Guardar ajustes", exact: true })
-    .click();
-  await expect
-    .poll(
-      async () =>
-        (await (await request.get("/api/state")).json()).settings
-          .native_timer_service,
-    )
-    .toBe("mobile_app_xiaomi");
+  await expect(page.locator('[name="native_timer_service"]')).toHaveCount(0);
+  const clock = page.getByRole("button", {
+    name: "Probar Reloj · 1 minuto",
+    exact: true,
+  });
+  if (info.project.name === "android") {
+    await expect(clock).toBeEnabled();
+    await clock.click();
+    const intents = await page.evaluate(() => window.__mesaClockIntents);
+    expect(intents).toHaveLength(1);
+    expect(intents[0]).toContain("LENGTH=60;");
+  } else {
+    await expect(clock).toBeDisabled();
+  }
   await page
     .getByRole("button", {
       name: "Probar aviso bloqueado · 1 minuto",
@@ -51,25 +55,43 @@ test("Alarmas: móvil para Reloj, prueba bloqueada y fallo visible sin perder co
   await expect(page.locator(".timer-name")).toContainText(
     "Prueba con pantalla bloqueada",
   );
-  const locked = (await (await request.get("/api/state")).json()).timers[0];
-  expect(locked.duration_seconds).toBe(60);
-  expect(locked.native_clock).toBeUndefined();
   await page.screenshot({
-    path: `test-results/${info.project.name}-android-alarmas.png`,
+    path: `test-results/${info.project.name}-reloj-local-ajustes.png`,
     fullPage: true,
   });
   await page.goto("/#detail/bowl");
   await page
     .getByRole("button", { name: "Iniciar · 15 min", exact: true })
     .click();
-  await expect(page.locator(".timer-error")).toContainText(
-    "Reloj: fallo al solicitar",
-  );
+  await expect(page.locator(".timer-pill")).toHaveCount(2);
+  await page
+    .getByRole("button", {
+      name: "Temporizador personalizado del paso 1",
+      exact: true,
+    })
+    .click();
+  await page.getByRole("button", { name: "+2 min", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Iniciar temporizador",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator(".timer-pill")).toHaveCount(3);
+  const intents = await page.evaluate(() => window.__mesaClockIntents);
+  if (info.project.name === "android") {
+    expect(intents).toHaveLength(3); // Prueba, contador normal y contador extra.
+    expect(intents[1]).toContain("LENGTH=900;");
+    expect(intents[2]).toContain("LENGTH=120;");
+    await expect(page.locator(".timer-clock")).toHaveCount(2);
+  } else {
+    expect(intents).toHaveLength(0);
+  }
   const timers = (await (await request.get("/api/state")).json()).timers;
-  expect(timers).toHaveLength(2);
-  expect(timers.find((t) => t.native_clock)?.status).toBe("running");
+  expect(timers).toHaveLength(3);
+  expect(timers.every((t) => !t.native_clock)).toBeTruthy();
   await page.screenshot({
-    path: `test-results/${info.project.name}-reloj-fallo.png`,
+    path: `test-results/${info.project.name}-reloj-local-contadores.png`,
     fullPage: true,
   });
 });
