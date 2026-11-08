@@ -15,7 +15,7 @@ La primera instalación compila una imagen local para **amd64** o **aarch64**. N
 ## Qué incluye
 
 - Recetas con categorías, etiquetas, favoritos, buscador, fotografías y vídeos (archivos locales o enlaces directos HTTPS).
-- Ingredientes estructurados, raciones ajustables y cantidades repetidas automáticamente en cada paso.
+- Ingredientes estructurados, cantidades ajustables por raciones o unidades y cantidades repetidas automáticamente en cada paso.
 - Modo cocina con pasos grandes, tareas paralelas y múltiples temporizadores persistentes.
 - Nutrición obligatoria por ración: kcal, proteínas, hidratos y grasas; datos marcados como estimados o verificados con fuente.
 - Semana de desayuno, comida, merienda y cena; entre uno y siete menús diarios rotativos desde el lunes.
@@ -32,6 +32,17 @@ La primera instalación compila una imagen local para **amd64** o **aarch64**. N
 Se incluyen doce recetas editables, tres por tipo de comida, para probar el flujo completo. Sus fotografías son **ilustrativas** y sus macros son **estimaciones orientativas**, no una tabla nutricional calculada por marcas. Revisa o sustituye estos ejemplos antes de usarlos como registro nutricional preciso. No se calcula una dieta individual para cada miembro de la familia.
 
 Los plazos de congelación pertenecen a cada receta; no se deducen automáticamente. El usuario debe comprobarlos al incorporar recetas. En el calendario se indican las comidas del congelador y la necesidad de descongelar en la nevera desde el día anterior; no se envían recordatorios automáticos de descongelación en esta versión.
+
+## Raciones o unidades
+
+Al crear o editar una receta, **Sistema de cálculo** permite elegir **Raciones** o **Unidades**. En unidades indica cuántas produce la receta base y su nombre en singular y plural. Los ingredientes corresponden siempre a toda la receta base.
+
+- **Wraps:** 10 unidades, nombre «wrap / wraps», 10 raciones nutricionales. Seleccionar 4 wraps utiliza el 40 % de los ingredientes.
+- **Pastel:** 1 unidad, nombre «pastel / pasteles», 6 raciones nutricionales. Seleccionar 2 pasteles duplica los ingredientes; los macros de un pastel son seis veces los de una porción.
+
+Los macros del editor siguen siendo **por una ración nutricional**. La ficha muestra los macros por unidad cuando usas ese sistema. El plan mantiene la referencia nutricional por persona y muestra por separado la cantidad que se prepara. Al generar el plan se redondea a unidades completas suficientes para los comensales; los sobrantes no se añaden automáticamente al congelador. En el congelador puedes registrar fracciones de unidad.
+
+Las recetas existentes siguen por raciones hasta que las edites. Cambiar de sistema no modifica los ingredientes ni los macros guardados: revisa la equivalencia antes de guardar. En repostería revisa también el molde y el grosor al cambiar cantidades; los tiempos y temperaturas no se multiplican automáticamente.
 
 ## Alarmas Android: configuración y límites
 
@@ -52,7 +63,8 @@ Referencia: [notificaciones críticas y Alarm Stream de Home Assistant Companion
 
 Pasa la información al asistente para preparar un JSON siguiendo [`public/recipe-example.json`](public/recipe-example.json). Después usa **Recetas → Importar** para cargarlo. No hay conexión automática del asistente a la base de datos de tu Home Assistant ni importación automática desde redes sociales en esta versión.
 
-- `servings`: raciones de la receta base. `nutrition` siempre contiene valores **por una ración**.
+- `servings`: raciones nutricionales de la receta base. `nutrition` siempre contiene valores **por una ración nutricional**.
+- `yield_mode`: `servings` (predeterminado) o `units`. En unidades añade `yield_quantity` (entero positivo), `yield_unit` y `yield_unit_plural`. Ejemplo de un pastel para seis porciones: `"yield_mode": "units", "yield_quantity": 1, "yield_unit": "pastel", "yield_unit_plural": "pasteles", "servings": 6`.
 - Cada ingrediente lleva `id`, `name`, `quantity`, `unit` y `group` (sección de la compra).
 - Los pasos usan `{{id}}`: por ejemplo `Añade {{leche}}`. Al cocinar se sustituye por `200 ml de leche`, ajustado a los comensales.
 - Si se reparte un ingrediente, `uses` indica su fracción en cada paso: `{"leche": 0.5}`. Las fracciones de todos los pasos deben sumar 1 por ingrediente. La interfaz permite editar estos porcentajes.

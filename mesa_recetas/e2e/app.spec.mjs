@@ -9,6 +9,117 @@ test.afterEach(async ({ request }) => {
   });
 });
 
+test("Unidades: dos pasteles, cuatro wraps, editor, compra y congelador", async ({
+  page,
+  request,
+}, info) => {
+  const original = baseline.recipes.find((r) => r.id === "avena");
+  const cake = {
+    ...original,
+    id: "cake",
+    title: "Pastel en unidades",
+    _rev: 0,
+    servings: 6,
+    yield_mode: "units",
+    yield_quantity: 1,
+    yield_unit: "pastel",
+    yield_unit_plural: "pasteles",
+    nutrition: { kcal: 192.5, protein: 8.75, carbs: 20.3, fat: 8.4 },
+    freezable: true,
+    freezer_days: 60,
+  };
+  const wraps = {
+    ...original,
+    id: "wraps",
+    title: "Wraps en unidades",
+    _rev: 0,
+    servings: 10,
+    yield_mode: "units",
+    yield_quantity: 10,
+    yield_unit: "wrap",
+    yield_unit_plural: "wraps",
+  };
+  expect((await request.post("/api/recipe", { data: cake })).ok()).toBeTruthy();
+  expect(
+    (await request.post("/api/recipe", { data: wraps })).ok(),
+  ).toBeTruthy();
+  await page.goto("/#detail/cake");
+  await expect(page.getByLabel("pasteles", { exact: true })).toHaveValue("1");
+  await page.getByLabel("pasteles", { exact: true }).fill("2");
+  await page.getByLabel("pasteles", { exact: true }).press("Tab");
+  await expect(page.locator(".ingredients")).toContainText("100 g");
+  await expect(page.locator(".step").first()).toContainText("100 g de copos");
+  await expect(page.locator(".metric").first()).toContainText("1155");
+  await expect(page.locator(".notice")).toContainText(
+    "192,5 kcal por ración nutricional",
+  );
+  await page.getByRole("button", { name: "Empezar a cocinar" }).click();
+  await expect(page.locator(".cook")).toContainText("2 pasteles");
+  await page.getByRole("button", { name: "Iniciar · 5 min" }).click();
+  await page.goto("/#shopping");
+  await page
+    .getByRole("button", {
+      name: "Abrir Pastel en unidades, paso 1",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator(".cook")).toContainText("2 pasteles");
+  await page.goto("/#detail/wraps");
+  await page.getByLabel("wraps", { exact: true }).fill("4");
+  await page.getByLabel("wraps", { exact: true }).press("Tab");
+  await expect(page.locator(".ingredients")).toContainText("20 g");
+  await page.goto("/#detail/cake");
+  await page.getByRole("button", { name: "Editar", exact: true }).click();
+  await expect(page.locator('[name="yield_mode"]')).toHaveValue("units");
+  await expect(page.locator('[name="yield_quantity"]')).toHaveValue("1");
+  await expect(page.locator('[name="yield_quantity"]')).toBeEnabled();
+  await expect(page.locator("#dialog-error")).not.toBeVisible();
+  await page.screenshot({
+    path: `test-results/${info.project.name}-editor-unidades.png`,
+    fullPage: true,
+  });
+  await page.locator('[name="yield_mode"]').selectOption("servings");
+  await expect(page.locator("#yield-unit-fields")).not.toBeVisible();
+  await expect(page.locator('[name="yield_quantity"]')).toBeDisabled();
+  await expect(page.getByLabel("Raciones de la receta base", { exact: true })).toBeVisible();
+  await page.locator('[name="yield_mode"]').selectOption("units");
+  await expect(page.locator('[name="yield_quantity"]')).toBeEnabled();
+  await expect(page.getByLabel("Raciones nutricionales que rinde la receta base", { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Guardar receta", exact: true })
+    .click();
+  await expect(page.locator("dialog")).not.toBeVisible();
+  await page.goto("/#week");
+  await page
+    .locator('[data-action="edit-meal"][data-day="0"][data-slot="0"]:visible')
+    .click();
+  await page.locator('#meal-form [name="recipe_id"]').selectOption("cake");
+  await expect(page.locator('#meal-form [name="servings"]')).toHaveValue("1");
+  await page.locator('#meal-form [name="servings"]').fill("2");
+  await page
+    .getByRole("button", { name: "Guardar comida", exact: true })
+    .click();
+  await expect(page.locator("dialog")).not.toBeVisible();
+  let current = await (await request.get("/api/state")).json();
+  expect(current.plans[0].entries[0].servings).toBe(12);
+  await page.goto("/#shopping");
+  await expect(
+    page.locator(".shop-item").filter({ hasText: "copos de avena" }),
+  ).toContainText("100 g");
+  await page.goto("/#freezer");
+  await page.getByRole("button", { name: "Añadir lote", exact: true }).click();
+  await page.locator('#stock-form [name="recipe_id"]').selectOption("cake");
+  await page.locator('#stock-form [name="portions"]').fill("3");
+  await page.getByRole("button", { name: "Guardar lote", exact: true }).click();
+  await expect(page.locator(".stock-card")).toContainText("pasteles");
+  current = await (await request.get("/api/state")).json();
+  expect(current.stock[0].portions).toBe(18);
+  await page.screenshot({
+    path: `test-results/${info.project.name}-stock-unidades.png`,
+    fullPage: true,
+  });
+});
+
 test("Contadores abren su paso y permiten un tiempo adicional personalizado", async ({
   page,
   request,

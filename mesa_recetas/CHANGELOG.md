@@ -1,3 +1,10 @@
+# 1.1.0
+
+- Sistema de cálculo por raciones o unidades al crear y editar recetas, con nombre singular y plural: wraps, pasteles, pizzas…
+- Las cantidades de ingredientes y pasos, el modo cocina y los temporizadores conservan la cantidad seleccionada.
+- Plan semanal, compra, congelador y cocina por tandas muestran las unidades correspondientes. El generador prepara unidades completas suficientes para los comensales.
+- Equivalencia entre unidades y raciones nutricionales para mantener los macros por persona. Las recetas existentes conservan el sistema por raciones.
+
 # 1.0.1
 
 - Pulsa un contador para abrir su receta y paso, conservando las raciones con las que se inició.

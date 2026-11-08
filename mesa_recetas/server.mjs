@@ -230,7 +230,7 @@ export function createApp({
     try {
       const path = new URL(req.url, "http://mesa.local").pathname;
       if (path === "/health" && req.method === "GET")
-        return send(res, 200, { ok: true, version: "1.0.1" });
+        return send(res, 200, { ok: true, version: "1.1.0" });
       if (
         ingressOnly &&
         !["172.30.32.2", "::ffff:172.30.32.2"].includes(
@@ -501,7 +501,7 @@ export function createApp({
               recipe_id: r.id,
               step_index: index,
               step_text: r.steps[index].text,
-              servings: num(b.servings, 1, 10000),
+              servings: num(b.servings, 0.001, 10000),
             };
           }
           const seconds = num(b.seconds, 1, 86400);
@@ -666,7 +666,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   app.server.listen(
     port,
     process.env.INGRESS_ONLY === "true" ? "0.0.0.0" : "127.0.0.1",
-    () => console.log(`Mesa · Recetas 1.0.1 en puerto ${port}`),
+    () => console.log(`Mesa · Recetas 1.1.0 en puerto ${port}`),
   );
   const stop = () => {
     app.close();

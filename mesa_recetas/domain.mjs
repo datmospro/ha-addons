@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { plannedPortions } from "./public/yield.js";
 export const MEALS = ["Desayuno", "Comida", "Merienda", "Cena"];
 export const DEFAULTS = {
   servings: 3,
@@ -66,6 +67,21 @@ export function validateRecipe(data) {
       data.nutrition_status === "verified" ? "verified" : "estimated",
     nutrition_source: str(data.nutrition_source || "", 2000),
   };
+  r.yield_mode = data.yield_mode ?? "servings";
+  if (!["servings", "units"].includes(r.yield_mode))
+    throw new Error("Elige raciones o unidades como sistema de cálculo");
+  r.yield_quantity =
+    r.yield_mode === "units" ? num(data.yield_quantity, 1, 10000) : r.servings;
+  if (r.yield_mode === "units" && !Number.isInteger(r.yield_quantity))
+    throw new Error("Las unidades de la receta base deben ser enteras");
+  r.yield_unit =
+    r.yield_mode === "units" ? str(data.yield_unit || "unidad", 50) : "ración";
+  r.yield_unit_plural =
+    r.yield_mode === "units"
+      ? str(data.yield_unit_plural || "unidades", 50)
+      : "raciones";
+  if (!r.yield_unit || !r.yield_unit_plural)
+    throw new Error("Indica el nombre de la unidad en singular y plural");
   if (
     !r.title ||
     !Array.isArray(r.meal_types) ||
@@ -276,7 +292,7 @@ export function generatePlan(recipes, settings, week, random = Math.random) {
         day,
         slot,
         recipe_id: r.id,
-        servings: s.servings,
+        servings: plannedPortions(r, s.servings),
         source: "cook",
         stock_id: null,
         consumed: false,
@@ -373,7 +389,7 @@ export function validatePlan(p, recipes, stock, plans = []) {
     const key = `${e.day}-${e.slot}`;
     if (keys.has(key)) throw new Error("Comida duplicada");
     keys.add(key);
-    num(e.servings, 1, 100);
+    num(e.servings, 0.001, 10000);
     if (e.recipe_id && !recipes.some((r) => r.id === e.recipe_id))
       throw new Error("La receta ya no existe");
     if (!["cook", "freezer", "outside"].includes(e.source))

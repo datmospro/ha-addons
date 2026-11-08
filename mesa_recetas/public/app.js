@@ -1,3 +1,14 @@
+import {
+  isUnits,
+  portionsPerUnit,
+  toPortions,
+  fromPortions,
+  unitName,
+  formatAmount,
+  nutritionPerUnit,
+  defaultPortions,
+  plannedPortions,
+} from "./yield.js";
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const esc = (s) =>
@@ -266,7 +277,7 @@ function renderRecipes() {
     <div class="section-label"><h2>${filter === "Todas" ? "Tu recetario" : esc(filter)}</h2><span class="muted small">${filtered.length} recetas</span></div><div class="recipe-grid">${filtered.map(recipeCard).join("")}</div>${!filtered.length ? empty("Todavía no hay recetas aquí.", "Añade una receta o cambia los filtros.") : ""}`;
 }
 function recipeCard(r) {
-  return `<article class="recipe-card"><button class="photo" data-action="open-recipe" data-id="${esc(r.id)}" aria-label="Abrir ${esc(r.title)}"><img src="${esc(r.image || "photos/verduras.jpg")}" alt="${esc(r.title)}" loading="lazy"></button>${btn(icon("heart"), "favorite", `icon favorite ${r.favorite ? "on" : ""}`, `data-id="${esc(r.id)}" aria-label="${r.favorite ? "Quitar de" : "Añadir a"} favoritos" aria-pressed="${r.favorite}"`)}<div class="card-body"><span class="pill accent">${esc(r.category)}</span><button class="title" data-action="open-recipe" data-id="${esc(r.id)}">${esc(r.title)}</button><div class="card-meta"><span class="flex">${icon("clock")}${n(r.minutes)} min</span>${r.freezable ? `<span class="flex">${icon("snow")}Congelable</span>` : ""}</div><div class="card-nutrition"><span class="accent">${n(r.nutrition.kcal)} kcal</span><span class="muted">${n(r.nutrition.protein)} g proteína</span></div></div></article>`;
+  return `<article class="recipe-card"><button class="photo" data-action="open-recipe" data-id="${esc(r.id)}" aria-label="Abrir ${esc(r.title)}"><img src="${esc(r.image || "photos/verduras.jpg")}" alt="${esc(r.title)}" loading="lazy"></button>${btn(icon("heart"), "favorite", `icon favorite ${r.favorite ? "on" : ""}`, `data-id="${esc(r.id)}" aria-label="${r.favorite ? "Quitar de" : "Añadir a"} favoritos" aria-pressed="${r.favorite}"`)}<div class="card-body"><span class="pill accent">${esc(r.category)}</span><button class="title" data-action="open-recipe" data-id="${esc(r.id)}">${esc(r.title)}</button><div class="card-meta"><span class="flex">${icon("clock")}${n(r.minutes)} min</span>${r.freezable ? `<span class="flex">${icon("snow")}Congelable</span>` : ""}</div><div class="card-nutrition"><span class="accent">${n(nutritionPerUnit(r).kcal)} kcal${isUnits(r) ? ` / ${esc(r.yield_unit)}` : ""}</span><span class="muted">${n(nutritionPerUnit(r).protein)} g proteína</span></div></div></article>`;
 }
 function empty(title, text = "") {
   return `<div class="empty">${icon("chef")}<h3>${esc(title)}</h3><p>${esc(text)}</p></div>`;
@@ -274,7 +285,7 @@ function empty(title, text = "") {
 function renderDetail() {
   const r = recipe(currentRecipe);
   if (!r) return empty("No se encuentra la receta");
-  return `<div class="flex between wrap detail-actions">${btn(`${icon("back")} Recetario`, "go-recipes", "ghost")}<div class="flex">${btn(`${icon("edit")} Editar`, "edit-recipe", "", `data-id="${esc(r.id)}"`)}${btn(icon("heart"), "favorite", `icon ${r.favorite ? "accent" : ""}`, `data-id="${esc(r.id)}" aria-label="Favorito"`)}</div></div><div class="detail-hero"><img src="${esc(r.image || "photos/verduras.jpg")}" alt="${esc(r.title)}"><div class="caption"><span class="pill">${esc(r.category)}</span><span class="pill">${n(r.minutes)} minutos</span></div></div><h1>${esc(r.title)}</h1><p class="muted">${esc(r.description)}</p><div class="flex between wrap gap"><div class="servings"><label for="servings">Raciones</label><input id="servings" type="number" min="1" max="100" step="1" value="${servings}"></div>${btn(`${icon("play")} Empezar a cocinar`, "start-cook", "primary")}</div><div class="gap">${nutritionCards(r.nutrition)}<p class="muted small">Por ración · ${r.nutrition_status === "verified" ? "Datos verificados" : "Valores estimados"}${r.nutrition_source ? ` · ${esc(r.nutrition_source)}` : ""}</p></div><div class="detail-columns gap"><div><section class="panel"><h2>Ingredientes</h2><p class="muted small">Para ${servings} raciones</p><ul class="ingredients">${r.ingredients.map((i) => `<li><span>${esc(i.name)}</span><b>${n((i.quantity * servings) / r.servings)} ${esc(i.unit)}</b></li>`).join("")}</ul></section>${r.freezable ? `<section class="panel gap"><div class="flex accent">${icon("snow")}<strong>Guarda para otro día</strong></div><p class="small gap">Congelable · ${r.freezer_days} días según la receta</p><p class="muted small">${esc(r.thaw)}</p><p class="muted small">${esc(r.reheat)}</p>${btn("Añadir lote al congelador", "new-stock", "", `data-id="${esc(r.id)}"`)}</section>` : ""}${r.source ? `<p class="gap small muted">Origen: ${esc(r.source)}</p>` : ""}</div><section><h2>Paso a paso</h2>${r.steps.map((s, i) => stepCard(r, s, i)).join("")}${r.video ? media(r.video, true) : ""}</section></div>`;
+  return `<div class="flex between wrap detail-actions">${btn(`${icon("back")} Recetario`, "go-recipes", "ghost")}<div class="flex">${btn(`${icon("edit")} Editar`, "edit-recipe", "", `data-id="${esc(r.id)}"`)}${btn(icon("heart"), "favorite", `icon ${r.favorite ? "accent" : ""}`, `data-id="${esc(r.id)}" aria-label="Favorito"`)}</div></div><div class="detail-hero"><img src="${esc(r.image || "photos/verduras.jpg")}" alt="${esc(r.title)}"><div class="caption"><span class="pill">${esc(r.category)}</span><span class="pill">${n(r.minutes)} minutos</span></div></div><h1>${esc(r.title)}</h1><p class="muted">${esc(r.description)}</p><div class="flex between wrap gap"><div class="servings"><label for="servings">${isUnits(r) ? esc(r.yield_unit_plural) : "Raciones"}</label><input id="servings" type="number" min="1" max="10000" step="1" value="${fromPortions(r, servings)}"></div>${btn(`${icon("play")} Empezar a cocinar`, "start-cook", "primary")}</div>${recipeQuantityHint(r)}<div class="gap">${nutritionCards(isUnits(r) ? nutritionPerUnit(r) : r.nutrition)}<p class="muted small">Por ${isUnits(r) ? `1 ${esc(r.yield_unit)}` : "ración"} · ${r.nutrition_status === "verified" ? "Datos verificados" : "Valores estimados"}${r.nutrition_source ? ` · ${esc(r.nutrition_source)}` : ""}</p></div><div class="detail-columns gap"><div><section class="panel"><h2>Ingredientes</h2><p class="muted small">Para ${esc(formatAmount(r, servings))}</p><ul class="ingredients">${r.ingredients.map((i) => `<li><span>${esc(i.name)}</span><b>${n((i.quantity * servings) / r.servings)} ${esc(i.unit)}</b></li>`).join("")}</ul></section>${r.freezable ? `<section class="panel gap"><div class="flex accent">${icon("snow")}<strong>Guarda para otro día</strong></div><p class="small gap">Congelable · ${r.freezer_days} días según la receta</p><p class="muted small">${esc(r.thaw)}</p><p class="muted small">${esc(r.reheat)}</p>${btn("Añadir lote al congelador", "new-stock", "", `data-id="${esc(r.id)}"`)}</section>` : ""}${r.source ? `<p class="gap small muted">Origen: ${esc(r.source)}</p>` : ""}</div><section><h2>Paso a paso</h2>${r.steps.map((s, i) => stepCard(r, s, i)).join("")}${r.video ? media(r.video, true) : ""}</section></div>`;
 }
 function media(url, video = false) {
   return video
@@ -293,7 +304,7 @@ function customTimerDialog(id, index, count) {
   if (!r?.steps[index]) return toast("Este paso ya no está disponible");
   openModal(
     "Temporizador personalizado",
-    `<form id="custom-timer-form" data-recipe-id="${esc(id)}" data-step-index="${index}" data-servings="${count}"><p class="muted small">${esc(r.title)} · Paso ${index + 1} · ${n(count)} raciones</p><p class="small">Inicia un contador adicional para este paso. Los demás temporizadores siguen en marcha.</p><div class="flex wrap gap">${[1, 2, 5, 10].map((minutes) => btn(`+${minutes} min`, "preset-timer", "", `data-minutes="${minutes}"`)).join("")}</div><div class="form-grid gap">${field("Minutos", "minutes", 2, 'min="0" max="1440" step="1" required', "number")}${field("Segundos", "seconds", 0, 'min="0" max="59" step="1" required', "number")}</div><div class="dialog-foot"><button class="primary" type="submit">${icon("play")} Iniciar temporizador</button></div></form>`,
+    `<form id="custom-timer-form" data-recipe-id="${esc(id)}" data-step-index="${index}" data-servings="${count}"><p class="muted small">${esc(r.title)} · Paso ${index + 1} · ${esc(formatAmount(r, count))}</p><p class="small">Inicia un contador adicional para este paso. Los demás temporizadores siguen en marcha.</p><div class="flex wrap gap">${[1, 2, 5, 10].map((minutes) => btn(`+${minutes} min`, "preset-timer", "", `data-minutes="${minutes}"`)).join("")}</div><div class="form-grid gap">${field("Minutos", "minutes", 2, 'min="0" max="1440" step="1" required', "number")}${field("Segundos", "seconds", 0, 'min="0" max="59" step="1" required', "number")}</div><div class="dialog-foot"><button class="primary" type="submit">${icon("play")} Iniciar temporizador</button></div></form>`,
   );
 }
 function timerDestination(t) {
@@ -318,7 +329,7 @@ function renderCook() {
   if (!r) return empty("Elige una receta");
   cookIndex = Math.min(cookIndex, r.steps.length - 1);
   const s = r.steps[cookIndex];
-  return `<section class="cook"><div class="flex between">${btn(`${icon("back")} Receta`, "back-detail", "ghost")}<span class="pill">${servings} raciones</span></div><div class="gap"><div class="eyebrow">Modo cocina</div><h2>${esc(r.title)}</h2><div class="flex between small muted"><span>Paso ${cookIndex + 1} de ${r.steps.length}</span><span>${n(r.minutes)} min en total</span></div><progress max="${r.steps.length}" value="${cookIndex + 1}"></progress></div>${stepCard(r, s, cookIndex)}<div class="cook-actions">${btn(`${icon("back")} Anterior`, "cook-prev", "", cookIndex === 0 ? "disabled" : "")}${btn(`${cookIndex === r.steps.length - 1 ? "Terminar" : "Siguiente paso"} ${icon("arrow")}`, "cook-next", "primary")}</div><p class="muted small gap">Los temporizadores siguen activos al cambiar de paso. ${state.settings.notify_services.length ? "Avisos Android configurados; comprueba el sonido en Ajustes." : "Configura los móviles en Ajustes para recibir avisos fuera de esta pantalla."}</p></section>`;
+  return `<section class="cook"><div class="flex between">${btn(`${icon("back")} Receta`, "back-detail", "ghost")}<span class="pill">${esc(formatAmount(r, servings))}</span></div><div class="gap"><div class="eyebrow">Modo cocina</div><h2>${esc(r.title)}</h2><div class="flex between small muted"><span>Paso ${cookIndex + 1} de ${r.steps.length}</span><span>${n(r.minutes)} min en total</span></div><progress max="${r.steps.length}" value="${cookIndex + 1}"></progress></div>${stepCard(r, s, cookIndex)}<div class="cook-actions">${btn(`${icon("back")} Anterior`, "cook-prev", "", cookIndex === 0 ? "disabled" : "")}${btn(`${cookIndex === r.steps.length - 1 ? "Terminar" : "Siguiente paso"} ${icon("arrow")}`, "cook-next", "primary")}</div><p class="muted small gap">Los temporizadores siguen activos al cambiar de paso. ${state.settings.notify_services.length ? "Avisos Android configurados; comprueba el sonido en Ajustes." : "Configura los móviles en Ajustes para recibir avisos fuera de esta pantalla."}</p></section>`;
 }
 function weekTools() {
   return `<div class="week-toolbar"><div class="flex">${btn(icon("back"), "prev-week", "icon", 'aria-label="Semana anterior"')}<span class="week-title">${niceDate(week)} – ${niceDate(shiftDate(week, 6))}</span>${btn(icon("arrow"), "next-week", "icon", 'aria-label="Semana siguiente"')}</div><div class="flex wrap">${btn("Hoy", "current-week", "ghost")}${btn(`${icon("copy")} Repetir semana`, "copy-week")}${btn(`${icon("spark")} Generar menú`, "generate-dialog", "primary")}</div></div>`;
@@ -338,14 +349,14 @@ function renderWeek() {
         .map((m, slot) => {
           const e = entry(day, slot),
             r = recipe(e?.recipe_id);
-          return `<div class="meal-row"><span class="meal-name">${m}</span><div class="grow"><div class="meal-title">${esc(r?.title || (e?.source === "outside" ? "Comer fuera" : "Sin planificar"))}</div><div class="small muted">${r ? `${n(r.nutrition.kcal)} kcal · ${e.servings} raciones${e.source === "freezer" ? " · ❄ Descongelar en nevera desde el día anterior" : ""}` : ""}</div>${e?.source === "freezer" && !e.consumed ? btn("Marcar consumido", "consume", "link-button", `data-day="${day}" data-slot="${slot}"`) : ""}</div>${btn(icon("edit"), "edit-meal", "icon", `data-day="${day}" data-slot="${slot}" aria-label="Editar ${m}" ${e?.consumed ? "disabled" : ""}`)}</div>`;
+          return `<div class="meal-row"><span class="meal-name">${m}</span><div class="grow"><div class="meal-title">${esc(r?.title || (e?.source === "outside" ? "Comer fuera" : "Sin planificar"))}</div><div class="small muted">${r ? `${n(r.nutrition.kcal)} kcal · ${esc(formatAmount(r, e.servings))}${e.source === "freezer" ? " · ❄ Descongelar en nevera desde el día anterior" : ""}` : ""}</div>${e?.source === "freezer" && !e.consumed ? btn("Marcar consumido", "consume", "link-button", `data-day="${day}" data-slot="${slot}"`) : ""}</div>${btn(icon("edit"), "edit-meal", "icon", `data-day="${day}" data-slot="${slot}" aria-label="Editar ${m}" ${e?.consumed ? "disabled" : ""}`)}</div>`;
         })
         .join(
           "",
         )}<div class="day-total ${daily(day).kcal > (p?.targets?.kcal_max || state.settings.kcal_max) ? "warning" : ""}">${n(daily(day).kcal)} kcal · P ${n(daily(day).protein)} · HC ${n(daily(day).carbs)} · G ${n(daily(day).fat)} por persona</div></section>`,
   ).join(
     "",
-  )}</div><p class="small muted gap">Los totales dependen de los datos nutricionales de cada receta. Las comidas fuera de casa no se incluyen.</p>`;
+  )}</div><p class="small muted gap">Las cantidades indican lo que se prepara. Los totales muestran una ración nutricional por persona de cada receta y dependen de sus datos nutricionales. Las comidas fuera de casa no se incluyen.</p>`;
 }
 function weeklySummary(p) {
   const total = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
@@ -377,7 +388,7 @@ function weeklySummary(p) {
 function cell(day, slot) {
   const e = entry(day, slot),
     r = recipe(e?.recipe_id);
-  return `<div class="meal-cell">${btn(esc(r?.title || (e?.source === "outside" ? "Comer fuera" : "+ Elegir plato")), "edit-meal", "", `data-day="${day}" data-slot="${slot}" ${e?.consumed ? "disabled" : ""}`)}${r ? `<span class="cell-meta">${n(r.nutrition.kcal)} kcal · ${e.servings} raciones${e.source === "freezer" ? "<br>❄ Congelador" : ""}</span>` : ""}${e?.source === "freezer" ? (e.consumed ? '<span class="small muted">Consumido ✓</span>' : btn("Consumido ✓", "consume", "consume", `data-day="${day}" data-slot="${slot}"`)) : ""}</div>`;
+  return `<div class="meal-cell">${btn(esc(r?.title || (e?.source === "outside" ? "Comer fuera" : "+ Elegir plato")), "edit-meal", "", `data-day="${day}" data-slot="${slot}" ${e?.consumed ? "disabled" : ""}`)}${r ? `<span class="cell-meta">${n(r.nutrition.kcal)} kcal · ${esc(formatAmount(r, e.servings))}${e.source === "freezer" ? "<br>❄ Congelador" : ""}</span>` : ""}${e?.source === "freezer" ? (e.consumed ? '<span class="small muted">Consumido ✓</span>' : btn("Consumido ✓", "consume", "consume", `data-day="${day}" data-slot="${slot}"`)) : ""}</div>`;
 }
 function renderShopping() {
   const s = shop(),
@@ -423,7 +434,7 @@ function renderFreezer() {
     .map((s) => {
       const r = recipe(s.recipe_id),
         expiring = s.expires_on <= shiftDate(dateISO(new Date()), 7);
-      return `<section class="panel stock-card ${expiring ? "expiring" : ""}"><span class="pill ${expiring ? "" : "accent"}">${expiring ? "Revisar fecha" : "En el congelador"}</span><h3 class="gap">${esc(r?.title)}</h3><div class="portions">${n(s.portions)}</div><span class="muted small">raciones · ${n(reserved(s.id))} reservadas</span><div class="dates"><div>Congelado: ${niceDate(s.frozen_on)}</div><div>Consumir antes de: ${niceDate(s.expires_on)}</div></div>${s.note ? `<p class="small muted">${esc(s.note)}</p>` : ""}${btn(`${icon("edit")} Ajustar lote`, "edit-stock", "ghost", `data-id="${esc(s.id)}"`)}<details class="small gap"><summary>Descongelar y recalentar</summary><p class="muted gap">${esc(r?.thaw)}<br>${esc(r?.reheat)}</p></details></section>`;
+      return `<section class="panel stock-card ${expiring ? "expiring" : ""}"><span class="pill ${expiring ? "" : "accent"}">${expiring ? "Revisar fecha" : "En el congelador"}</span><h3 class="gap">${esc(r?.title)}</h3><div class="portions">${n(fromPortions(r, s.portions))}</div><span class="muted small">${esc(unitName(r))} · ${esc(formatAmount(r, reserved(s.id)))} reservadas</span><div class="dates"><div>Congelado: ${niceDate(s.frozen_on)}</div><div>Consumir antes de: ${niceDate(s.expires_on)}</div></div>${s.note ? `<p class="small muted">${esc(s.note)}</p>` : ""}${btn(`${icon("edit")} Ajustar lote`, "edit-stock", "ghost", `data-id="${esc(s.id)}"`)}<details class="small gap"><summary>Descongelar y recalentar</summary><p class="muted gap">${esc(r?.thaw)}<br>${esc(r?.reheat)}</p></details></section>`;
     })
     .join(
       "",
@@ -459,10 +470,10 @@ function renderBatch() {
           "Aún no hay recetas para preparar",
           "Planifica platos con origen «Cocinar» en tu semana.",
         )
-      : `<div class="batch-head gap"><section class="panel"><h2>Lo que vas a preparar</h2>${rows.map(({ r, portions }) => `<div class="flex between small" style="padding:8px 0"><span>${esc(r.title)}${r.freezable ? " ❄" : ""}</span><strong class="accent">${n(portions)} raciones</strong></div>`).join("")}<p class="muted small gap">Se suman las raciones de todas las apariciones de cada plato. Comprueba que tu equipo admite estas cantidades; divide la preparación si es necesario.</p></section><section class="panel"><h2>Antes de empezar</h2><ul class="summary-list"><li>Ten a mano los ingredientes de la lista de compra.</li><li>Organiza recipientes y etiquetas para las raciones.</li><li>Los tiempos son los de la receta base: verifica el punto de cocción al ampliar cantidades.</li><li>El orden conserva los pasos de cada receta. Avanza manualmente cuando una tarea haya terminado o pueda continuar sola.</li></ul>${btn(`${icon("cart")} Ver ingredientes`, "go-shopping")}${btn(`${icon("snow")} Registrar lo cocinado`, "new-stock", "ghost gap")}</section></div><section class="panel"><h2>Tu sesión de cocina</h2>${tasks
+      : `<div class="batch-head gap"><section class="panel"><h2>Lo que vas a preparar</h2>${rows.map(({ r, portions }) => `<div class="flex between small" style="padding:8px 0"><span>${esc(r.title)}${r.freezable ? " ❄" : ""}</span><strong class="accent">${esc(formatAmount(r, portions))}</strong></div>`).join("")}<p class="muted small gap">Se suman las raciones de todas las apariciones de cada plato. Comprueba que tu equipo admite estas cantidades; divide la preparación si es necesario.</p></section><section class="panel"><h2>Antes de empezar</h2><ul class="summary-list"><li>Ten a mano los ingredientes de la lista de compra.</li><li>Organiza recipientes y etiquetas para las raciones.</li><li>Los tiempos son los de la receta base: verifica el punto de cocción al ampliar cantidades.</li><li>El orden conserva los pasos de cada receta. Avanza manualmente cuando una tarea haya terminado o pueda continuar sola.</li></ul>${btn(`${icon("cart")} Ver ingredientes`, "go-shopping")}${btn(`${icon("snow")} Registrar lo cocinado`, "new-stock", "ghost gap")}</section></div><section class="panel"><h2>Tu sesión de cocina</h2>${tasks
           .map((t) => {
             const key = `${week}-${t.r.id}-${t.index}`;
-            return `<div class="batch-task ${batchDone.has(key) ? "done" : ""}"><input type="checkbox" data-batch-key="${esc(key)}" aria-label="Marcar tarea completada" ${batchDone.has(key) ? "checked" : ""}><div class="grow"><span class="task-recipe">${esc(t.r.title)} · ${n(t.portions)} raciones · Paso ${t.index + 1}</span><p>${esc(stepText(t.r, t.step, t.portions))}</p>${t.step.parallel ? `<p class="muted small">Mientras tanto: ${esc(t.step.parallel)}</p>` : ""}${stepTimers(t.r, t.step, t.index, t.portions)}</div></div>`;
+            return `<div class="batch-task ${batchDone.has(key) ? "done" : ""}"><input type="checkbox" data-batch-key="${esc(key)}" aria-label="Marcar tarea completada" ${batchDone.has(key) ? "checked" : ""}><div class="grow"><span class="task-recipe">${esc(t.r.title)} · ${esc(formatAmount(t.r, t.portions))} · Paso ${t.index + 1}</span><p>${esc(stepText(t.r, t.step, t.portions))}</p>${t.step.parallel ? `<p class="muted small">Mientras tanto: ${esc(t.step.parallel)}</p>` : ""}${stepTimers(t.r, t.step, t.index, t.portions)}</div></div>`;
           })
           .join("")}</section>`
   }`;
@@ -551,16 +562,18 @@ function mealDialog(day, slot) {
   const rows = state.recipes;
   openModal(
     `${meals[slot]} · ${niceDate(shiftDate(week, day))}`,
-    `<form id="meal-form" data-day="${day}" data-slot="${slot}"><label class="field"><span>Plato</span><select name="recipe_id"><option value="">Sin planificar</option><option value="outside" ${e?.source === "outside" ? "selected" : ""}>Comer fuera</option>${rows.map((r) => `<option value="${esc(r.id)}" ${e?.recipe_id === r.id ? "selected" : ""}>${esc(r.title)} · ${r.nutrition.kcal} kcal</option>`).join("")}</select></label>${field("Raciones", "servings", e?.servings || state.settings.servings, 'min="1" max="100" required', "number")}<label class="field"><span>Preparación</span><select name="stock_id"><option value="">Cocinar</option>${state.stock
+    `<form id="meal-form" data-day="${day}" data-slot="${slot}"><label class="field"><span>Plato</span><select name="recipe_id"><option value="">Sin planificar</option><option value="outside" ${e?.source === "outside" ? "selected" : ""}>Comer fuera</option>${rows.map((r) => `<option value="${esc(r.id)}" ${e?.recipe_id === r.id ? "selected" : ""}>${esc(r.title)} · ${r.nutrition.kcal} kcal</option>`).join("")}</select></label>${field(isUnits(recipe(e?.recipe_id)) ? unitName(recipe(e.recipe_id)) : "Raciones", "servings", e ? fromPortions(recipe(e.recipe_id), e.servings) : state.settings.servings, 'min="1" max="10000" step="1" required', "number")}<label class="field"><span>Preparación</span><select name="stock_id"><option value="">Cocinar</option>${state.stock
       .filter((s) => s.portions > 0)
       .map(
         (s) =>
-          `<option value="${esc(s.id)}" ${e?.stock_id === s.id ? "selected" : ""}>Congelador: ${esc(recipe(s.recipe_id)?.title)} · ${n(s.portions - reserved(s.id) + (e?.stock_id === s.id ? e.servings : 0))} libres · ${niceDate(s.frozen_on)}</option>`,
+          `<option value="${esc(s.id)}" ${e?.stock_id === s.id ? "selected" : ""}>Congelador: ${esc(recipe(s.recipe_id)?.title)} · ${esc(formatAmount(recipe(s.recipe_id), s.portions - reserved(s.id) + (e?.stock_id === s.id ? e.servings : 0)))} libres · ${niceDate(s.frozen_on)}</option>`,
       )
       .join(
         "",
       )}</select></label><p class="muted small">Si usas el congelador, el lote debe corresponder al plato elegido. Se reservarán las raciones y no se añadirán sus ingredientes a la compra.</p><div class="dialog-foot">${e?.recipe_id ? btn("Ver receta", "open-recipe", "", `data-id="${esc(e.recipe_id)}" data-servings="${e.servings}"`) : ""}<button class="primary" type="submit">Guardar comida</button></div></form>`,
   );
+  const countInput = $('#meal-form [name="servings"]');
+  countInput.dataset.quantityRecipe = e?.recipe_id || "";
 }
 function stockDialog(id, recipeId) {
   const s = state.stock.find((s) => s.id === id);
@@ -569,8 +582,30 @@ function stockDialog(id, recipeId) {
     s ? "Ajustar lote" : "Guardar para otro día",
     !rows.length
       ? "<p>Marca primero una receta como congelable.</p>"
-      : `<form id="stock-form" data-id="${esc(s?.id || "")}"><label class="field"><span>Receta</span><select name="recipe_id" ${s ? "disabled" : ""}>${rows.map((r) => `<option value="${esc(r.id)}" ${r.id === (s?.recipe_id || recipeId) ? "selected" : ""}>${esc(r.title)} · ${r.freezer_days} días</option>`).join("")}</select></label>${field("Raciones en el lote", "portions", s?.portions ?? state.settings.servings, 'min="0" max="10000" required', "number")}${field("Fecha de congelación", "frozen_on", s?.frozen_on || dateISO(new Date()), "required", "date")}${field("Etiqueta / ubicación / notas", "note", s?.note || "", 'placeholder="Cajón superior, recipientes azules…"')}<div class="dialog-foot"><button class="primary" type="submit">Guardar lote</button></div></form>`,
+      : `<form id="stock-form" data-id="${esc(s?.id || "")}"><label class="field"><span>Receta</span><select name="recipe_id" ${s ? "disabled" : ""}>${rows.map((r) => `<option value="${esc(r.id)}" ${r.id === (s?.recipe_id || recipeId) ? "selected" : ""}>${esc(r.title)} · ${r.freezer_days} días</option>`).join("")}</select></label>${field("Cantidad en el lote", "portions", s?.portions ?? state.settings.servings, 'min="0" max="10000" step="any" required', "number")}${field("Fecha de congelación", "frozen_on", s?.frozen_on || dateISO(new Date()), "required", "date")}${field("Etiqueta / ubicación / notas", "note", s?.note || "", 'placeholder="Cajón superior, recipientes azules…"')}<div class="dialog-foot"><button class="primary" type="submit">Guardar lote</button></div></form>`,
   );
+  if ($("#stock-form")) updateFormQuantity($("#stock-form"), s?.portions);
+}
+function updateFormQuantity(form, storedPortions) {
+  const r = recipe($('[name="recipe_id"]', form).value);
+  const input = $(
+    form.id === "meal-form" ? '[name="servings"]' : '[name="portions"]',
+    form,
+  );
+  const normalized =
+    storedPortions ??
+    (r
+      ? form.id === "meal-form"
+        ? plannedPortions(r, state.settings.servings)
+        : defaultPortions(r, state.settings.servings)
+      : state.settings.servings);
+  input.value = fromPortions(r, normalized);
+  input.dataset.quantityRecipe = r?.id || "";
+  input.closest("label").querySelector("span").textContent = isUnits(r)
+    ? unitName(r)
+    : form.id === "stock-form"
+      ? "Raciones en el lote"
+      : "Raciones";
 }
 function editorDialog(r) {
   editDraft = structuredClone(
@@ -600,12 +635,32 @@ function editorDialog(r) {
   );
   drawEditor();
 }
+function yieldEditorFields(r) {
+  return `<label class="field full"><span>Sistema de cálculo</span><select name="yield_mode"><option value="servings" ${!isUnits(r) ? "selected" : ""}>Raciones</option><option value="units" ${isUnits(r) ? "selected" : ""}>Unidades</option></select></label><div id="yield-unit-fields" class="full ${isUnits(r) ? "" : "hidden"}"><div class="form-grid">${field("Unidades que produce la receta base", "yield_quantity", r.yield_quantity || 1, 'min="1" max="10000" step="1" required', "number")}${field("Nombre en singular", "yield_unit", r.yield_unit || "unidad", 'maxlength="50" required placeholder="wrap, pastel, pizza…"')}${field("Nombre en plural", "yield_unit_plural", r.yield_unit_plural || "unidades", 'maxlength="50" required placeholder="wraps, pasteles, pizzas…"')}</div><p class="editor-help">Indica también las raciones nutricionales de toda la receta base: 10 wraps pueden ser 10 raciones; 1 pastel puede dar 6 porciones. Los macros se introducen por una de esas raciones. Los ingredientes corresponden a toda la receta base.</p></div>`;
+}
+function updateYieldEditor() {
+  const f = $("#recipe-form"),
+    units = $('[name="yield_mode"]', f).value === "units";
+  $("#yield-unit-fields", f).classList.toggle("hidden", !units);
+  $$("#yield-unit-fields input", f).forEach(
+    (input) => (input.disabled = !units),
+  );
+  $('[name="servings"]', f).closest("label").querySelector("span").textContent =
+    units
+      ? "Raciones nutricionales que rinde la receta base"
+      : "Raciones de la receta base";
+}
+function recipeQuantityHint(r) {
+  return isUnits(r)
+    ? `<p class="notice small">Receta base: ${esc(formatAmount(r, r.servings))} · ${n(r.servings)} raciones nutricionales. Cada ${esc(r.yield_unit)} equivale a ${n(portionsPerUnit(r))} raciones nutricionales. ${n(r.nutrition.kcal)} kcal por ración nutricional. Ajusta las unidades para preparar la cantidad que quieres. En repostería, conserva el tamaño de molde y el grosor adecuados al cambiar la cantidad.</p>`
+    : "";
+}
 function drawEditor() {
   const r = editDraft;
   if (modal.open) modal.close();
   openModal(
     r.id ? "Editar receta" : "Una nueva receta",
-    `<form id="recipe-form"><div class="form-grid"><div class="full">${field("Nombre del plato", "title", r.title, 'required maxlength="180"')}</div><label class="field full"><span>Descripción</span><textarea name="description">${esc(r.description)}</textarea></label>${field("Categoría", "category", r.category)}${field("Etiquetas (separadas por comas)", "tags", r.tags.join(", "))}${field("Raciones de la receta base", "servings", r.servings, 'min="1" max="100" required', "number")}${field("Tiempo total (min)", "minutes", r.minutes, 'min="1" max="1440" required', "number")}</div><div class="flex wrap gap">${meals.map((m) => `<label class="check-label small"><input name="meal_types" type="checkbox" value="${m}" ${r.meal_types.includes(m) ? "checked" : ""}>${m}</label>`).join("")}</div><h3 class="gap">Foto y vídeo</h3>${field("Imagen (URL HTTPS o archivo subido)", "image", r.image)}<label class="field"><span>Subir imagen</span><input type="file" data-upload-target="image" accept="image/jpeg,image/png,image/webp"></label>${field("Vídeo (URL directa HTTPS, MP4 o WebM)", "video", r.video)}<label class="field"><span>Subir vídeo · máximo 30 MB</span><input type="file" data-upload-target="video" accept="video/mp4,video/webm"></label>${field("Fuente de la receta", "source", r.source)}<h3 class="gap">Nutrición por ración · obligatoria</h3><div class="form-grid">${[
+    `<form id="recipe-form"><div class="form-grid"><div class="full">${field("Nombre del plato", "title", r.title, 'required maxlength="180"')}</div><label class="field full"><span>Descripción</span><textarea name="description">${esc(r.description)}</textarea></label>${field("Categoría", "category", r.category)}${field("Etiquetas (separadas por comas)", "tags", r.tags.join(", "))}${yieldEditorFields(r)}${field(isUnits(r) ? "Raciones nutricionales que rinde la receta base" : "Raciones de la receta base", "servings", r.servings, 'min="1" max="100" required', "number")}${field("Tiempo total (min)", "minutes", r.minutes, 'min="1" max="1440" required', "number")}</div><div class="flex wrap gap">${meals.map((m) => `<label class="check-label small"><input name="meal_types" type="checkbox" value="${m}" ${r.meal_types.includes(m) ? "checked" : ""}>${m}</label>`).join("")}</div><h3 class="gap">Foto y vídeo</h3>${field("Imagen (URL HTTPS o archivo subido)", "image", r.image)}<label class="field"><span>Subir imagen</span><input type="file" data-upload-target="image" accept="image/jpeg,image/png,image/webp"></label>${field("Vídeo (URL directa HTTPS, MP4 o WebM)", "video", r.video)}<label class="field"><span>Subir vídeo · máximo 30 MB</span><input type="file" data-upload-target="video" accept="video/mp4,video/webm"></label>${field("Fuente de la receta", "source", r.source)}<h3 class="gap">Nutrición por ración · obligatoria</h3><div class="form-grid">${[
       ["kcal", "Kcal"],
       ["protein", "Proteína (g)"],
       ["carbs", "Hidratos (g)"],
@@ -624,6 +679,7 @@ function drawEditor() {
         "",
       )}</div><label class="field"><span>Calidad del dato nutricional</span><select name="nutrition_status"><option value="estimated" ${r.nutrition_status === "estimated" ? "selected" : ""}>Estimado</option><option value="verified" ${r.nutrition_status === "verified" ? "selected" : ""}>Verificado con fuente</option></select></label>${field("Fuente de los macros / marcas utilizadas", "nutrition_source", r.nutrition_source)}<h3 class="gap">Ingredientes de la receta base</h3><p class="editor-help">Nombre · cantidad · unidad · sección de compra. Usa siempre el mismo nombre para sumar correctamente la compra.</p>${r.ingredients.map((i, index) => `<div class="editor-row" data-ingredient="${esc(i.id)}"><input data-key="name" aria-label="Nombre ingrediente ${index + 1}" placeholder="Leche" value="${esc(i.name)}" required><input data-key="quantity" aria-label="Cantidad ingrediente ${index + 1}" type="number" min="0.001" step="any" value="${i.quantity}" required><input data-key="unit" aria-label="Unidad ingrediente ${index + 1}" placeholder="ml" value="${esc(i.unit)}"><input class="ingredient-group" data-key="group" aria-label="Sección de compra" placeholder="Lácteos" value="${esc(i.group)}"><input class="ingredient-components" data-key="components" aria-label="Componentes del ingrediente" placeholder="Componentes de salsas o mezclas (opcional, separados por comas)" value="${esc((i.components || []).join(", "))}">${btn(icon("close"), "remove-ingredient", "icon ghost remove-ingredient", `data-index="${index}" aria-label="Eliminar ingrediente"`)}</div>`).join("")}${btn(`${icon("plus")} Ingrediente`, "add-ingredient", "ghost")}<h3 class="gap">Pasos que te acompañan</h3><p class="editor-help">Pon primero las tareas largas. Inserta ingredientes con los botones: se sustituirán por su cantidad y nombre al cocinar. Si repartes uno entre pasos, indica el porcentaje usado en cada paso; deben sumar 100 %.</p>${r.steps.map((s, index) => `<section class="editor-step" data-step="${index}"><div class="flex between"><strong class="small">Paso ${index + 1}</strong><div class="flex">${btn("↑", "move-step", "icon ghost", `data-index="${index}" data-dir="-1" aria-label="Subir paso" ${index === 0 ? "disabled" : ""}`)}${btn("↓", "move-step", "icon ghost", `data-index="${index}" data-dir="1" aria-label="Bajar paso" ${index === r.steps.length - 1 ? "disabled" : ""}`)}${btn(icon("close"), "remove-step", "icon ghost", `data-index="${index}" aria-label="Eliminar paso"`)}</div></div><label class="field"><span>Instrucciones</span><textarea data-key="text" required placeholder="Añade {{i0}} y remueve…">${esc(s.text)}</textarea></label><div class="flex wrap">${r.ingredients.map((i) => btn(`+ ${esc(i.name || i.id)}`, "insert-token", "insert-token", `data-index="${index}" data-id="${esc(i.id)}"`)).join("")}</div>${[...new Set([...s.text.matchAll(/\{\{([\w-]+)\}\}/g)].map((x) => x[1]))].map((id) => `<label class="fraction-row">${esc(r.ingredients.find((i) => i.id === id)?.name || id)}<input type="number" min="0.1" max="100" step="any" data-fraction="${esc(id)}" value="${(s.uses?.[id] ?? 1) * 100}">% de la cantidad</label>`).join("")}<div class="step-extra gap"><label class="field"><span>Timer (min)</span><input data-key="timer_minutes" type="number" min="0" max="1440" step="any" value="${s.timer_minutes || 0}"></label><label class="field"><span>Mientras tanto…</span><input data-key="parallel" value="${esc(s.parallel || "")}" placeholder="Continúa con el siguiente paso"></label></div><label class="field"><span>Imagen del paso (URL HTTPS o archivo subido)</span><input data-key="image" value="${esc(s.image || "")}"></label><input type="file" data-step-upload="${index}" data-upload-target="image" accept="image/jpeg,image/png,image/webp" aria-label="Subir imagen del paso"><label class="field gap"><span>Vídeo del paso (URL directa)</span><input data-key="video" value="${esc(s.video || "")}"></label><input type="file" data-step-upload="${index}" data-upload-target="video" accept="video/mp4,video/webm" aria-label="Subir vídeo del paso"></section>`).join("")}${btn(`${icon("plus")} Añadir paso`, "add-step", "ghost")}<h3 class="gap">Conservación</h3><label class="check-label"><input name="freezable" type="checkbox" ${r.freezable ? "checked" : ""}>Se puede congelar</label>${field("Conservación en congelador (días)", "freezer_days", r.freezer_days || 60, 'min="1" max="730"', "number")}${field("Cómo descongelar", "thaw", r.thaw)}${field("Cómo recalentar", "reheat", r.reheat)}<div class="dialog-foot">${r.id ? btn("Eliminar", "delete-recipe", "danger", `data-id="${esc(r.id)}"`) : ""}<button class="primary" type="submit">${icon("check")} Guardar receta</button></div></form>`,
   );
+  updateYieldEditor();
 }
 function readEditor() {
   const f = $("#recipe-form");
@@ -643,8 +699,11 @@ function readEditor() {
     "nutrition_source",
   ])
     r[k] = data.get(k);
-  for (const k of ["servings", "minutes", "freezer_days"])
+  for (const k of ["servings", "minutes", "freezer_days", "yield_quantity"])
     r[k] = Number(data.get(k));
+  r.yield_mode = data.get("yield_mode");
+  r.yield_unit = data.get("yield_unit");
+  r.yield_unit_plural = data.get("yield_unit_plural");
   r.tags = splitList(data.get("tags"));
   r.meal_types = data.getAll("meal_types");
   r.freezable = data.has("freezable");
@@ -790,7 +849,9 @@ async function runAction(action, el) {
     case "open-recipe":
       if (modal.open) modal.close();
       currentRecipe = d.id;
-      servings = Number(d.servings) || state.settings.servings;
+      servings =
+        Number(d.servings) ||
+        defaultPortions(recipe(d.id), state.settings.servings);
       go(`detail/${encodeURIComponent(d.id)}`);
       return;
     case "new-recipe":
@@ -1136,7 +1197,7 @@ document.addEventListener("submit", async (e) => {
           day,
           slot,
           recipe_id: id === "outside" ? null : id,
-          servings: Number(f.get("servings")),
+          servings: toPortions(recipe(id), Number(f.get("servings"))),
           source: id === "outside" ? "outside" : stockId ? "freezer" : "cook",
           stock_id: id === "outside" ? null : stockId || null,
           consumed: false,
@@ -1171,7 +1232,10 @@ document.addEventListener("submit", async (e) => {
       await api("stock", {
         ...old,
         recipe_id: old?.recipe_id || f.get("recipe_id"),
-        portions: Number(f.get("portions")),
+        portions: toPortions(
+          recipe(old?.recipe_id || f.get("recipe_id")),
+          Number(f.get("portions")),
+        ),
         frozen_on: f.get("frozen_on"),
         note: f.get("note"),
       });
@@ -1231,8 +1295,17 @@ document.addEventListener("input", (e) => {
 document.addEventListener("change", async (e) => {
   const el = e.target;
   try {
+    if (el.name === "yield_mode" && el.closest("#recipe-form"))
+      updateYieldEditor();
+    if (el.name === "recipe_id" && el.closest("#meal-form, #stock-form"))
+      updateFormQuantity(el.closest("form"));
     if (el.id === "servings") {
-      servings = Math.max(1, Math.min(100, Number(el.value) || 1));
+      const r = recipe(currentRecipe);
+      const count = Math.max(
+        1,
+        Math.min(10000, Math.round(Number(el.value) || 1)),
+      );
+      servings = toPortions(r, count);
       render();
     }
     if (el.dataset.shopKey) {
@@ -1285,7 +1358,12 @@ document.addEventListener("change", async (e) => {
 function readRoute() {
   const [name, id, step] = location.hash.slice(1).split("/");
   route = name || "recipes";
-  if (id) currentRecipe = decodeURIComponent(id);
+  if (id) {
+    const decoded = decodeURIComponent(id);
+    if (currentRecipe !== decoded)
+      servings = defaultPortions(recipe(decoded), state.settings.servings);
+    currentRecipe = decoded;
+  }
   if (name === "cook" && /^\d+$/.test(step || "")) cookIndex = Number(step);
   render();
   window.scrollTo(0, 0);
