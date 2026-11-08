@@ -96,6 +96,38 @@ test("Alarmas locales: sin selector, Reloj en el propio Android y respaldo separ
   });
 });
 
+test("Cocina: permite avanzar mientras se guarda un temporizador", async ({
+  page,
+}) => {
+  let release;
+  const pending = new Promise((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/timer", async (route) => {
+    await pending;
+    await route.continue();
+  });
+  try {
+    await page.goto("/#detail/bowl");
+    await page
+      .getByRole("button", { name: "Empezar a cocinar", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Iniciar · 15 min", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Siguiente paso", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Iniciar · 8 min", exact: true }),
+    ).toBeVisible();
+    release();
+    await expect(page.locator(".timer-pill")).toHaveCount(1);
+  } finally {
+    release();
+  }
+});
+
 test("Unidades: dos pasteles, cuatro wraps, editor, compra y congelador", async ({
   page,
   request,

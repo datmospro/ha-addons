@@ -1186,16 +1186,19 @@ async function runAction(action, el) {
 }
 document.addEventListener("click", async (e) => {
   const el = e.target.closest("[data-action]");
-  if (!el || busy) return;
+  if (!el) return;
+  const concurrentCookNavigation =
+    busy && ["cook-next", "cook-prev"].includes(el.dataset.action);
+  if (busy && !concurrentCookNavigation) return;
   e.preventDefault();
-  busy = true;
+  if (!concurrentCookNavigation) busy = true;
   try {
     await runAction(el.dataset.action, el);
   } catch (err) {
     if (modal.open) dialogError(err);
     else toast(err.message);
   } finally {
-    busy = false;
+    if (!concurrentCookNavigation) busy = false;
   }
 });
 document.addEventListener("submit", async (e) => {
