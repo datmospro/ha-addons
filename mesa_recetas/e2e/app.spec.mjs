@@ -121,8 +121,11 @@ test("Cocina: permite avanzar mientras se guarda un temporizador", async ({
     await expect(
       page.getByRole("button", { name: "Iniciar · 8 min", exact: true }),
     ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Iniciar · 8 min", exact: true })
+      .click();
     release();
-    await expect(page.locator(".timer-pill")).toHaveCount(1);
+    await expect(page.locator(".timer-pill")).toHaveCount(2);
   } finally {
     release();
   }

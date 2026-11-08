@@ -1184,21 +1184,41 @@ async function runAction(action, el) {
       return;
   }
 }
+const pendingTimerStarts = new Set();
 document.addEventListener("click", async (e) => {
   const el = e.target.closest("[data-action]");
   if (!el) return;
+  const isTimerStart = el.dataset.action === "start-timer";
+  const timerKey = isTimerStart
+    ? JSON.stringify([
+        el.dataset.recipeId,
+        el.dataset.stepIndex,
+        el.dataset.servings,
+        el.dataset.minutes,
+      ])
+    : "";
+  if (isTimerStart && pendingTimerStarts.has(timerKey)) return;
   const concurrentCookNavigation =
     busy && ["cook-next", "cook-prev"].includes(el.dataset.action);
-  if (busy && !concurrentCookNavigation) return;
+  if (busy && !concurrentCookNavigation && !isTimerStart) return;
   e.preventDefault();
-  if (!concurrentCookNavigation) busy = true;
+  const ownsBusy = !concurrentCookNavigation && !isTimerStart;
+  if (ownsBusy) busy = true;
+  if (isTimerStart) {
+    pendingTimerStarts.add(timerKey);
+    el.disabled = true;
+  }
   try {
     await runAction(el.dataset.action, el);
   } catch (err) {
     if (modal.open) dialogError(err);
     else toast(err.message);
   } finally {
-    if (!concurrentCookNavigation) busy = false;
+    if (ownsBusy) busy = false;
+    if (isTimerStart) {
+      pendingTimerStarts.delete(timerKey);
+      el.disabled = false;
+    }
   }
 });
 document.addEventListener("submit", async (e) => {
