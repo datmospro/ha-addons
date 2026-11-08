@@ -120,8 +120,10 @@ export function createApp({
     return r.json();
   };
   async function notify(timer) {
-    const targets = timer.targets || [];
-    if (!targets.length)
+    const configured = [...new Set(timer.targets || [])];
+    const delivered = new Set(timer.delivered_targets || []);
+    const targets = configured.filter((x) => !delivered.has(x));
+    if (!configured.length)
       throw new Error("No hay móviles seleccionados en Ajustes.");
     const results = await Promise.allSettled(
       targets.map((service) =>
@@ -140,10 +142,43 @@ export function createApp({
         }),
       ),
     );
-    if (results.some((x) => x.status === "rejected"))
-      throw new Error(
-        "No se pudo avisar a todos los móviles. Revisa la conexión y los servicios Android.",
+    results.forEach((x, i) => {
+      if (x.status === "fulfilled") delivered.add(targets[i]);
+    });
+    if (results.some((x) => x.status === "rejected")) {
+      const error = new Error(
+        "Home Assistant no aceptó el aviso para: " +
+          targets.filter((_, i) => results[i].status === "rejected").join(", "),
       );
+      error.delivered_targets = [...delivered];
+      throw error;
+    }
+    return [...delivered];
+  }
+  async function startNativeClock(timer, service) {
+    // Una sola solicitud: repetir un comando podría crear varios temporizadores.
+    const seconds = Math.ceil((timer.ends_at - Date.now()) / 1000);
+    if (seconds < 1) throw new Error("El temporizador ya ha terminado");
+    await supervisor(`services/notify/${service}`, {
+      method: "POST",
+      body: JSON.stringify({
+        message: "command_activity",
+        data: {
+          ttl: 0,
+          priority: "high",
+          intent_action: "android.intent.action.SET_TIMER",
+          intent_extras: `android.intent.extra.alarm.LENGTH:${seconds}:int,android.intent.extra.alarm.MESSAGE:${encodeURIComponent(timer.label)}:String.urlencoded,android.intent.extra.alarm.SKIP_UI:false:boolean`,
+        },
+      }),
+    });
+  }
+  async function nativeCopy(timer, service) {
+    try {
+      await startNativeClock(timer, service);
+      return { service, status: "requested", requested_at: Date.now() };
+    } catch (e) {
+      return { service, status: "failed", error: e.message };
+    }
   }
   let ticking = false;
   async function tick() {
@@ -169,14 +204,15 @@ export function createApp({
       )) {
         let result;
         try {
-          await notify(t);
-          result = { notification: "sent", error: "" };
+          const delivered_targets = await notify(t);
+          result = { notification: "sent", error: "", delivered_targets };
         } catch (e) {
           const attempts = (t.attempts || 0) + 1;
           result = {
             notification: attempts >= 5 ? "failed" : "pending",
             attempts,
             error: e.message,
+            delivered_targets: e.delivered_targets || t.delivered_targets || [],
             retry_at: Date.now() + Math.min(60000, attempts * 10000),
           };
         }
@@ -230,7 +266,7 @@ export function createApp({
     try {
       const path = new URL(req.url, "http://mesa.local").pathname;
       if (path === "/health" && req.method === "GET")
-        return send(res, 200, { ok: true, version: "1.1.0" });
+        return send(res, 200, { ok: true, version: "1.2.0" });
       if (
         ingressOnly &&
         !["172.30.32.2", "::ffff:172.30.32.2"].includes(
@@ -518,7 +554,18 @@ export function createApp({
             targets: settings().notify_services,
             notification: "waiting",
           };
-          return send(res, 201, save("timer", t.id, t));
+          save("timer", t.id, t);
+          const nativeService = settings().native_timer_service;
+          if (nativeService) {
+            const native_clock = await nativeCopy(t, nativeService);
+            // El worker puede haber terminado la cuenta durante la llamada.
+            return send(
+              res,
+              201,
+              save("timer", t.id, { ...get("timer", t.id), native_clock }),
+            );
+          }
+          return send(res, 201, get("timer", t.id));
         }
         if (path === "/api/timer/dismiss") {
           const t = get("timer", b.id);
@@ -536,6 +583,37 @@ export function createApp({
             targets: settings().notify_services,
           });
           return send(res, 200, { ok: true });
+        }
+        if (path === "/api/android/test-clock") {
+          const service = settings().native_timer_service;
+          if (!service)
+            throw new Error(
+              "Selecciona y guarda primero un móvil para el Reloj Android",
+            );
+          await startNativeClock(
+            {
+              label: "Mesa · Prueba Reloj Android",
+              ends_at: Date.now() + 60000,
+            },
+            service,
+          );
+          return send(res, 200, { status: "requested" });
+        }
+        if (path === "/api/android/test-locked") {
+          if (!settings().notify_services.length)
+            throw new Error(
+              "Selecciona y guarda primero los móviles de avisos",
+            );
+          const t = {
+            id: randomUUID(),
+            label: "Mesa · Prueba con pantalla bloqueada",
+            duration_seconds: 60,
+            ends_at: Date.now() + 60000,
+            status: "running",
+            targets: settings().notify_services,
+            notification: "waiting",
+          };
+          return send(res, 201, save("timer", t.id, t));
         }
         if (path === "/api/import") {
           const rows = Array.isArray(b) ? b : b.recipes;
@@ -666,7 +744,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   app.server.listen(
     port,
     process.env.INGRESS_ONLY === "true" ? "0.0.0.0" : "127.0.0.1",
-    () => console.log(`Mesa · Recetas 1.1.0 en puerto ${port}`),
+    () => console.log(`Mesa · Recetas 1.2.0 en puerto ${port}`),
   );
   const stop = () => {
     app.close();

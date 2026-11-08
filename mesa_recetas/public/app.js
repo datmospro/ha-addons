@@ -486,7 +486,7 @@ function settingsFields(s) {
 }
 function renderSettings() {
   const s = state.settings;
-  return `${pageHead("A tu gusto.", "Tu mesa, tus colores y tus preferencias.")}<form id="settings-form"><div class="settings-grid"><section class="panel"><h2>Un toque de color</h2><p class="muted small">Grafito como base. El acento lo eliges tú.</p><div class="swatches">${["#f5b940", "#bba1ee", "#38d5cb", "#fa8d79", "#98cd66", "#70adf5"].map((c) => btn(c === s.accent ? icon("check") : "", "accent", `swatch ${c === s.accent ? "selected" : ""}`, `style="--swatch:${c}" data-color="${c}" aria-label="Acento ${c}"`)).join("")}</div><label class="flex small muted">Color personalizado <input name="accent" type="color" value="${esc(s.accent)}" aria-label="Color de acento personalizado"></label><div class="notice">Los cambios se guardan para toda la familia.</div></section><section class="panel"><h2>Alarmas en Android</h2><p class="muted small">Selecciona los móviles con la app Home Assistant Companion. Los temporizadores se guardan en el servidor y no dependen de mantener esta pantalla abierta.</p><div id="android-services">${s.notify_services.map((x) => `<label class="check-label small"><input type="checkbox" name="notify_services" value="${esc(x)}" checked>${esc(x.replace("mobile_app_", ""))}</label>`).join("")}</div>${btn("Buscar móviles", "load-android", "ghost")}${btn(`${icon("bell")} Probar alarma`, "test-android")}<p class="muted small gap">Guarda los cambios antes de probar. En Android permite las notificaciones y configura el canal alarm_stream y el modo No molestar. La entrega depende de la conexión, Home Assistant y los permisos: no sustituye una alarma nativa sin conexión.</p><a class="small" href="https://companion.home-assistant.io/docs/notifications/critical-notifications/" target="_blank" rel="noreferrer">Ayuda de notificaciones Android ↗</a></section><section class="panel wide"><h2>Tu semana por defecto</h2>${settingsFields(s)}<button class="primary" type="submit">${icon("check")} Guardar ajustes</button></section></div></form><section class="panel gap"><h2>Tus recetas, a salvo</h2><p class="muted small">Exporta datos y archivos subidos. La restauración reemplaza los datos actuales y descarta los temporizadores. Las fotos enlazadas a webs externas conservan su enlace.</p><div class="flex wrap"><a href="api/export" download="mesa-backup.json">${icon("download")} Descargar copia completa</a>${btn("Importar recetas", "import-dialog")}${btn("Restaurar copia", "restore-dialog", "danger")}</div></section>`;
+  return `${pageHead("A tu gusto.", "Tu mesa, tus colores y tus preferencias.")}<form id="settings-form"><div class="settings-grid"><section class="panel"><h2>Un toque de color</h2><p class="muted small">Grafito como base. El acento lo eliges tú.</p><div class="swatches">${["#f5b940", "#bba1ee", "#38d5cb", "#fa8d79", "#98cd66", "#70adf5"].map((c) => btn(c === s.accent ? icon("check") : "", "accent", `swatch ${c === s.accent ? "selected" : ""}`, `style="--swatch:${c}" data-color="${c}" aria-label="Acento ${c}"`)).join("")}</div><label class="flex small muted">Color personalizado <input name="accent" type="color" value="${esc(s.accent)}" aria-label="Color de acento personalizado"></label><div class="notice">Los cambios se guardan para toda la familia.</div></section><section class="panel"><h2>Alarmas en Android</h2><p class="muted small">Selecciona los móviles con la app Home Assistant Companion. Los temporizadores se guardan en el servidor y no dependen de mantener esta pantalla abierta.</p><div id="android-services">${s.notify_services.map((x) => `<label class="check-label small"><input type="checkbox" name="notify_services" value="${esc(x)}" checked>${esc(x.replace("mobile_app_", ""))}</label>`).join("")}</div>${btn("Buscar móviles", "load-android", "ghost")}${btn(`${icon("bell")} Probar alarma`, "test-android")}${androidClockSettings(s)}<p class="muted small gap">Guarda los cambios antes de probar. En Android permite las notificaciones y configura el canal alarm_stream y el modo No molestar. La entrega depende de la conexión, Home Assistant y los permisos: no sustituye una alarma nativa sin conexión.</p><a class="small" href="https://companion.home-assistant.io/docs/notifications/critical-notifications/" target="_blank" rel="noreferrer">Ayuda de notificaciones Android ↗</a></section><section class="panel wide"><h2>Tu semana por defecto</h2>${settingsFields(s)}<button class="primary" type="submit">${icon("check")} Guardar ajustes</button></section></div></form><section class="panel gap"><h2>Tus recetas, a salvo</h2><p class="muted small">Exporta datos y archivos subidos. La restauración reemplaza los datos actuales y descarta los temporizadores. Las fotos enlazadas a webs externas conservan su enlace.</p><div class="flex wrap"><a href="api/export" download="mesa-backup.json">${icon("download")} Descargar copia completa</a>${btn("Importar recetas", "import-dialog")}${btn("Restaurar copia", "restore-dialog", "danger")}</div></section>`;
 }
 function openModal(title, html) {
   modal.innerHTML = `<div class="dialog-head"><h2>${title}</h2>${btn(icon("close"), "close-modal", "icon ghost", 'aria-label="Cerrar"')}</div><div id="dialog-error" class="notice error hidden" role="alert"></div>${html}`;
@@ -506,6 +506,22 @@ function splitList(s) {
     .map((x) => x.trim())
     .filter(Boolean);
 }
+function androidClockSettings(s) {
+  const phones = [
+    ...new Set([...s.notify_services, s.native_timer_service].filter(Boolean)),
+  ];
+  return `<div class="gap"><h3>Reloj Android al iniciar</h3><label class="field"><span>Móvil para crear el temporizador nativo</span><select name="native_timer_service"><option value="">Desactivado</option>${phones.map((x) => `<option value="${esc(x)}" ${s.native_timer_service === x ? "selected" : ""}>${esc(x.replace("mobile_app_", ""))}</option>`).join("")}</select></label><p class="small muted">Al iniciar cualquier contador, Mesa pedirá al Reloj de este móvil que cree una copia. Este ajuste se comparte: también se usa si inicias desde PC u otro móvil. Comprueba que aparece y confirma el inicio si el Reloj lo pide. Home Assistant puede solicitar el permiso «Mostrar sobre otras aplicaciones»; debes concederlo en el móvil si quieres usar esta función.</p><p class="small muted">Una vez creado, el Reloj gestiona su alarma sin esperar al aviso final por Internet. La solicitud inicial sí necesita conexión y puede retrasarse: revisa la duración antes de bloquear. Las copias son independientes; cancelar en Mesa no cancela el Reloj y viceversa. Se conserva el aviso de Home Assistant como respaldo.</p>${btn("Probar Reloj · 1 minuto", "test-clock")}${btn("Probar aviso bloqueado · 1 minuto", "test-locked", "ghost")}<details class="gap"><summary>Si solo llega al desbloquear (Xiaomi / Android)</summary><p class="small muted">En la información de la app Home Assistant, revisa batería «Sin restricciones», inicio automático / en segundo plano y datos en segundo plano. Comprueba que sus notificaciones, sonido y canal alarm_stream están permitidos, y que el volumen de alarmas del Reloj no está a cero. Las rutas cambian según HyperOS / MIUI. En Companion puedes revisar Conexión persistente (Siempre); puede aumentar el consumo. Guarda los ajustes de Mesa antes de probar. Bloquea el móvil, déjalo quieto y espera sin abrir Home Assistant.</p></details></div>`;
+}
+function nativeClockNote(t) {
+  if (!t.native_clock) return "";
+  return `<details class="timer-clock small ${t.native_clock.status === "failed" ? "timer-error" : "muted"}"><summary>${t.native_clock.status === "failed" ? "Reloj: fallo al solicitar" : "Reloj solicitado · comprobar"}</summary><p>${t.native_clock.status === "failed" ? esc(t.native_clock.error) : "Comprueba que el Reloj del móvil inicia la cuenta. La solicitud no confirma su creación. Cancela también allí si cancelas en Mesa."}</p></details>`;
+}
+function timerStartedMessage(t) {
+  if (!t.native_clock) return "Temporizador en marcha";
+  return t.native_clock.status === "failed"
+    ? "Contador en marcha; falló la solicitud al Reloj. Revisa el aviso del contador."
+    : "Contador en marcha. Comprueba que el Reloj del móvil ha iniciado su copia.";
+}
 function readSettings(form) {
   const f = new FormData(form);
   return {
@@ -523,6 +539,10 @@ function readSettings(form) {
     preferred: splitList(f.get("preferred")),
     excluded: splitList(f.get("excluded")),
     accent: f.get("accent") || state.settings.accent,
+    native_timer_service:
+      form.id === "settings-form"
+        ? f.get("native_timer_service") || ""
+        : state.settings.native_timer_service || "",
     notify_services:
       form.id === "settings-form"
         ? f.getAll("notify_services")
@@ -807,6 +827,7 @@ function renderTimers() {
       done,
       t.notification,
       t.error,
+      t.native_clock,
       destination?.r.id,
       destination?.index,
     ]),
@@ -815,7 +836,7 @@ function renderTimers() {
     $("#timer-tray").innerHTML = views
       .map(
         ({ t, done, destination, text }) =>
-          `<div class="timer-pill ${done ? "finished" : ""}"><button class="timer-open" data-action="open-timer" data-id="${esc(t.id)}" aria-label="${esc(destination ? (destination.index >= 0 ? `Abrir ${destination.r.title}, paso ${destination.index + 1}` : `Revisar ${destination.r.title}`) : `Abrir origen de ${t.label}`)}">${icon("clock")}<span class="grow"><span class="timer-name">${esc(destination?.r.title || t.label)}</span>${destination ? `<span class="timer-step">${destination.index >= 0 ? `Paso ${destination.index + 1}${t.custom ? " · Extra" : ""}` : "Revisar receta"}</span>` : ""}<strong data-countdown="${esc(t.id)}">${text}</strong></span></button>${t.notification === "failed" ? `<div class="timer-error">${esc(t.error)}</div>` : ""}${done && t.notification === "pending" ? '<span class="small muted">Enviando aviso…</span>' : ""}${btn(icon("close"), "dismiss-timer", "icon ghost", `data-id="${esc(t.id)}" aria-label="${done ? "Cerrar" : "Cancelar"} temporizador"`)}</div>`,
+          `<div class="timer-pill ${done ? "finished" : ""}"><button class="timer-open" data-action="open-timer" data-id="${esc(t.id)}" aria-label="${esc(destination ? (destination.index >= 0 ? `Abrir ${destination.r.title}, paso ${destination.index + 1}` : `Revisar ${destination.r.title}`) : `Abrir origen de ${t.label}`)}">${icon("clock")}<span class="grow"><span class="timer-name">${esc(destination?.r.title || t.label)}</span>${destination ? `<span class="timer-step">${destination.index >= 0 ? `Paso ${destination.index + 1}${t.custom ? " · Extra" : ""}` : "Revisar receta"}</span>` : ""}<strong data-countdown="${esc(t.id)}">${text}</strong></span></button>${nativeClockNote(t)}${t.notification === "failed" ? `<div class="timer-error">${esc(t.error)}</div>` : ""}${done && t.notification === "pending" ? '<span class="small muted">Enviando aviso…</span>' : ""}${btn(icon("close"), "dismiss-timer", "icon ghost", `data-id="${esc(t.id)}" aria-label="${done ? "Cerrar" : "Cancelar"} temporizador"`)}</div>`,
       )
       .join("");
     timerMarkupKey = key;
@@ -895,14 +916,14 @@ async function runAction(action, el) {
       return;
     case "start-timer":
       enableAudio();
-      await api("timer", {
+      var startedTimer = await api("timer", {
         recipe_id: d.recipeId,
         step_index: Number(d.stepIndex),
         servings: Number(d.servings),
         seconds: Number(d.minutes) * 60,
       });
       await refresh(false);
-      toast("Temporizador en marcha");
+      toast(timerStartedMessage(startedTimer));
       return;
     case "custom-timer":
       customTimerDialog(d.recipeId, Number(d.stepIndex), Number(d.servings));
@@ -934,8 +955,15 @@ async function runAction(action, el) {
       return;
     }
     case "dismiss-timer":
+      var dismissedClock = state.timers.find(
+        (t) => t.id === d.id,
+      )?.native_clock;
       await api("timer/dismiss", { id: d.id });
       await refresh(false);
+      if (dismissedClock)
+        toast(
+          "Cerrado en Mesa. Cancela también la copia en el Reloj del móvil si sigue activa.",
+        );
       return;
     case "prev-week":
       week = shiftDate(week, -7);
@@ -1036,11 +1064,34 @@ async function runAction(action, el) {
           )
           .join("") ||
         '<p class="muted small">No hay móviles registrados. Abre primero la app Companion en Android.</p>';
+      const clockSelect = $('[name="native_timer_service"]');
+      const clockPhone = clockSelect.value;
+      clockSelect.innerHTML =
+        '<option value="">Desactivado</option>' +
+        [...new Set([...rows, ...selected, clockPhone].filter(Boolean))]
+          .map(
+            (x) =>
+              `<option value="${esc(x)}" ${clockPhone === x ? "selected" : ""}>${esc(x.replace("mobile_app_", ""))}</option>`,
+          )
+          .join("");
       return;
     }
     case "test-android":
       await api("android/test", {});
       toast("Aviso enviado. Comprueba el sonido en los móviles.");
+      return;
+    case "test-clock":
+      await api("android/test-clock", {});
+      toast(
+        "Solicitud enviada. Comprueba en el móvil que el Reloj inicia 1 minuto y confirma si lo pide.",
+      );
+      return;
+    case "test-locked":
+      await api("android/test-locked", {});
+      await refresh(false);
+      toast(
+        "Prueba en marcha: bloquea el móvil y espera 1 minuto sin abrir Home Assistant.",
+      );
       return;
     case "import-dialog":
       importDialog();
@@ -1153,7 +1204,7 @@ document.addEventListener("submit", async (e) => {
       )
         throw new Error("Indica un tiempo entre 1 segundo y 24 horas.");
       enableAudio();
-      await api("timer", {
+      const extraTimer = await api("timer", {
         recipe_id: form.dataset.recipeId,
         step_index: Number(form.dataset.stepIndex),
         servings: Number(form.dataset.servings),
@@ -1162,7 +1213,7 @@ document.addEventListener("submit", async (e) => {
       });
       modal.close();
       await refresh(false);
-      toast("Temporizador adicional en marcha");
+      toast(timerStartedMessage(extraTimer));
     }
     if (form.id === "settings-form") {
       await api("settings", readSettings(form));

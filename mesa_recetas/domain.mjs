@@ -10,6 +10,7 @@ export const DEFAULTS = {
   fat_max: 0,
   accent: "#f5b940",
   notify_services: [],
+  native_timer_service: "",
   preferred: [],
   excluded: [],
 };
@@ -157,6 +158,12 @@ export function validateRecipe(data) {
 export function validateSettings(s) {
   if (!Number.isInteger(Number(s.menu_count)))
     throw new Error("El número de menús debe ser entero");
+  if (
+    s.native_timer_service &&
+    (typeof s.native_timer_service !== "string" ||
+      !/^mobile_app_[a-zA-Z0-9_]+$/.test(s.native_timer_service))
+  )
+    throw new Error("Móvil para el Reloj Android no válido");
   return {
     servings: num(s.servings, 1, 100),
     menu_count: num(s.menu_count, 1, 7),
@@ -165,6 +172,7 @@ export function validateSettings(s) {
     carbs_max: num(s.carbs_max ?? 0, 0, 1000),
     fat_max: num(s.fat_max ?? 0, 0, 1000),
     accent: /^#[\da-fA-F]{6}$/.test(s.accent) ? s.accent : DEFAULTS.accent,
+    native_timer_service: s.native_timer_service || "",
     notify_services: (s.notify_services || [])
       .map((x) => {
         if (!/^mobile_app_[a-zA-Z0-9_]+$/.test(x))

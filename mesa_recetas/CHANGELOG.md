@@ -1,3 +1,10 @@
+# 1.2.0
+
+- Copia opcional en el Reloj Android al iniciar cada contador normal o personalizado. Selección de un móvil en Ajustes, desactivada inicialmente.
+- Pruebas separadas de Reloj nativo y aviso con pantalla bloqueada, ambas de un minuto; ayuda para restricciones de batería y conexión en Xiaomi / Android.
+- Fallos del Reloj visibles sin perder el contador. Se distingue solicitud de confirmación real y se recuerda que las copias se cancelan por separado.
+- Los reintentos de avisos finales se limitan a los móviles cuya llamada a Home Assistant falló.
+
 # 1.1.0
 
 - Sistema de cálculo por raciones o unidades al crear y editar recetas, con nombre singular y plural: wraps, pasteles, pizzas…

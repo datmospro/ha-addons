@@ -9,6 +9,71 @@ test.afterEach(async ({ request }) => {
   });
 });
 
+test("Alarmas: móvil para Reloj, prueba bloqueada y fallo visible sin perder contador", async ({
+  page,
+  request,
+}, info) => {
+  await request.post("/api/settings", {
+    data: {
+      ...baseline.settings,
+      notify_services: ["mobile_app_xiaomi", "mobile_app_lorena"],
+    },
+  });
+  await page.goto("/#settings");
+  await expect(
+    page.getByRole("combobox", {
+      name: "Móvil para crear el temporizador nativo",
+      exact: true,
+    }),
+  ).toHaveValue("");
+  await page
+    .getByRole("combobox", {
+      name: "Móvil para crear el temporizador nativo",
+      exact: true,
+    })
+    .selectOption("mobile_app_xiaomi");
+  await page
+    .getByRole("button", { name: "Guardar ajustes", exact: true })
+    .click();
+  await expect
+    .poll(
+      async () =>
+        (await (await request.get("/api/state")).json()).settings
+          .native_timer_service,
+    )
+    .toBe("mobile_app_xiaomi");
+  await page
+    .getByRole("button", {
+      name: "Probar aviso bloqueado · 1 minuto",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator(".timer-name")).toContainText(
+    "Prueba con pantalla bloqueada",
+  );
+  const locked = (await (await request.get("/api/state")).json()).timers[0];
+  expect(locked.duration_seconds).toBe(60);
+  expect(locked.native_clock).toBeUndefined();
+  await page.screenshot({
+    path: `test-results/${info.project.name}-android-alarmas.png`,
+    fullPage: true,
+  });
+  await page.goto("/#detail/bowl");
+  await page
+    .getByRole("button", { name: "Iniciar · 15 min", exact: true })
+    .click();
+  await expect(page.locator(".timer-error")).toContainText(
+    "Reloj: fallo al solicitar",
+  );
+  const timers = (await (await request.get("/api/state")).json()).timers;
+  expect(timers).toHaveLength(2);
+  expect(timers.find((t) => t.native_clock)?.status).toBe("running");
+  await page.screenshot({
+    path: `test-results/${info.project.name}-reloj-fallo.png`,
+    fullPage: true,
+  });
+});
+
 test("Unidades: dos pasteles, cuatro wraps, editor, compra y congelador", async ({
   page,
   request,
@@ -81,10 +146,16 @@ test("Unidades: dos pasteles, cuatro wraps, editor, compra y congelador", async 
   await page.locator('[name="yield_mode"]').selectOption("servings");
   await expect(page.locator("#yield-unit-fields")).not.toBeVisible();
   await expect(page.locator('[name="yield_quantity"]')).toBeDisabled();
-  await expect(page.getByLabel("Raciones de la receta base", { exact: true })).toBeVisible();
+  await expect(
+    page.getByLabel("Raciones de la receta base", { exact: true }),
+  ).toBeVisible();
   await page.locator('[name="yield_mode"]').selectOption("units");
   await expect(page.locator('[name="yield_quantity"]')).toBeEnabled();
-  await expect(page.getByLabel("Raciones nutricionales que rinde la receta base", { exact: true })).toBeVisible();
+  await expect(
+    page.getByLabel("Raciones nutricionales que rinde la receta base", {
+      exact: true,
+    }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Guardar receta", exact: true })
     .click();

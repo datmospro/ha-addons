@@ -46,16 +46,36 @@ Las recetas existentes siguen por raciones hasta que las edites. Cambiar de sist
 
 ## Alarmas Android: configuración y límites
 
+### Copia en el Reloj Android (desde 1.2.0)
+
+En **Ajustes → Alarmas en Android → Reloj Android al iniciar**, selecciona un móvil y guarda. Está desactivado inicialmente. La selección se comparte entre usuarios: cualquier contador que inicies desde Mesa, incluido desde PC u otro móvil, solicitará una copia únicamente en ese teléfono. El aviso final de Home Assistant se conserva como respaldo para los móviles marcados.
+
+Pulsa **Probar Reloj · 1 minuto** con el móvil desbloqueado. Companion puede abrir la pantalla del permiso **Mostrar sobre otras aplicaciones**: debes concederlo manualmente si quieres usar esta función. Comprueba que tu app Reloj muestra e inicia un temporizador de un minuto; confirma si lo solicita y vuelve a Mesa para cocinar. Prueba después su sonido con el móvil bloqueado. La compatibilidad depende de la app Reloj instalada y de las restricciones de Android / HyperOS / MIUI.
+
+La petición usa `command_activity` y `android.intent.action.SET_TIMER`, duración restante en segundos y etiqueta del paso. Se muestra la interfaz del Reloj para comprobar el inicio. **Reloj solicitado** solo indica que Home Assistant aceptó la petición, no que el teléfono creó el temporizador. Si la petición inicial se retrasa, la duración recibida puede desfasarse: compruébala antes de bloquear. No se reintenta automáticamente el comando, porque podría crear duplicados.
+
+Una vez creado en el Reloj, su cuenta y sonido los gestiona el teléfono. **Las copias son independientes:** cerrar/cancelar en Mesa no cancela el Reloj, ni al contrario. Los contadores iniciados antes de activar la opción no se copian retrospectivamente. Si falla la petición, Mesa conserva la cuenta y muestra el error.
+
+Referencias: [comandos de Companion](https://companion.home-assistant.io/docs/notifications/notification-commands/#activity) y [temporizadores de Android](https://developer.android.com/guide/components/intents-common#CreateTimer).
+
+### Avisos de Home Assistant y diagnóstico
+
 1. Registra ambos móviles con la aplicación **Home Assistant Companion**.
 2. En **Mesa → Ajustes → Alarmas en Android**, pulsa **Buscar móviles**, selecciona los destinos y **Guarda ajustes**.
 3. Pulsa **Probar alarma** y comprueba el sonido con cada teléfono bloqueado.
 4. Permite las notificaciones de Home Assistant. Configura el canal Android `alarm_stream`, el volumen de alarmas y su permiso para interrumpir No molestar si lo necesitas.
 
+**Probar aviso bloqueado · 1 minuto** crea una cuenta de prueba en Mesa sin copia nativa. Bloquea el móvil, déjalo quieto y espera sin abrir Companion: sirve para revisar el retraso de notificaciones. La prueba inmediata por sí sola no verifica el comportamiento en reposo prolongado.
+
+En Xiaomi revisa en la información de Home Assistant batería **Sin restricciones**, inicio automático/en segundo plano, datos en segundo plano y permisos de notificación y sonido. Los nombres varían por modelo y versión. En Companion revisa **Conexión persistente → Siempre** si necesitas probar una conexión directa; puede consumir más batería. Revisa también el volumen del Reloj y No molestar. Estas comprobaciones requieren los móviles físicos; el add-on no puede verificarlas remotamente.
+
 Los temporizadores se guardan con una fecha de vencimiento en el servidor. Siguen funcionando al navegar, cerrar el navegador o reiniciar el add-on. Al vencer se envía un aviso con `priority: high`, `ttl: 0` y `channel: alarm_stream` mediante Home Assistant. Los fallos de entrega a Home Assistant se reintentan y se muestran en la interfaz.
+
+Los reintentos se hacen solo para los móviles cuya llamada falló. Una respuesta correcta de Home Assistant no confirma recepción ni sonido en el teléfono; no se reenvía por falta de confirmación del dispositivo.
 
 Pulsa el nombre o el tiempo de un contador para abrir el paso que lo inició. Los contadores nuevos conservan también las raciones. Junto al botón de tiempo de cada paso aparece **Otro tiempo**: puedes iniciar un contador adicional de minutos y segundos, con opciones rápidas de +1, +2, +5 y +10 minutos, sin cambiar los contadores en marcha. También está disponible en la vista por tandas y en pasos sin temporizador predefinido. Si has reordenado los pasos, se busca el texto original; si el paso se ha eliminado o reescrito, se abre la receta para revisarla.
 
-**Son avisos de Home Assistant, no alarmas programadas en el reloj nativo de Android.** No se puede garantizar sonido en cualquier estado: necesitan Home Assistant y el add-on encendidos, conexión y permisos correctos. Una respuesta correcta de Home Assistant confirma la aceptación del aviso, no que el teléfono lo haya reproducido. La interfaz también emite un sonido si está abierta y el navegador permite audio. Debes probarlo en vuestros teléfonos antes de depender de ello mientras cocináis.
+**Los avisos finales son notificaciones de Home Assistant; la copia opcional en el Reloj se solicita por separado al iniciar.** Los avisos necesitan Home Assistant y el add-on encendidos, conexión y permisos correctos. Una respuesta correcta de Home Assistant confirma la aceptación del aviso, no que el teléfono lo haya reproducido. La interfaz también emite un sonido si está abierta y el navegador permite audio. Debes probarlo en vuestros teléfonos antes de depender de ello mientras cocináis.
 
 Referencia: [notificaciones críticas y Alarm Stream de Home Assistant Companion](https://companion.home-assistant.io/docs/notifications/critical-notifications/).
 
