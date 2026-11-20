@@ -1,3 +1,7 @@
+## 4.5.24
+
+- Permite copiar torrents con nombres que no incluyen «Título (Año)» usando el título y año de la ficha de Roverr.
+
 ## 4.5.23
 
 - Prepara el interés en segundo plano al cargar el panel, lo guarda en la base de datos y notifica al dashboard: el marco dorado no depende de abrir la ficha y se conserva tras reiniciar.

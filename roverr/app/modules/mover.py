@@ -629,9 +629,18 @@ from .client import get_qb_client
 def copy_paths(torrent, settings):
     item = os.path.basename(torrent.content_path.replace('\\', '/').rstrip('/'))
     match = re.search(r"(.+?)\s*\((\d{4})\)", item)
-    if not match:
-        raise ValueError("Torrent filename must contain 'Title (Year)'")
-    folder = f"{sanitize_path_component(match[1].strip())} ({sanitize_path_component(match[2])})"
+    if match:
+        title, year = match[1], match[2]
+    else:
+        movie = Movie.get_or_none(Movie.torrent_hash == torrent.hash)
+        title = (movie.title or '').strip() if movie else ''
+        year = str(movie.year or '').strip() if movie else ''
+        if not title or not re.fullmatch(r'[0-9]{4}', year):
+            raise ValueError('Identifica la película en Roverr para obtener su título y año antes de copiarla.')
+    title = sanitize_path_component(title.strip()).strip()
+    if not title:
+        raise ValueError('El título de la película no permite crear una carpeta de destino.')
+    folder = f"{title} ({year})"
     source_base = settings.get('local_source_path')
     dest_base = settings.get('local_dest_path')
     if not source_base or not dest_base:
