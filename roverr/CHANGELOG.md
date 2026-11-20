@@ -1,3 +1,7 @@
+## 4.5.25
+
+- La cola de copias usa el mismo título y año que la comprobación inicial para torrents con nombres de archivo no estándar.
+
 ## 4.5.24
 
 - Permite copiar torrents con nombres que no incluyen «Título (Año)» usando el título y año de la ficha de Roverr.

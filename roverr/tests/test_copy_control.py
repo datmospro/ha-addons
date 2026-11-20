@@ -327,6 +327,21 @@ class CopyControlTests(unittest.TestCase):
         self.assertEqual(result['comparison']['folder_name'], 'Film (2026)')
         self.assertEqual(result['comparison']['source_path'], str(source))
 
+    def test_manual_copy_queue_finishes_release_without_parenthesized_year(self):
+        self.movie(year='2026', tmdb_id=123)
+        release = 'Film.2026.1080p.WEB-DL.mkv'
+        source = Path(self.settings['local_source_path']) / release
+        source.write_bytes(b'movie')
+        torrent = SimpleNamespace(**{**self.torrent(), 'name': release, 'content_path': release})
+        qb = Mock()
+        qb.torrents_info.return_value = [torrent]
+        with patch.object(mover, 'get_qb_client', return_value=qb):
+            self.assertTrue(mover.manual_move('a')['success'])
+            self.wait_for(lambda: 'a' not in mover.COPY_PROGRESS)
+        destination = Path(self.settings['local_dest_path']) / 'Film (2026)' / 'Film (2026).mkv'
+        self.assertEqual(destination.read_bytes(), b'movie')
+        self.assertEqual(source.read_bytes(), b'movie')
+
     def test_inspection_compares_exact_sizes_and_dates(self):
         src = Path(self.settings['local_source_path']) / 'Film (2026).mkv'
         src.write_bytes(b'123456789')

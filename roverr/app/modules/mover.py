@@ -626,8 +626,7 @@ def find_file_in_path(base_path, filename):
 
 from .client import get_qb_client
 
-def copy_paths(torrent, settings):
-    item = os.path.basename(torrent.content_path.replace('\\', '/').rstrip('/'))
+def copy_title_year(torrent, item):
     match = re.search(r"(.+?)\s*\((\d{4})\)", item)
     if match:
         title, year = match[1], match[2]
@@ -640,6 +639,12 @@ def copy_paths(torrent, settings):
     title = sanitize_path_component(title.strip()).strip()
     if not title:
         raise ValueError('El título de la película no permite crear una carpeta de destino.')
+    return title, year
+
+
+def copy_paths(torrent, settings):
+    item = os.path.basename(torrent.content_path.replace('\\', '/').rstrip('/'))
+    title, year = copy_title_year(torrent, item)
     folder = f"{title} ({year})"
     source_base = settings.get('local_source_path')
     dest_base = settings.get('local_dest_path')
@@ -1052,20 +1057,7 @@ def process_single_torrent(qb, torrent, settings):
             _record_history(torrent_name=torrent.name, status='error', message=f"File not found in {local_source}", source_path="", dest_path="")
             return
 
-    # 3. Parse Name (Movie vs Series) - Allow space before year to be optional
-    match = re.search(r"(.+?)\s*\((\d{4})\)", item_name)
-    if not match:
-        logger.info(f"Skipping {torrent.name}: Does not match 'Title (Year)' pattern.")
-        _record_history(torrent_name=torrent.name, status='skipped', message="Invalid name format", source_path=source_path, dest_path="")
-        return
-
-    # 4. Sanitize title and year to prevent path traversal attacks
-    title_raw = match.group(1).strip()
-    year_raw = match.group(2).strip()
-    
-    title = sanitize_path_component(title_raw)
-    year = sanitize_path_component(year_raw)
-    
+    title, year = copy_title_year(torrent, item_name)
     folder_name = f"{title} ({year})"
     
     # Destination Path
